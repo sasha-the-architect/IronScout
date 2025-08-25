@@ -1,0 +1,21 @@
+{
+  "name": "zeroedin",
+  "version": "1.0.0",
+  "description": "AI-native proactive purchasing assistant platform",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm run --parallel dev",
+    "build": "pnpm run --recursive build",
+    "lint": "pnpm run --recursive lint",
+    "type-check": "pnpm run --recursive type-check"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "packageManager": "pnpm@8.0.0"
+}

@@ -1,0 +1,193 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  tier      UserTier @default(FREE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  alerts        Alert[]
+  subscriptions Subscription[]
+  
+  // POST-MVP FEATURE: Not for initial implementation
+  dataSubscriptions DataSubscription[]
+
+  @@map("users")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String
+  brand       String?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  prices Price[]
+  alerts Alert[]
+
+  @@map("products")
+}
+
+model Retailer {
+  id          String      @id @default(cuid())
+  name        String
+  website     String
+  logoUrl     String?
+  tier        RetailerTier @default(STANDARD)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  prices        Price[]
+  subscriptions Subscription[]
+
+  @@map("retailers")
+}
+
+model Price {
+  id         String   @id @default(cuid())
+  productId  String
+  retailerId String
+  price      Decimal  @db.Decimal(10, 2)
+  currency   String   @default("USD")
+  url        String
+  inStock    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  retailer Retailer @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+
+  @@map("prices")
+}
+
+model Alert {
+  id        String      @id @default(cuid())
+  userId    String
+  productId String
+  targetPrice Decimal?  @db.Decimal(10, 2)
+  isActive  Boolean     @default(true)
+  alertType AlertType   @default(PRICE_DROP)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
+}
+
+model Advertisement {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  imageUrl    String?
+  targetUrl   String
+  adType      AdType   @default(DISPLAY)
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("advertisements")
+}
+
+model Subscription {
+  id         String           @id @default(cuid())
+  userId     String?
+  retailerId String?
+  type       SubscriptionType
+  status     SubscriptionStatus @default(ACTIVE)
+  startDate  DateTime         @default(now())
+  endDate    DateTime?
+  amount     Decimal          @db.Decimal(10, 2)
+  currency   String           @default("USD")
+  stripeId   String?          @unique
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  retailer Retailer? @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// POST-MVP FEATURE: Not for initial implementation
+model DataSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  plan      DaaSPlan @default(BASIC)
+  status    SubscriptionStatus @default(ACTIVE)
+  apiKey    String   @unique
+  rateLimit Int      @default(1000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("data_subscriptions")
+}
+
+// POST-MVP FEATURE: Not for initial implementation
+model MarketReport {
+  id          String   @id @default(cuid())
+  productId   String?
+  category    String
+  reportType  String
+  data        Json
+  generatedAt DateTime @default(now())
+
+  @@map("market_reports")
+}
+
+enum UserTier {
+  FREE
+  PREMIUM
+}
+
+enum RetailerTier {
+  STANDARD
+  PREMIUM
+}
+
+enum AlertType {
+  PRICE_DROP
+  BACK_IN_STOCK
+  NEW_PRODUCT
+}
+
+enum AdType {
+  DISPLAY
+  SPONSORED_PRODUCT
+  BANNER
+}
+
+enum SubscriptionType {
+  USER_PREMIUM
+  RETAILER_PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+// POST-MVP FEATURE: Not for initial implementation
+enum DaaSPlan {
+  BASIC
+  PROFESSIONAL
+  ENTERPRISE
+}
