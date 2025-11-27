@@ -1,0 +1,22 @@
+
+> @zeroedin/harvester@1.0.0 worker /mnt/s/workspace/ZeroedIn/apps/harvester
+> tsx src/worker.ts
+
+/mnt/s/workspace/ZeroedIn/node_modules/.pnpm/@prisma+client@6.14.0_prisma@6.14.0_typescript@5.9.2__typescript@5.9.2/node_modules/.prisma/client/default.js:43
+    throw new Error('@prisma/client did not initialize yet. Please run "prisma generate" and try to import it again.');
+          ^
+
+Error: @prisma/client did not initialize yet. Please run "prisma generate" and try to import it again.
+    at new PrismaClient (/mnt/s/workspace/ZeroedIn/node_modules/.pnpm/@prisma+client@6.14.0_prisma@6.14.0_typescript@5.9.2__typescript@5.9.2/node_modules/.prisma/client/default.js:43:11)
+    at <anonymous> (/mnt/s/workspace/ZeroedIn/packages/db/index.ts:9:3)
+    at Object.<anonymous> (/mnt/s/workspace/ZeroedIn/packages/db/index.ts:13:69)
+    at Module._compile (node:internal/modules/cjs/loader:1760:14)
+    at Object.transformer (/mnt/s/workspace/ZeroedIn/node_modules/.pnpm/tsx@4.20.6/node_modules/tsx/dist/register-D46fvsV_.cjs:3:1104)
+    at Module.load (node:internal/modules/cjs/loader:1480:32)
+    at Module._load (node:internal/modules/cjs/loader:1299:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:244:24)
+    at Module.require (node:internal/modules/cjs/loader:1503:12)
+
+Node.js v24.11.0
+ ELIFECYCLE  Command failed with exit code 1.

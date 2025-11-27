@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Malformed Product Data</title>
+</head>
+<body>
+    <div class="product-grid">
+        <!-- Product with missing price -->
+        <div class="product-item">
+            <h3>Winchester 9mm - No Price Listed</h3>
+            <div class="details">
+                <span class="caliber">9mm</span>
+                <span class="grain">115 grain</span>
+            </div>
+            <span class="stock">In Stock</span>
+        </div>
+
+        <!-- Product with malformed price -->
+        <div class="product-item">
+            <h3>Federal .223 Ammunition</h3>
+            <div class="details">
+                <span class="caliber">.223</span>
+                <span class="grain">55 grain</span>
+            </div>
+            <div class="price">Price: Call for quote</div>
+        </div>
+
+        <!-- Product with missing caliber -->
+        <div class="product-item">
+            <h3>Mystery Ammunition Box</h3>
+            <div class="price">$19.99</div>
+            <span class="stock">In Stock</span>
+        </div>
+
+        <!-- Valid product for comparison -->
+        <div class="product-item">
+            <h3>Hornady 5.56 NATO 62gr FMJ</h3>
+            <div class="details">
+                <span class="caliber">5.56 NATO</span>
+                <span class="grain">62 grain</span>
+                <span class="bullet-type">FMJ</span>
+                <span class="rounds">20 rounds</span>
+            </div>
+            <div class="price">$15.99</div>
+            <span class="stock">In Stock</span>
+        </div>
+    </div>
+</body>
+</html>

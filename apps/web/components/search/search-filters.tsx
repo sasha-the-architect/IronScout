@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,37 +32,97 @@ const brands = [
 ]
 
 export function SearchFilters() {
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const [selectedBrands, setSelectedBrands] = useState<string[]>([])
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const [selectedCategory, setSelectedCategory] = useState<string>('')
+  const [selectedBrand, setSelectedBrand] = useState<string>('')
   const [priceRange, setPriceRange] = useState([0, 1000])
+  const [inStockOnly, setInStockOnly] = useState(false)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
 
-  const toggleCategory = (category: string) => {
-    setSelectedCategories(prev =>
-      prev.includes(category)
-        ? prev.filter(c => c !== category)
-        : [...prev, category]
-    )
-  }
+  // Initialize from URL params
+  useEffect(() => {
+    const category = searchParams.get('category') || ''
+    const brand = searchParams.get('brand') || ''
+    const minPrice = searchParams.get('minPrice')
+    const maxPrice = searchParams.get('maxPrice')
+    const inStock = searchParams.get('inStock') === 'true'
 
-  const toggleBrand = (brand: string) => {
-    setSelectedBrands(prev =>
-      prev.includes(brand)
-        ? prev.filter(b => b !== brand)
-        : [...prev, brand]
-    )
+    setSelectedCategory(category)
+    setSelectedBrand(brand)
+    if (minPrice || maxPrice) {
+      setPriceRange([
+        minPrice ? parseInt(minPrice) : 0,
+        maxPrice ? parseInt(maxPrice) : 1000
+      ])
+    }
+    setInStockOnly(inStock)
+  }, [searchParams])
+
+  const applyFilters = () => {
+    const params = new URLSearchParams(searchParams.toString())
+
+    // Preserve search query
+    const query = searchParams.get('q')
+    if (query) params.set('q', query)
+
+    // Apply filters
+    if (selectedCategory) {
+      params.set('category', selectedCategory)
+    } else {
+      params.delete('category')
+    }
+
+    if (selectedBrand) {
+      params.set('brand', selectedBrand)
+    } else {
+      params.delete('brand')
+    }
+
+    if (priceRange[0] > 0) {
+      params.set('minPrice', priceRange[0].toString())
+    } else {
+      params.delete('minPrice')
+    }
+
+    if (priceRange[1] < 1000) {
+      params.set('maxPrice', priceRange[1].toString())
+    } else {
+      params.delete('maxPrice')
+    }
+
+    if (inStockOnly) {
+      params.set('inStock', 'true')
+    } else {
+      params.delete('inStock')
+    }
+
+    // Reset to page 1 when filters change
+    params.delete('page')
+
+    router.push(`/search?${params.toString()}`)
   }
 
   const clearFilters = () => {
-    setSelectedCategories([])
-    setSelectedBrands([])
+    const params = new URLSearchParams()
+    const query = searchParams.get('q')
+    if (query) params.set('q', query)
+
+    setSelectedCategory('')
+    setSelectedBrand('')
     setPriceRange([0, 1000])
+    setInStockOnly(false)
+
+    router.push(`/search?${params.toString()}`)
   }
+
+  const hasActiveFilters = selectedCategory || selectedBrand || priceRange[0] > 0 || priceRange[1] < 1000 || inStockOnly
 
   const FilterContent = () => (
     <div className="space-y-6">
       {/* Active Filters */}
-      {(selectedCategories.length > 0 || selectedBrands.length > 0) && (
+      {hasActiveFilters && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-sm">Active Filters</h3>
@@ -70,27 +131,54 @@ export function SearchFilters() {
             </Button>
           </div>
           <div className="flex flex-wrap gap-2">
-            {selectedCategories.map(category => (
-              <Badge key={category} variant="secondary" className="flex items-center gap-1">
-                {category}
+            {selectedCategory && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                {selectedCategory}
                 <X
                   className="h-3 w-3 cursor-pointer"
-                  onClick={() => toggleCategory(category)}
+                  onClick={() => setSelectedCategory('')}
                 />
               </Badge>
-            ))}
-            {selectedBrands.map(brand => (
-              <Badge key={brand} variant="secondary" className="flex items-center gap-1">
-                {brand}
+            )}
+            {selectedBrand && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                {selectedBrand}
                 <X
                   className="h-3 w-3 cursor-pointer"
-                  onClick={() => toggleBrand(brand)}
+                  onClick={() => setSelectedBrand('')}
                 />
               </Badge>
-            ))}
+            )}
+            {inStockOnly && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                In Stock
+                <X
+                  className="h-3 w-3 cursor-pointer"
+                  onClick={() => setInStockOnly(false)}
+                />
+              </Badge>
+            )}
           </div>
         </div>
       )}
+
+      {/* Availability */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Availability</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={inStockOnly}
+              onChange={(e) => setInStockOnly(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <span className="text-sm">In Stock Only</span>
+          </label>
+        </CardContent>
+      </Card>
 
       {/* Price Range */}
       <Card>
@@ -125,49 +213,48 @@ export function SearchFilters() {
         </CardContent>
       </Card>
 
-      {/* Categories */}
+      {/* Category */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Categories</CardTitle>
+          <CardTitle className="text-sm">Category</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+          >
+            <option value="">All Categories</option>
             {categories.map(category => (
-              <label key={category} className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedCategories.includes(category)}
-                  onChange={() => toggleCategory(category)}
-                  className="rounded border-gray-300"
-                />
-                <span className="text-sm">{category}</span>
-              </label>
+              <option key={category} value={category}>{category}</option>
             ))}
-          </div>
+          </select>
         </CardContent>
       </Card>
 
-      {/* Brands */}
+      {/* Brand */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Brands</CardTitle>
+          <CardTitle className="text-sm">Brand</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
+          <select
+            value={selectedBrand}
+            onChange={(e) => setSelectedBrand(e.target.value)}
+            className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+          >
+            <option value="">All Brands</option>
             {brands.map(brand => (
-              <label key={brand} className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedBrands.includes(brand)}
-                  onChange={() => toggleBrand(brand)}
-                  className="rounded border-gray-300"
-                />
-                <span className="text-sm">{brand}</span>
-              </label>
+              <option key={brand} value={brand}>{brand}</option>
             ))}
-          </div>
+          </select>
         </CardContent>
       </Card>
+
+      {/* Apply Button */}
+      <Button onClick={applyFilters} className="w-full">
+        Apply Filters
+      </Button>
     </div>
   )
 

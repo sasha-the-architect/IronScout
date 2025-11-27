@@ -1,4 +1,6 @@
-import Link from 'next/link'
+'use client'
+
+import { useState } from 'react'
 import Image from 'next/image'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -6,19 +8,23 @@ import { Badge } from '@/components/ui/badge'
 import { formatPrice } from '@/lib/utils'
 import { Star, ExternalLink, Bell, Crown } from 'lucide-react'
 import type { Product } from '@/lib/api'
+import { CreateAlertDialog } from './create-alert-dialog'
 
 interface ProductCardProps {
   product: Product
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const lowestPrice = product.prices.reduce((min, price) => 
+  const [showAlertDialog, setShowAlertDialog] = useState(false)
+
+  const lowestPrice = product.prices.reduce((min, price) =>
     price.price < min.price ? price : min
   )
-  
+
   const isPremiumRetailer = lowestPrice.retailer.tier === 'PREMIUM'
 
   return (
+    <>
     <Card className="group hover:shadow-lg transition-all duration-200 overflow-hidden">
       <div className="relative">
         <div className="aspect-square relative overflow-hidden bg-gray-50">
@@ -42,7 +48,12 @@ export function ProductCard({ product }: ProductCardProps) {
 
         {/* Quick Actions */}
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button size="sm" variant="secondary" className="h-8 w-8 p-0">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-8 w-8 p-0"
+            onClick={() => setShowAlertDialog(true)}
+          >
             <Bell className="h-4 w-4" />
           </Button>
         </div>
@@ -105,7 +116,12 @@ export function ProductCard({ product }: ProductCardProps) {
               Buy Now
             </a>
           </Button>
-          <Button size="sm" variant="outline" className="flex-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            onClick={() => setShowAlertDialog(true)}
+          >
             <Bell className="h-3 w-3 mr-1" />
             Alert
           </Button>
@@ -115,6 +131,12 @@ export function ProductCard({ product }: ProductCardProps) {
           <p className="text-xs text-destructive text-center">Out of Stock</p>
         )}
       </CardFooter>
-    </Card>
+
+      <CreateAlertDialog
+        product={product}
+        open={showAlertDialog}
+        onOpenChange={setShowAlertDialog}
+      />
+    </>
   )
 }

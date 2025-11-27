@@ -19,7 +19,7 @@ router.get('/placement', async (req, res) => {
         id: '1',
         title: 'Premium Electronics Sale',
         description: 'Up to 50% off on premium electronics. Limited time offer!',
-        imageUrl: 'https://via.placeholder.com/400x200',
+        imageUrl: 'https://images.unsplash.com/photo-1510552776732-01acc9a4c1d6?w=400&h=200&fit=crop',
         targetUrl: 'https://example.com/sale/electronics',
         adType: 'DISPLAY',
         priority: 10
@@ -28,7 +28,7 @@ router.get('/placement', async (req, res) => {
         id: '2',
         title: 'Best Deals on Home & Garden',
         description: 'Transform your space with our curated selection',
-        imageUrl: 'https://via.placeholder.com/400x200',
+        imageUrl: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=400&h=200&fit=crop',
         targetUrl: 'https://example.com/category/home-garden',
         adType: 'SPONSORED_PRODUCT',
         priority: 8
@@ -37,7 +37,7 @@ router.get('/placement', async (req, res) => {
         id: '3',
         title: 'Fashion Forward',
         description: 'Discover the latest trends in fashion',
-        imageUrl: 'https://via.placeholder.com/400x200',
+        imageUrl: 'https://images.unsplash.com/photo-1514996937319-344454492b37?w=400&h=200&fit=crop',
         targetUrl: 'https://example.com/category/fashion',
         adType: 'BANNER',
         priority: 5

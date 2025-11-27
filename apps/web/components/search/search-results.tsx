@@ -8,8 +8,11 @@ interface SearchResultsProps {
   searchParams: {
     q?: string
     category?: string
+    brand?: string
     minPrice?: string
     maxPrice?: string
+    inStock?: string
+    sortBy?: string
     page?: string
   }
 }

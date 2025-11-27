@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Complex Retailer Page with Mixed Content</title>
+    <style>
+        .product { padding: 10px; }
+        .price { font-weight: bold; color: red; }
+    </style>
+    <script>
+        // This script should be removed during cleaning
+        function addToCart(id) {
+            console.log('Adding to cart:', id);
+        }
+    </script>
+</head>
+<body>
+    <header role="banner">
+        <nav>
+            <a href="/">Home</a>
+            <a href="/products">Products</a>
+        </nav>
+    </header>
+
+    <main>
+        <h1>9mm Ammunition</h1>
+
+        <div class="product-grid">
+            <!-- Product with bulk pricing -->
+            <div class="product-item">
+                <img src="https://example.com/images/bulk-9mm.jpg" alt="Bulk 9mm">
+                <h3>Federal American Eagle 9mm Luger 115gr FMJ - Case of 1000</h3>
+                <div class="details">
+                    <span class="caliber">9mm Luger</span>
+                    <span class="grain">115 grain</span>
+                    <span class="bullet-type">FMJ</span>
+                    <span class="case-type">Brass</span>
+                    <span class="rounds">1000 rounds</span>
+                </div>
+                <div class="price">$299.99</div>
+                <div class="price-per-round">($0.30/round)</div>
+                <span class="stock">In Stock - 5 available</span>
+                <button onclick="addToCart(123)">Add to Cart</button>
+            </div>
+
+            <!-- Product with special characters in name -->
+            <div class="product-item">
+                <img src="https://example.com/images/hst.jpg" alt="HST">
+                <h3>Federal Premium® HST™ 9mm+P 124gr JHP</h3>
+                <div class="details">
+                    <span class="caliber">9mm +P</span>
+                    <span class="grain">124 grain</span>
+                    <span class="bullet-type">JHP</span>
+                    <span class="rounds">50 rounds</span>
+                </div>
+                <div class="price">$39.99</div>
+                <span class="stock">Low Stock - 2 left</span>
+            </div>
+
+            <!-- Product with sale pricing -->
+            <div class="product-item sale">
+                <span class="badge">SALE</span>
+                <img src="https://example.com/images/blazer.jpg" alt="Blazer">
+                <h3>Blazer Brass 9mm 115gr FMJ</h3>
+                <div class="details">
+                    <span class="caliber">9mm</span>
+                    <span class="grain">115 grain</span>
+                    <span class="bullet-type">FMJ</span>
+                    <span class="rounds">50 rounds</span>
+                </div>
+                <div class="price">
+                    <span class="original-price" style="text-decoration: line-through;">$24.99</span>
+                    <span class="sale-price">$19.99</span>
+                </div>
+                <span class="stock">In Stock</span>
+            </div>
+
+            <!-- Product with pre-order status -->
+            <div class="product-item pre-order">
+                <img src="https://example.com/images/hornady.jpg" alt="Hornady">
+                <h3>Hornady Critical Duty 9mm +P 135gr FlexLock</h3>
+                <div class="details">
+                    <span class="caliber">9mm +P</span>
+                    <span class="grain">135 grain</span>
+                    <span class="bullet-type">FlexLock</span>
+                    <span class="rounds">25 rounds</span>
+                </div>
+                <div class="price">$32.99</div>
+                <span class="stock">Pre-Order - Ships in 2 weeks</span>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Test Retailer. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // More scripts that should be removed
+        window.analytics = { track: function() {} };
+    </script>
+</body>
+</html>

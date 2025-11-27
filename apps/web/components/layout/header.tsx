@@ -5,10 +5,11 @@ import { useState } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Menu, X, User, ShoppingBag } from 'lucide-react'
+import { Search, Menu, X, User, ShoppingBag, Bell, Settings, LayoutDashboard, ChevronDown } from 'lucide-react'
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const { data: session } = useSession()
 
@@ -52,19 +53,65 @@ export function Header() {
               For Dealers
             </Link>
             {session ? (
-              <div className="flex items-center space-x-4">
-                <Link href="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
-                  Dashboard
-                </Link>
+              <div className="relative">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => signOut()}
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center space-x-2"
                 >
                   <User className="h-4 w-4" />
-                  <span>Sign Out</span>
+                  <span>{session.user?.name?.split(' ')[0] || 'Account'}</span>
+                  <ChevronDown className="h-4 w-4" />
                 </Button>
+
+                {isUserMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-background border z-50">
+                      <div className="py-1">
+                        <Link
+                          href="/dashboard"
+                          className="flex items-center px-4 py-2 text-sm hover:bg-accent"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          <LayoutDashboard className="h-4 w-4 mr-3" />
+                          Dashboard
+                        </Link>
+                        <Link
+                          href="/dashboard/alerts"
+                          className="flex items-center px-4 py-2 text-sm hover:bg-accent"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          <Bell className="h-4 w-4 mr-3" />
+                          My Alerts
+                        </Link>
+                        <Link
+                          href="/dashboard/settings"
+                          className="flex items-center px-4 py-2 text-sm hover:bg-accent"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          <Settings className="h-4 w-4 mr-3" />
+                          Settings
+                        </Link>
+                        <div className="border-t my-1"></div>
+                        <button
+                          onClick={() => {
+                            setIsUserMenuOpen(false)
+                            signOut()
+                          }}
+                          className="flex items-center w-full px-4 py-2 text-sm hover:bg-accent text-left"
+                        >
+                          <User className="h-4 w-4 mr-3" />
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <Button onClick={() => signIn()} size="sm">
@@ -122,11 +169,29 @@ export function Header() {
                 <>
                   <Link
                     href="/dashboard"
-                    className="text-sm font-medium hover:text-primary transition-colors"
+                    className="flex items-center text-sm font-medium hover:text-primary transition-colors"
                     onClick={() => setIsMenuOpen(false)}
                   >
+                    <LayoutDashboard className="h-4 w-4 mr-2" />
                     Dashboard
                   </Link>
+                  <Link
+                    href="/dashboard/alerts"
+                    className="flex items-center text-sm font-medium hover:text-primary transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Bell className="h-4 w-4 mr-2" />
+                    My Alerts
+                  </Link>
+                  <Link
+                    href="/dashboard/settings"
+                    className="flex items-center text-sm font-medium hover:text-primary transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </Link>
+                  <div className="border-t my-2"></div>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -136,6 +201,7 @@ export function Header() {
                     }}
                     className="justify-start"
                   >
+                    <User className="h-4 w-4 mr-2" />
                     Sign Out
                   </Button>
                 </>

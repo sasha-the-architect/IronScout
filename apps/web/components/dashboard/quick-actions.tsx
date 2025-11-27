@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Search, Settings, CreditCard } from 'lucide-react'
+import { Plus, Search, Settings, Bell } from 'lucide-react'
 
 const actions = [
   {
@@ -10,22 +10,22 @@ const actions = [
     href: '/search'
   },
   {
-    title: 'Browse Deals',
-    description: 'Discover trending products',
-    icon: Search,
-    href: '/search?q=deals'
+    title: 'Manage Alerts',
+    description: 'View and edit your alerts',
+    icon: Bell,
+    href: '/dashboard/alerts'
   },
   {
-    title: 'Account Settings',
+    title: 'Browse Products',
+    description: 'Search for deals',
+    icon: Search,
+    href: '/search'
+  },
+  {
+    title: 'Settings',
     description: 'Manage your preferences',
     icon: Settings,
     href: '/dashboard/settings'
-  },
-  {
-    title: 'Billing',
-    description: 'View subscription details',
-    icon: CreditCard,
-    href: '/dashboard/billing'
   }
 ]
 

@@ -1,0 +1,70 @@
+Devin Prompt v4: Responsive UI, MVP Architecture with Ads & Future-Ready DaaS
+
+Project Goal:
+Create the foundational architecture and code stubs for a new, AI-native web application, codenamed "ZeroedIn". The Minimum Viable Product (MVP) will feature a modern, fully responsive user interface and a multi-faceted monetization strategy. The architecture must also include non-functional stubs for a future Data as a Service (DaaS) platform.
+
+Core Concept:
+The platform will be a proactive, personalized purchasing assistant. The MVP monetization strategy will be based on user subscriptions, prioritized dealer subscriptions, affiliate link revenue, and display advertising. The platform must provide a seamless user experience on all modern devices, from phones to desktops.
+
+Key Features to Stub Out:
+Backend API (in apps/api):
+Products & Ads: Stub out endpoints for searching products (/api/products/search) with prioritization for premium dealers, and for fetching ads (/api/ads/placement).
+
+Alerts & Payments: Stub endpoints for creating/managing user alerts and handling Stripe webhooks/checkouts. The alert service must differentiate between 'PREMIUM' (real-time) and 'FREE' (delayed) users.
+
+Data as a Service (DaaS) - POST-MVP:
+
+GET /api/data/market-trends: [POST-MVP] Stub a protected endpoint for DaaS subscribers.
+
+GET /api/data/price-velocity?productId={id}: [POST-MVP] Stub a protected endpoint.
+
+Database Schema (in packages/db):
+Using Prisma ORM, define the schemas for User, Product, Retailer, Price, Alert, Advertisement, and the post-MVP DataSubscription and MarketReport models.
+
+Generate the initial database migration files.
+
+Frontend Application (in apps/web):
+UI/UX Requirements: The entire user interface must be modern, clean, and fully responsive. All layouts and components must adapt seamlessly to modern desktop, tablet, and mobile screen sizes. Use Tailwind CSS's responsive design utilities (e.g., md:, lg:) extensively to achieve this.
+
+/search?q={query} (Search Results Page): The core of the MVP.
+
+The page layout should be a responsive grid (e.g., 1 column on mobile, 2-3 on tablet, 4-5 on desktop).
+
+The page should fetch data from both product and ad endpoints and render a mixed "stream" of ProductCard and AdCard components.
+
+Stub out a visual indicator on the ProductCard for listings from 'PREMIUM' tier retailers.
+
+Stub out a visually distinct and responsive AdCard component.
+
+Monetization Pages: Create responsive layouts for /pricing, /dealers, and /dashboard/billing.
+
+Technology Stack:
+Please use the following modern, type-safe stack:
+
+Framework: Next.js (with App Router)
+
+Language: TypeScript
+
+Database: PostgreSQL
+
+ORM: Prisma
+
+Payment Processing: Stripe SDK
+
+Styling: Tailwind CSS (for responsive, utility-first styling)
+
+UI Components: Shadcn/UI (for accessible, responsive components)
+
+Authentication: NextAuth.js
+
+Architectural Requirements & Instructions:
+Monorepo Setup: Initialize the project as a pnpm workspace.
+
+Environment Variables: Create a .env.example file with placeholders for database, auth, and Stripe keys.
+
+POST-MVP Code: For all DaaS-related stubs, please include a prominent comment: // POST-MVP FEATURE: Not for initial implementation.
+
+Documentation: Generate a comprehensive README.md file with a project description, tech stack summary, and detailed local setup instructions.
+
+Final Deliverable:
+The final output should be a fully structured project pushed to a new GitHub repository. The repository should contain the complete monorepo with all specified stubs. The frontend code must be written with a mobile-first, responsive approach. The application should be runnable locally (pnpm dev) and display correctly across a range of screen sizes.

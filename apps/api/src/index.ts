@@ -9,6 +9,10 @@ import { adsRouter } from './routes/ads'
 import { alertsRouter } from './routes/alerts'
 import { paymentsRouter } from './routes/payments'
 import { dataRouter } from './routes/data'
+import { sourcesRouter } from './routes/sources'
+import { executionsRouter } from './routes/executions'
+import { logsRouter } from './routes/logs'
+import { harvesterRouter } from './routes/harvester'
 
 dotenv.config()
 
@@ -31,6 +35,10 @@ app.use('/api/ads', adsRouter)
 app.use('/api/alerts', alertsRouter)
 app.use('/api/payments', paymentsRouter)
 app.use('/api/data', dataRouter)
+app.use('/api/sources', sourcesRouter)
+app.use('/api/executions', executionsRouter)
+app.use('/api/logs', logsRouter)
+app.use('/api/harvester', harvesterRouter)
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(err.stack)
