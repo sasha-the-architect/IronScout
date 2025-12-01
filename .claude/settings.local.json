@@ -61,7 +61,8 @@
       "Bash(netstat:*)",
       "Bash(pnpm update:*)",
       "Bash(pnpm build:*)",
-      "Bash(timeout 15 pnpm dev:*)"
+      "Bash(timeout 15 pnpm dev:*)",
+      "Bash(python -m json.tool:*)"
     ],
     "deny": [],
     "ask": []

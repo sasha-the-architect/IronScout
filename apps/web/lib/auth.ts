@@ -98,4 +98,8 @@ export const authOptions: NextAuthOptions = {
   },
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
+// For server-side auth checks
+export async function auth() {
+  const { getServerSession } = await import('next-auth/next')
+  return getServerSession(authOptions)
+}
