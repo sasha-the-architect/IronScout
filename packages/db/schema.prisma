@@ -15,6 +15,7 @@ model User {
   email     String   @unique
   name      String?
   image     String?
+  password  String?  // For email/password authentication (hashed with bcrypt)
   emailVerified DateTime?
   tier      UserTier @default(FREE)
   createdAt DateTime @default(now())

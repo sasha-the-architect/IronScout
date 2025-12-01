@@ -48,7 +48,14 @@
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
       "Bash(rm:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(redis-cli ping:*)",
+      "Bash(pnpm prisma migrate:*)",
+      "Bash(docker --version:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)",
+      "Bash(stripe:*)",
+      "Bash(\"/c/Program Files/stripe/stripe.exe\" --version)"
     ],
     "deny": [],
     "ask": []
