@@ -73,6 +73,8 @@ services:
           property: host
       - key: NEXTAUTH_SECRET
         generateValue: true
+      - key: AUTH_TRUST_HOST
+        value: true
       - key: DATABASE_URL
         fromDatabase:
           name: ironscout-db
