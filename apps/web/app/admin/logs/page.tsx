@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,7 +21,7 @@ interface Log {
   }
 }
 
-export default function LogsPage() {
+function LogsContent() {
   const searchParams = useSearchParams()
   const [logs, setLogs] = useState<Log[]>([])
   const [loading, setLoading] = useState(true)
@@ -224,5 +224,24 @@ export default function LogsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function LogsPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900">Execution Logs</h1>
+        </div>
+        <div className="animate-pulse space-y-3">
+          {[...Array(10)].map((_, i) => (
+            <div key={i} className="h-16 bg-gray-200 rounded"></div>
+          ))}
+        </div>
+      </div>
+    }>
+      <LogsContent />
+    </Suspense>
   )
 }

@@ -2,7 +2,7 @@
 
 import { signIn } from 'next-auth/react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Separator } from '@/components/ui/separator'
 import Link from 'next/link'
 
-export default function SignInPage() {
+function SignInForm() {
   const params = useSearchParams()
   const router = useRouter()
   const callbackUrl = params.get('callbackUrl') || '/'
@@ -148,4 +148,20 @@ export default function SignInPage() {
   )
 }
 
+export default function SignInPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-[70vh] flex items-center justify-center px-4 py-12">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Sign in to IronScout.ai</CardTitle>
+            <CardDescription>Loading...</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    }>
+      <SignInForm />
+    </Suspense>
+  )
+}
 
