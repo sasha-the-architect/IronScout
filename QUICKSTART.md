@@ -229,3 +229,51 @@ User → Admin UI → API → Triggers Job → Redis Queue
 **🎉 Congratulations! Your intelligent price harvesting platform is live!**
 
 For detailed information, see [SETUP.md](./SETUP.md)
+
+---
+
+## Deploy to Production
+
+Ready to deploy to the cloud? We've got you covered!
+
+### Render.com Deployment (Recommended)
+
+We provide complete Infrastructure as Code configuration for Render.com:
+
+1. **Read the deployment guide**: [DEPLOYMENT.md](./DEPLOYMENT.md)
+2. **Use the checklist**: [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)
+3. **Review environment variables**: [.env.render.example](./.env.render.example)
+
+### Quick Deploy Steps
+
+```bash
+# 1. Push code to GitHub
+git push origin main
+
+# 2. Go to Render.com dashboard
+# https://dashboard.render.com
+
+# 3. Create new Blueprint
+# - Select your repository
+# - Render auto-detects render.yaml
+
+# 4. Set required secrets in dashboard
+# See .env.render.example for required keys
+
+# 5. Deploy!
+# All services deploy automatically
+```
+
+### What Gets Deployed
+
+- ✅ PostgreSQL database (managed)
+- ✅ Redis instance (managed)
+- ✅ API backend (Express.js)
+- ✅ Web frontend (Next.js)
+- ✅ Harvester worker (BullMQ)
+
+### Free Tier Available
+
+Start with **$0/month** on Render's free tier, perfect for development and testing!
+
+For more details, see [DEPLOYMENT.md](./DEPLOYMENT.md)

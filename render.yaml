@@ -1,0 +1,125 @@
+# Render.com Infrastructure as Code
+# This file defines all services for the IronScout.ai application
+
+databases:
+  - name: ironscout-db
+    databaseName: ironscout
+    user: ironscout
+    plan: free  # Change to 'starter' or 'standard' for production
+    region: ohio
+    ipAllowList: []  # Empty = allow all Render services
+
+  - name: ironscout-redis
+    plan: free  # Change to 'starter' for production
+    region: ohio
+    maxmemoryPolicy: noeviction
+
+services:
+  # API Backend Service
+  - type: web
+    name: ironscout-api
+    runtime: node
+    region: ohio
+    plan: free  # Change to 'starter' or 'standard' for production
+    buildCommand: pnpm install && pnpm --filter @ironscout/db db:generate && pnpm --filter @ironscout/api build
+    startCommand: cd apps/api && pnpm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ironscout-db
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: ironscout-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: ironscout-redis
+          property: port
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: ironscout-web
+          property: host
+      - key: STRIPE_SECRET_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false  # Set manually in Render dashboard
+      - key: SENDGRID_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: SENDGRID_FROM_EMAIL
+        sync: false  # Set manually in Render dashboard
+
+  # Next.js Web Frontend
+  - type: web
+    name: ironscout-web
+    runtime: node
+    region: ohio
+    plan: free  # Change to 'starter' or 'standard' for production
+    buildCommand: pnpm install && pnpm --filter @ironscout/db db:generate && pnpm --filter @ironscout/web build
+    startCommand: cd apps/web && pnpm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: ironscout-api
+          property: host
+      - key: NEXTAUTH_URL
+        fromService:
+          type: web
+          name: ironscout-web
+          property: host
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ironscout-db
+          property: connectionString
+      - key: GOOGLE_CLIENT_ID
+        sync: false  # Set manually in Render dashboard
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false  # Set manually in Render dashboard
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false  # Set manually in Render dashboard
+
+  # Harvester Background Worker
+  - type: worker
+    name: ironscout-harvester
+    runtime: node
+    region: ohio
+    plan: free  # Change to 'starter' for production
+    buildCommand: pnpm install && pnpm --filter @ironscout/db db:generate && pnpm --filter @ironscout/harvester build
+    startCommand: cd apps/harvester && pnpm worker
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ironscout-db
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: ironscout-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: ironscout-redis
+          property: port
+      - key: ANTHROPIC_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: SENDGRID_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: SENDGRID_FROM_EMAIL
+        sync: false  # Set manually in Render dashboard
