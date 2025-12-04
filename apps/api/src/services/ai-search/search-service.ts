@@ -1,5 +1,4 @@
-import { prisma } from '@ironscout/db'
-import { Prisma } from '@prisma/client'
+import { prisma, Prisma } from '@ironscout/db'
 import { parseSearchIntent, SearchIntent } from './intent-parser'
 import { QUALITY_INDICATORS, CASE_MATERIAL_BY_PURPOSE } from './ammo-knowledge'
 import { generateEmbedding, buildProductText } from './embedding-service'
@@ -20,6 +19,7 @@ export interface AISearchResult {
   searchMetadata: {
     parsedFilters: Record<string, any>
     aiEnhanced: boolean
+    vectorSearchUsed: boolean
     processingTimeMs: number
   }
 }
