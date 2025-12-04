@@ -4,26 +4,46 @@
 
 @layer base {
   :root {
-    /* Night Recon Theme - Light Mode (rarely used) */
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* 🌤️ Hybrid Scout Theme - Light Mode */
+
+    /* Primary Base - Off-White Fog #F8F9FA */
+    --background: 210 17% 98%;
+
+    /* Text Dark - Gunmetal #343A40 */
+    --foreground: 210 10% 23%;
+
+    /* Cards - Pure White */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 210 10% 23%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 183 100% 40%; /* Tactical Cyan */
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 183 100% 40%; /* Tactical Cyan */
-    --accent-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 210 10% 23%;
+
+    /* Primary - Modern Olive Drab #4B5F44 */
+    --primary: 110 15% 32%;
+    --primary-foreground: 210 17% 98%;
+
+    /* Secondary - Reliant Blue #005691 */
+    --secondary: 206 100% 29%;
+    --secondary-foreground: 210 17% 98%;
+
+    /* Muted - Light grey */
+    --muted: 210 17% 95%;
+    --muted-foreground: 210 10% 45%;
+
+    /* Accent - Signal Orange #F15A29 */
+    --accent: 15 87% 56%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Destructive - Red for errors */
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 183 100% 40%; /* Tactical Cyan */
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders */
+    --border: 210 17% 90%;
+    --input: 210 17% 95%;
+
+    /* Ring - Signal Orange */
+    --ring: 15 87% 56%;
     --radius: 0.5rem;
   }
 

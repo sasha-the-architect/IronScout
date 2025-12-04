@@ -1,8 +1,8 @@
-import { Router } from 'express'
+import { Router, type Router as ExpressRouter } from 'express'
 import { prisma } from '@ironscout/db'
 import { z } from 'zod'
 
-const router = Router()
+const router: ExpressRouter = Router()
 
 // =====================================================
 // VALIDATION SCHEMAS

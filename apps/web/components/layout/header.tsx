@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { Search, Menu, X, User, ShoppingBag, Bell, Settings, LayoutDashboard, ChevronDown } from 'lucide-react'
 
 export function Header() {
@@ -52,6 +53,7 @@ export function Header() {
             <Link href="/dealers" className="text-sm font-medium hover:text-primary transition-colors">
               For Dealers
             </Link>
+            <ThemeToggle />
             {session ? (
               <div className="relative">
                 <Button
@@ -165,6 +167,10 @@ export function Header() {
               >
                 For Dealers
               </Link>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium">Theme:</span>
+                <ThemeToggle />
+              </div>
               {session ? (
                 <>
                   <Link
