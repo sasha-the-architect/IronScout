@@ -4,48 +4,72 @@
 
 @layer base {
   :root {
+    /* Night Recon Theme - Light Mode (rarely used) */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+    --primary: 183 100% 40%; /* Tactical Cyan */
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 84% 4.9%;
     --muted: 210 40% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
+    --accent: 183 100% 40%; /* Tactical Cyan */
     --accent-foreground: 222.2 84% 4.9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 183 100% 40%; /* Tactical Cyan */
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    /* 🌙 Night Recon Theme - Primary Mode */
+
+    /* Primary Base - Deep Ops Black #121418 */
+    --background: 225 14% 9%;
+
+    /* Text Light - Vapor Grey #DCE3E8 */
+    --foreground: 208 20% 89%;
+
+    /* Secondary Base - Slate Armor #2C333A */
+    --card: 213 15% 20%;
+    --card-foreground: 208 20% 89%;
+    --popover: 213 15% 20%;
+    --popover-foreground: 208 20% 89%;
+
+    /* Accent/Action - Tactical Cyan #00C2CB */
+    --primary: 183 100% 40%;
+    --primary-foreground: 208 20% 89%;
+
+    /* Secondary Base - Slate Armor #2C333A */
+    --secondary: 213 15% 20%;
+    --secondary-foreground: 208 20% 89%;
+
+    /* Muted - Slightly darker Slate */
+    --muted: 213 15% 15%;
+
+    /* Text Muted - Cool Steel #8A97A6 */
+    --muted-foreground: 209 16% 60%;
+
+    /* Accent - Tactical Cyan */
+    --accent: 183 100% 40%;
+    --accent-foreground: 225 14% 9%;
+
+    /* Destructive - Red for errors */
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 208 20% 89%;
+
+    /* Borders - Cool Steel darker */
+    --border: 209 16% 25%;
+    --input: 213 15% 20%;
+
+    /* Ring - Tactical Cyan */
+    --ring: 183 100% 40%;
   }
 }
 

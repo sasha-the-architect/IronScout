@@ -25,6 +25,7 @@ model User {
   subscriptions Subscription[]
   accounts      Account[]
   sessions      Session[]
+  reports       ProductReport[]
 
   // POST-MVP FEATURE: Not for initial implementation
   dataSubscriptions DataSubscription[]
@@ -52,8 +53,9 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  prices Price[]
-  alerts Alert[]
+  prices  Price[]
+  alerts  Alert[]
+  reports ProductReport[]
 
   @@map("products")
 }
@@ -81,10 +83,17 @@ model Price {
   currency   String   @default("USD")
   url        String
   inStock    Boolean  @default(true)
+
+  // Shipping & Handling
+  shippingCost         Decimal? @db.Decimal(10, 2) // Null means free shipping or unknown
+  freeShippingMinimum  Decimal? @db.Decimal(10, 2) // Minimum order for free shipping
+  shippingNotes        String?  // e.g., "Free shipping for Prime members"
+
   createdAt  DateTime @default(now())
 
   product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   retailer Retailer @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  reports  ProductReport[]
 
   @@map("prices")
 }
@@ -119,6 +128,27 @@ model Advertisement {
   updatedAt   DateTime @updatedAt
 
   @@map("advertisements")
+}
+
+model ProductReport {
+  id          String             @id @default(cuid())
+  productId   String
+  userId      String?            // Nullable to allow anonymous reports
+  priceId     String?            // Specific price/retailer if issue is retailer-specific
+  issueType   ProductIssueType
+  description String             // User's description of the issue
+  status      ReportStatus       @default(PENDING)
+  reviewedBy  String?            // Admin user ID who reviewed
+  reviewNotes String?            // Admin notes
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  resolvedAt  DateTime?
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  price   Price?  @relation(fields: [priceId], references: [id], onDelete: SetNull)
+
+  @@map("product_reports")
 }
 
 model Source {
@@ -288,6 +318,23 @@ enum AffiliateNetwork {
   SHAREASALE    // ShareASale
   CJ            // Commission Junction
   RAKUTEN       // Rakuten Advertising
+}
+
+enum ProductIssueType {
+  INCORRECT_PRICE      // Price is wrong
+  OUT_OF_STOCK         // Listed as in stock but actually out
+  INCORRECT_INFO       // Wrong product details (caliber, grain, etc.)
+  BROKEN_LINK          // URL doesn't work
+  WRONG_PRODUCT        // Link goes to different product
+  SPAM                 // Spam or inappropriate content
+  OTHER                // Other issue (described in description field)
+}
+
+enum ReportStatus {
+  PENDING              // Awaiting review
+  UNDER_REVIEW         // Being investigated
+  RESOLVED             // Issue fixed
+  DISMISSED            // Not an issue or cannot fix
 }
 
 // POST-MVP FEATURE: Not for initial implementation

@@ -13,6 +13,7 @@ import { sourcesRouter } from './routes/sources'
 import { executionsRouter } from './routes/executions'
 import { logsRouter } from './routes/logs'
 import { harvesterRouter } from './routes/harvester'
+import reportsRouter from './routes/reports'
 
 dotenv.config()
 
@@ -58,6 +59,7 @@ app.use('/api/sources', sourcesRouter)
 app.use('/api/executions', executionsRouter)
 app.use('/api/logs', logsRouter)
 app.use('/api/harvester', harvesterRouter)
+app.use('/api/reports', reportsRouter)
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(err.stack)
