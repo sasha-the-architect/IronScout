@@ -20,7 +20,7 @@ export default function AdminDashboard() {
       <DashboardStats />
 
       {/* Quick Links */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Link href="/admin/sources">
           <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Manage Sources</h3>
@@ -39,6 +39,13 @@ export default function AdminDashboard() {
           <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Execution Logs</h3>
             <p className="text-gray-600">Search and filter detailed logs</p>
+          </Card>
+        </Link>
+
+        <Link href="/admin/embeddings">
+          <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer bg-gradient-to-br from-blue-50 to-purple-50">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">AI Search & Embeddings</h3>
+            <p className="text-gray-600">Manage vector embeddings for semantic search</p>
           </Card>
         </Link>
       </div>

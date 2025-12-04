@@ -50,6 +50,9 @@ model Product {
   roundCount  Int?     // Rounds per box/case
   metadata    Json?    // Additional flexible data
 
+  // Vector embedding for semantic search (1536 dimensions for OpenAI text-embedding-3-small)
+  embedding   Unsupported("vector(1536)")?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

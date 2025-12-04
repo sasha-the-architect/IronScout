@@ -245,3 +245,108 @@ export async function getProductPriceHistory(productId: string): Promise<PriceHi
   }
   return response.json()
 }
+
+// ============================================
+// AI-Powered Semantic Search
+// ============================================
+
+export interface SearchIntent {
+  calibers?: string[]
+  purpose?: string
+  grainWeights?: number[]
+  caseMaterials?: string[]
+  brands?: string[]
+  minPrice?: number
+  maxPrice?: number
+  inStockOnly?: boolean
+  qualityLevel?: 'budget' | 'standard' | 'premium' | 'match-grade'
+  rangePreference?: 'short' | 'medium' | 'long'
+  originalQuery: string
+  keywords?: string[]
+  confidence: number
+  explanation?: string
+}
+
+export interface AISearchParams {
+  query: string
+  page?: number
+  limit?: number
+  sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'date_desc'
+}
+
+export interface AISearchResponse {
+  products: (Product & { relevanceScore?: number })[]
+  intent: SearchIntent
+  facets: Record<string, Record<string, number>>
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+  searchMetadata: {
+    parsedFilters: Record<string, any>
+    aiEnhanced: boolean
+    processingTimeMs: number
+  }
+}
+
+export interface ParsedFiltersResponse {
+  filters: Record<string, any>
+  intent: SearchIntent
+  explanation: string
+}
+
+/**
+ * AI-powered semantic search
+ * Accepts natural language queries like "best ammo for long range AR15"
+ */
+export async function aiSearch(params: AISearchParams): Promise<AISearchResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/search/semantic`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params)
+  })
+  
+  if (!response.ok) {
+    throw new Error('AI search failed')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Parse a natural language query into structured filters
+ * Useful for showing users what the AI understood
+ */
+export async function parseQueryToFilters(query: string): Promise<ParsedFiltersResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/search/nl-to-filters`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ query })
+  })
+  
+  if (!response.ok) {
+    throw new Error('Query parsing failed')
+  }
+  
+  return response.json()
+}
+
+/**
+ * Get search suggestions/autocomplete
+ */
+export async function getSearchSuggestions(query: string): Promise<string[]> {
+  const response = await fetch(`${API_BASE_URL}/api/search/suggestions?q=${encodeURIComponent(query)}`)
+  
+  if (!response.ok) {
+    return []
+  }
+  
+  const data = await response.json()
+  return data.suggestions || []
+}
