@@ -12,7 +12,8 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx seed.ts",
     "db:seed-source": "tsx seed-source.ts",
-    "db:seed-ammo": "tsx seed-ammo-data.ts"
+    "db:seed-ammo": "tsx seed-ammo-data.ts",
+    "db:seed-retailers": "tsx seed-retailers.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0"
