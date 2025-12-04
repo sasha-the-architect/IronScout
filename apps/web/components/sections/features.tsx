@@ -3,34 +3,34 @@ import { Zap, Bell, Target, TrendingUp, Shield, Clock } from 'lucide-react'
 
 const features = [
   {
-    icon: Zap,
-    title: 'AI-Powered Search',
-    description: 'Our advanced AI understands your preferences and finds the best deals across millions of products.',
-  },
-  {
-    icon: Bell,
-    title: 'Real-time Alerts',
-    description: 'Get instant notifications when prices drop on products you\'re watching.',
-  },
-  {
     icon: Target,
-    title: 'Smart Price Tracking',
-    description: 'Set target prices and let us monitor the market for you 24/7.',
+    title: 'Detailed Product Specs',
+    description: 'Access comprehensive specifications for ammunition, optics, and tactical gear. Compare calibers, grain weights, ballistic data, and more.',
   },
   {
     icon: TrendingUp,
-    title: 'Price History',
-    description: 'View detailed price trends to make informed purchasing decisions.',
+    title: 'Real Pricing Data',
+    description: 'Track pricing trends across multiple vendors. See historical prices and identify the best time to buy.',
+  },
+  {
+    icon: Zap,
+    title: 'Intelligent Recommendations',
+    description: 'Get AI-powered suggestions based on your needs. Find the right gear for your specific use case—target shooting, hunting, or tactical applications.',
+  },
+  {
+    icon: Bell,
+    title: 'Price Drop Alerts',
+    description: 'Set alerts for specific products and get notified instantly when prices drop to your target.',
   },
   {
     icon: Shield,
-    title: 'Verified Retailers',
-    description: 'Shop with confidence from our network of trusted retail partners.',
+    title: 'Guided Comparisons',
+    description: 'Compare products side-by-side with detailed breakdowns of specs, pricing, and performance characteristics.',
   },
   {
     icon: Clock,
-    title: 'Early Access',
-    description: 'Premium members get early access to deals before they go public.',
+    title: 'Always Up to Date',
+    description: 'Our platform continuously monitors inventory and pricing across vendors so you never miss in-stock notifications.',
   },
 ]
 
@@ -40,11 +40,11 @@ export function Features() {
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Why Choose IronScout.ai?
+            Why Choose IronScout?
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            We combine cutting-edge AI technology with comprehensive market data to give you 
-            the ultimate shopping advantage.
+            We combine real pricing data, product insights, and intelligent recommendations
+            to make gear selection faster and more informed.
           </p>
         </div>
 

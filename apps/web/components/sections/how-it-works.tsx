@@ -4,20 +4,20 @@ import { Search, Bell, ShoppingCart } from 'lucide-react'
 const steps = [
   {
     icon: Search,
-    title: 'Search & Discover',
-    description: 'Search for any product or browse our curated deals. Our AI learns your preferences over time.',
+    title: 'Search & Compare',
+    description: 'Search for ammunition, optics, or tactical gear. View detailed specs, pricing across vendors, and side-by-side comparisons.',
     step: '01',
   },
   {
     icon: Bell,
-    title: 'Set Alerts',
-    description: 'Create price alerts for products you want. We\'ll monitor prices across all major retailers.',
+    title: 'Track & Monitor',
+    description: 'Set price alerts for specific products. Our platform monitors pricing trends and notifies you when deals become available.',
     step: '02',
   },
   {
     icon: ShoppingCart,
-    title: 'Buy at Best Price',
-    description: 'Get notified when prices drop to your target. Purchase directly from verified retailers.',
+    title: 'Buy with Confidence',
+    description: 'Make informed decisions with complete product data and pricing history. Purchase from trusted vendors at the best price.',
     step: '03',
   },
 ]
@@ -31,8 +31,8 @@ export function HowItWorks() {
             How It Works
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Getting the best deals has never been easier. Follow these simple steps 
-            to start saving money today.
+            Finding the right gear has never been easier. Follow these simple steps
+            to make confident, informed purchasing decisions.
           </p>
         </div>
 

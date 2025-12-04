@@ -11,18 +11,18 @@ export function Hero() {
           <div className="flex justify-center mb-6">
             <div className="flex items-center space-x-2 bg-primary/10 rounded-full px-4 py-2">
               <Zap className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium text-primary">AI-Powered Shopping Assistant</span>
+              <span className="text-sm font-medium text-primary">AI-Powered Gear Intelligence</span>
             </div>
           </div>
-          
+
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
-            Find the Best Deals
-            <span className="text-primary block">Before Everyone Else</span>
+            Find the Right Gear
+            <span className="text-primary block">With Confidence</span>
           </h1>
-          
+
           <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            IronScout.ai uses AI to monitor millions of products across thousands of retailers, 
-            alerting you to price drops and deals before they go mainstream.
+            IronScout brings together real pricing data, detailed specs, and intelligent recommendations
+            to help outdoor and tactical enthusiasts make informed gear decisions.
           </p>
 
           {/* Hero Search */}
@@ -32,12 +32,12 @@ export function Hero() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search for any product..."
+                  placeholder="Search for ammunition, optics, tactical gear..."
                   className="pl-10 pr-4 h-12 text-base"
                 />
               </div>
               <Button size="lg" className="h-12 px-8">
-                Search Deals
+                Search Gear
               </Button>
             </form>
           </div>
@@ -46,15 +46,15 @@ export function Hero() {
           <div className="flex flex-wrap justify-center gap-4 mb-12">
             <div className="flex items-center space-x-2 bg-background border rounded-full px-4 py-2">
               <Target className="h-4 w-4 text-primary" />
-              <span className="text-sm">Smart Price Tracking</span>
+              <span className="text-sm">Detailed Specs</span>
             </div>
             <div className="flex items-center space-x-2 bg-background border rounded-full px-4 py-2">
               <Bell className="h-4 w-4 text-primary" />
-              <span className="text-sm">Real-time Alerts</span>
+              <span className="text-sm">Pricing Trends</span>
             </div>
             <div className="flex items-center space-x-2 bg-background border rounded-full px-4 py-2">
               <Zap className="h-4 w-4 text-primary" />
-              <span className="text-sm">AI Recommendations</span>
+              <span className="text-sm">Guided Comparisons</span>
             </div>
           </div>
 
@@ -64,7 +64,7 @@ export function Hero() {
               <Link href="/pricing">Start Free Trial</Link>
             </Button>
             <Button variant="outline" size="lg" asChild>
-              <Link href="/search?q=electronics">Browse Deals</Link>
+              <Link href="/search">Browse Gear</Link>
             </Button>
           </div>
         </div>
