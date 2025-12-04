@@ -5,7 +5,7 @@ export function PricingHeader() {
         Simple, Transparent Pricing
       </h1>
       <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-        Choose the plan that works best for you. Upgrade or downgrade at any time.
+        Get the gear intelligence you need at a price that works for you. Upgrade or downgrade at any time.
       </p>
     </div>
   )

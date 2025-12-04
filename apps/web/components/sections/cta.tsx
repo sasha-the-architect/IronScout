@@ -15,12 +15,12 @@ export function CTA() {
           </div>
           
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-            Ready to Start Saving?
+            Ready to Find Your Gear?
           </h2>
-          
+
           <p className="text-lg md:text-xl opacity-90 mb-8 max-w-2xl mx-auto">
-            Join thousands of smart shoppers who save an average of $200 per month 
-            with IronScout.ai's AI-powered deal discovery.
+            Join outdoor and tactical enthusiasts who trust IronScout for detailed specs,
+            real pricing data, and confident gear decisions.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -31,8 +31,8 @@ export function CTA() {
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/search?q=deals" className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10">
-                Browse Deals
+              <Link href="/search" className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10">
+                Browse Gear
               </Link>
             </Button>
           </div>

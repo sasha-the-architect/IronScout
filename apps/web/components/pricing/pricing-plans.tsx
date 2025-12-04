@@ -13,9 +13,10 @@ const plans = [
   {
     name: 'Free',
     price: 0,
-    description: 'Perfect for casual shoppers',
+    description: 'Perfect for getting started',
     features: [
-      'Basic product search',
+      'Basic gear search',
+      'Product specifications',
       'Price alerts (delayed)',
       'Up to 5 active alerts',
       'Email notifications',
@@ -24,7 +25,7 @@ const plans = [
     limitations: [
       'Alerts delayed by 1 hour',
       'Limited search results',
-      'No price history'
+      'No pricing history'
     ],
     cta: 'Get Started',
     popular: false
@@ -32,16 +33,17 @@ const plans = [
   {
     name: 'Premium',
     price: 9.99,
-    description: 'For serious deal hunters',
+    description: 'For serious enthusiasts',
     features: [
       'Advanced AI-powered search',
+      'Detailed ballistic & spec data',
       'Real-time price alerts',
       'Unlimited active alerts',
       'SMS & email notifications',
-      'Price history & trends',
+      'Complete pricing history & trends',
+      'Side-by-side comparisons',
       'Priority support',
-      'Early access to deals',
-      'Advanced filtering'
+      'Advanced filtering by caliber, grain, etc.'
     ],
     limitations: [],
     cta: 'Start Free Trial',
@@ -50,7 +52,7 @@ const plans = [
   {
     name: 'Pro',
     price: 19.99,
-    description: 'For power users and businesses',
+    description: 'For professionals and dealers',
     features: [
       'Everything in Premium',
       'API access (coming soon)',
@@ -58,7 +60,7 @@ const plans = [
       'Custom notifications',
       'Dedicated account manager',
       'Advanced analytics',
-      'White-label options'
+      'Dealer integrations'
     ],
     limitations: [],
     cta: 'Contact Sales',

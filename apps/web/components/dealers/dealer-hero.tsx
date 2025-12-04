@@ -7,13 +7,13 @@ export function DealerHero() {
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
-            Reach More Customers
+            Reach Qualified Buyers
             <span className="text-primary block">Drive More Sales</span>
           </h1>
-          
+
           <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join thousands of retailers using IronScout.ai to connect with motivated buyers 
-            and increase their sales through our AI-powered platform.
+            Join ammunition and tactical gear dealers using IronScout to connect with serious enthusiasts
+            ready to buy. Get your inventory in front of customers actively searching for your products.
           </p>
 
           <div className="flex flex-wrap justify-center gap-8 mb-12">

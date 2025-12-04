@@ -40,11 +40,11 @@ export function DealerBenefits() {
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Why Partner with IronScout.ai?
+            Why Partner with IronScout?
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Join our network of successful retailers and unlock new growth opportunities 
-            with our AI-powered platform.
+            Join ammunition and tactical gear dealers who are growing their business
+            by connecting with qualified buyers actively searching for products.
           </p>
         </div>
 

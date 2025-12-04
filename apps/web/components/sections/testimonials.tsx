@@ -3,25 +3,25 @@ import { Star } from 'lucide-react'
 
 const testimonials = [
   {
-    name: 'Sarah Johnson',
-    role: 'Frequent Online Shopper',
-    content: 'IronScout.ai saved me over $500 last month alone! The price alerts are incredibly accurate and timely.',
-    rating: 5,
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=64&h=64&fit=crop&crop=face',
-  },
-  {
-    name: 'Mike Chen',
-    role: 'Tech Enthusiast',
-    content: 'Finally, a shopping assistant that actually understands what I\'m looking for. The AI recommendations are spot-on.',
+    name: 'Marcus Thompson',
+    role: 'Competition Shooter',
+    content: 'IronScout makes it easy to compare ammunition specs and pricing across vendors. I always know I\'m getting the right ammo at the best price.',
     rating: 5,
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop&crop=face',
   },
   {
-    name: 'Emily Rodriguez',
-    role: 'Budget-Conscious Parent',
-    content: 'As a mom of three, every dollar counts. IronScout.ai helps me find the best deals on everything my family needs.',
+    name: 'Sarah Mitchell',
+    role: 'Hunting Enthusiast',
+    content: 'The detailed ballistic data and pricing trends help me make informed decisions. No more guessing which load is best for my rifle.',
     rating: 5,
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=64&h=64&fit=crop&crop=face',
+    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=64&h=64&fit=crop&crop=face',
+  },
+  {
+    name: 'James Rodriguez',
+    role: 'Tactical Professional',
+    content: 'Finally, a platform that understands gear specs matter. The side-by-side comparisons and price alerts save me time and money on duty gear.',
+    rating: 5,
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=64&h=64&fit=crop&crop=face',
   },
 ]
 
@@ -31,10 +31,10 @@ export function Testimonials() {
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            What Our Users Say
+            Trusted by Enthusiasts
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Join thousands of smart shoppers who are already saving money with IronScout.ai.
+            Join outdoor and tactical enthusiasts who make confident gear decisions with IronScout.
           </p>
         </div>
 
