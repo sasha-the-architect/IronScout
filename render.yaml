@@ -36,10 +36,7 @@ services:
       - key: REDIS_PORT
         sync: false  # Set manually after creating Redis instance
       - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: ironscout-web
-          property: hostURL
+        sync: false  # Set manually: https://ironscout-web.onrender.com
       - key: STRIPE_SECRET_KEY
         sync: false  # Set manually in Render dashboard
       - key: STRIPE_WEBHOOK_SECRET
@@ -62,15 +59,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_URL
-        fromService:
-          type: web
-          name: ironscout-api
-          property: hostURL
+        sync: false  # Set manually: https://ironscout-api.onrender.com
       - key: NEXTAUTH_URL
-        fromService:
-          type: web
-          name: ironscout-web
-          property: hostURL
+        sync: false  # Set manually: https://ironscout-web.onrender.com
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: AUTH_TRUST_HOST
