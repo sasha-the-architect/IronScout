@@ -1,4 +1,5 @@
 import { Hero } from '@/components/sections/hero'
+import { Comparison } from '@/components/sections/comparison'
 import { Features } from '@/components/sections/features'
 import { HowItWorks } from '@/components/sections/how-it-works'
 import { Testimonials } from '@/components/sections/testimonials'
@@ -8,6 +9,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col">
       <Hero />
+      <Comparison />
       <Features />
       <HowItWorks />
       <Testimonials />
