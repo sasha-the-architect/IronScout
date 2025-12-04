@@ -10,7 +10,7 @@ export default function HomePage() {
     <>
       {/* AvantLink Affiliate Verification */}
       <Script
-        src="http://classic.avantlink.com/affiliate_app_confirm.php?mode=js&authResponse=83b35735960abca5c62924f3fbe01e4e919343a3"
+        src="https://classic.avantlink.com/affiliate_app_confirm.php?mode=js&authResponse=83b35735960abca5c62924f3fbe01e4e919343a3"
         strategy="afterInteractive"
       />
 
