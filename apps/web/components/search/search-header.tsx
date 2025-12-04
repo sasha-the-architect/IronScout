@@ -93,9 +93,9 @@ export function SearchHeader({
                     Purpose: {intent.purpose}
                   </span>
                 )}
-                {intent.grainWeights?.length > 0 && (
+                {(intent.grainWeights?.length ?? 0) > 0 && (
                   <span className="px-2 py-1 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded text-xs font-medium">
-                    Grain: {intent.grainWeights.join('/')}gr
+                    Grain: {intent.grainWeights?.join('/') ?? ''}gr
                   </span>
                 )}
                 {intent.caseMaterials?.map((mat, i) => (

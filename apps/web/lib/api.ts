@@ -287,6 +287,7 @@ export interface AISearchResponse {
   searchMetadata: {
     parsedFilters: Record<string, any>
     aiEnhanced: boolean
+    vectorSearchUsed: boolean
     processingTimeMs: number
   }
 }

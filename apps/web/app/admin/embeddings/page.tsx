@@ -332,17 +332,17 @@ export default function EmbeddingsAdminPage() {
         )}
 
         {/* Completion Message */}
-        {!progress?.inProgress && progress?.processed > 0 && (
+        {!progress?.inProgress && (progress?.processed ?? 0) > 0 && (
           <div className="mt-6 p-4 bg-green-50 rounded-lg flex items-center gap-3">
             <CheckCircle className="h-5 w-5 text-green-600" />
             <div>
               <span className="font-medium text-green-900">Backfill complete!</span>
               <span className="text-green-700 ml-2">
-                Processed {progress.processed} products
+                Processed {progress?.processed ?? 0} products
               </span>
-              {progress.errors.length > 0 && (
+              {(progress?.errors?.length ?? 0) > 0 && (
                 <span className="text-red-600 ml-2">
-                  ({progress.errors.length} errors)
+                  ({progress?.errors?.length ?? 0} errors)
                 </span>
               )}
             </div>
