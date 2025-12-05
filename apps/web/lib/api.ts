@@ -267,11 +267,25 @@ export interface SearchIntent {
   explanation?: string
 }
 
+export interface ExplicitFilters {
+  caliber?: string
+  purpose?: string
+  caseMaterial?: string
+  minPrice?: number
+  maxPrice?: number
+  minGrain?: number
+  maxGrain?: number
+  inStock?: boolean
+  brand?: string
+}
+
 export interface AISearchParams {
   query: string
   page?: number
   limit?: number
-  sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'date_desc'
+  sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'date_desc' | 'date_asc'
+  userId?: string // For tier-based result limits
+  filters?: ExplicitFilters // Explicit filters that override AI intent
 }
 
 export interface AISearchResponse {
@@ -301,14 +315,30 @@ export interface ParsedFiltersResponse {
 /**
  * AI-powered semantic search
  * Accepts natural language queries like "best ammo for long range AR15"
+ * Optionally accepts explicit filters that override AI-parsed intent
  */
 export async function aiSearch(params: AISearchParams): Promise<AISearchResponse> {
+  const { userId, filters, ...searchParams } = params
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  }
+  
+  // Pass user ID for tier-based result limits
+  if (userId) {
+    headers['X-User-Id'] = userId
+  }
+  
+  // Build request body with filters if provided
+  const body: any = { ...searchParams }
+  if (filters && Object.keys(filters).length > 0) {
+    body.filters = filters
+  }
+  
   const response = await fetch(`${API_BASE_URL}/api/search/semantic`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(params)
+    headers,
+    body: JSON.stringify(body)
   })
   
   if (!response.ok) {

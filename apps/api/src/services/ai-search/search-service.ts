@@ -4,6 +4,21 @@ import { QUALITY_INDICATORS, CASE_MATERIAL_BY_PURPOSE } from './ammo-knowledge'
 import { generateEmbedding, buildProductText } from './embedding-service'
 
 /**
+ * Explicit filters that can override AI intent
+ */
+export interface ExplicitFilters {
+  caliber?: string
+  purpose?: string
+  caseMaterial?: string
+  minPrice?: number
+  maxPrice?: number
+  minGrain?: number
+  maxGrain?: number
+  inStock?: boolean
+  brand?: string
+}
+
+/**
  * Search result with AI-enhanced ranking
  */
 export interface AISearchResult {
@@ -18,6 +33,7 @@ export interface AISearchResult {
   }
   searchMetadata: {
     parsedFilters: Record<string, any>
+    explicitFilters: ExplicitFilters
     aiEnhanced: boolean
     vectorSearchUsed: boolean
     processingTimeMs: number
@@ -25,36 +41,52 @@ export interface AISearchResult {
 }
 
 /**
- * AI-powered semantic search
+ * AI-powered semantic search with optional explicit filter overrides
+ * 
+ * The search process:
+ * 1. Parse natural language query to extract intent (caliber, purpose, grain, etc.)
+ * 2. Merge explicit filters on top of AI intent (explicit filters take priority)
+ * 3. Execute hybrid search (vector + structured)
+ * 4. Re-rank results based on combined intent
  */
 export async function aiSearch(
   query: string,
   options: {
     page?: number
     limit?: number
-    sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'date_desc'
-    useVectorSearch?: boolean // Enable pgvector semantic search
+    sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'date_desc' | 'date_asc'
+    useVectorSearch?: boolean
+    explicitFilters?: ExplicitFilters // Explicit filters override AI intent
   } = {}
 ): Promise<AISearchResult> {
   const startTime = Date.now()
-  const { page = 1, limit = 20, sortBy = 'relevance', useVectorSearch = true } = options
+  const { 
+    page = 1, 
+    limit = 20, 
+    sortBy = 'relevance', 
+    useVectorSearch = true,
+    explicitFilters = {}
+  } = options
   
   // 1. Parse the natural language query into structured intent
   const intent = await parseSearchIntent(query)
   
-  // 2. Build Prisma where clause from intent
-  const where = buildWhereClause(intent)
+  // 2. Merge explicit filters with AI intent (explicit takes priority)
+  const mergedIntent = mergeFiltersWithIntent(intent, explicitFilters)
   
-  // 3. Build price/stock conditions
-  const priceConditions = buildPriceConditions(intent)
+  // 3. Build Prisma where clause from merged intent
+  const where = buildWhereClause(mergedIntent, explicitFilters)
+  
+  // 4. Build price/stock conditions
+  const priceConditions = buildPriceConditions(mergedIntent, explicitFilters)
   if (Object.keys(priceConditions).length > 0) {
     where.prices = { some: priceConditions }
   }
   
-  // 4. Get total count
+  // 5. Get total count
   const total = await prisma.product.count({ where })
   
-  // 5. Fetch products - use vector search if enabled and sorting by relevance
+  // 6. Fetch products - use vector search if enabled and sorting by relevance
   const skip = (page - 1) * limit
   let products: any[]
   let vectorSearchUsed = false
@@ -62,7 +94,7 @@ export async function aiSearch(
   if (useVectorSearch && sortBy === 'relevance') {
     try {
       // Try vector-enhanced search
-      products = await vectorEnhancedSearch(query, intent, { skip, limit: limit * 2 })
+      products = await vectorEnhancedSearch(query, mergedIntent, explicitFilters, { skip, limit: limit * 2 })
       vectorSearchUsed = true
     } catch (error) {
       console.warn('Vector search failed, falling back to standard search:', error)
@@ -72,12 +104,12 @@ export async function aiSearch(
     products = await standardSearch(where, skip, limit * 2)
   }
   
-  // 6. AI-enhanced re-ranking based on intent (if not already vector-ranked)
-  if (sortBy === 'relevance' && intent.confidence > 0.5 && !vectorSearchUsed) {
-    products = reRankProducts(products, intent)
+  // 7. AI-enhanced re-ranking based on intent (if not already vector-ranked)
+  if (sortBy === 'relevance' && mergedIntent.confidence > 0.5 && !vectorSearchUsed) {
+    products = reRankProducts(products, mergedIntent)
   }
   
-  // 7. Apply sorting
+  // 8. Apply sorting
   if (sortBy === 'price_asc' || sortBy === 'price_desc') {
     products = products.sort((a: any, b: any) => {
       const aPrice = a.prices[0]?.price || Infinity
@@ -87,13 +119,13 @@ export async function aiSearch(
     })
   }
   
-  // 8. Trim to requested limit
+  // 9. Trim to requested limit
   products = products.slice(0, limit)
   
-  // 9. Format products
+  // 10. Format products
   const formattedProducts = products.map(formatProduct)
   
-  // 10. Build facets
+  // 11. Build facets
   const facets = await buildFacets(where)
   
   const processingTimeMs = Date.now() - startTime
@@ -116,11 +148,64 @@ export async function aiSearch(
         caseMaterials: intent.caseMaterials,
         qualityLevel: intent.qualityLevel,
       },
+      explicitFilters,
       aiEnhanced: intent.confidence > 0.5,
       vectorSearchUsed,
       processingTimeMs
     }
   }
+}
+
+/**
+ * Merge explicit filters with AI-parsed intent
+ * Explicit filters take priority over AI interpretation
+ */
+function mergeFiltersWithIntent(intent: SearchIntent, filters: ExplicitFilters): SearchIntent {
+  const merged = { ...intent }
+  
+  // Explicit caliber overrides AI-detected calibers
+  if (filters.caliber) {
+    merged.calibers = [filters.caliber]
+  }
+  
+  // Explicit purpose overrides AI-detected purpose
+  if (filters.purpose) {
+    merged.purpose = filters.purpose
+  }
+  
+  // Explicit case material overrides AI-detected
+  if (filters.caseMaterial) {
+    merged.caseMaterials = [filters.caseMaterial]
+  }
+  
+  // Explicit grain range overrides AI-detected
+  if (filters.minGrain !== undefined || filters.maxGrain !== undefined) {
+    // Build grain weights array from range
+    if (filters.minGrain !== undefined && filters.maxGrain !== undefined) {
+      // We'll handle this in the where clause instead
+      merged.grainWeights = undefined
+    }
+  }
+  
+  // Explicit price range
+  if (filters.minPrice !== undefined) {
+    merged.minPrice = filters.minPrice
+  }
+  if (filters.maxPrice !== undefined) {
+    merged.maxPrice = filters.maxPrice
+  }
+  
+  // Explicit in-stock filter
+  if (filters.inStock !== undefined) {
+    merged.inStockOnly = filters.inStock
+  }
+  
+  // Explicit brand
+  if (filters.brand) {
+    merged.brands = [filters.brand]
+  }
+  
+  return merged
 }
 
 /**
@@ -152,6 +237,7 @@ async function standardSearch(where: any, skip: number, take: number): Promise<a
 async function vectorEnhancedSearch(
   query: string,
   intent: SearchIntent,
+  explicitFilters: ExplicitFilters,
   options: { skip: number; limit: number }
 ): Promise<any[]> {
   const { skip, limit } = options
@@ -172,24 +258,42 @@ async function vectorEnhancedSearch(
   const conditions: string[] = ['embedding IS NOT NULL']
   const params: any[] = []
   
-  if (intent.calibers?.length) {
-    conditions.push(`caliber ILIKE ANY(${params.length + 1})`)
-    params.push(intent.calibers.map(c => `%${c}%`))
+  // Use explicit caliber if provided, otherwise use AI-detected
+  const calibers = explicitFilters.caliber ? [explicitFilters.caliber] : intent.calibers
+  if (calibers?.length) {
+    conditions.push(`caliber ILIKE ANY($${params.length + 1})`)
+    params.push(calibers.map(c => `%${c}%`))
   }
   
-  if (intent.purpose) {
-    conditions.push(`purpose ILIKE ${params.length + 1}`)
-    params.push(`%${intent.purpose}%`)
+  // Use explicit purpose if provided, otherwise use AI-detected
+  const purpose = explicitFilters.purpose || intent.purpose
+  if (purpose) {
+    conditions.push(`purpose ILIKE $${params.length + 1}`)
+    params.push(`%${purpose}%`)
   }
   
-  if (intent.caseMaterials?.length) {
-    conditions.push(`"caseMaterial" ILIKE ANY(${params.length + 1})`)
-    params.push(intent.caseMaterials.map(c => `%${c}%`))
+  // Use explicit case material if provided
+  const caseMaterials = explicitFilters.caseMaterial ? [explicitFilters.caseMaterial] : intent.caseMaterials
+  if (caseMaterials?.length) {
+    conditions.push(`"caseMaterial" ILIKE ANY($${params.length + 1})`)
+    params.push(caseMaterials.map(c => `%${c}%`))
   }
   
-  if (intent.brands?.length) {
-    conditions.push(`brand ILIKE ANY(${params.length + 1})`)
-    params.push(intent.brands.map(b => `%${b}%`))
+  // Use explicit brand if provided
+  const brands = explicitFilters.brand ? [explicitFilters.brand] : intent.brands
+  if (brands?.length) {
+    conditions.push(`brand ILIKE ANY($${params.length + 1})`)
+    params.push(brands.map(b => `%${b}%`))
+  }
+  
+  // Grain weight range filter
+  if (explicitFilters.minGrain !== undefined) {
+    conditions.push(`"grainWeight" >= $${params.length + 1}`)
+    params.push(explicitFilters.minGrain)
+  }
+  if (explicitFilters.maxGrain !== undefined) {
+    conditions.push(`"grainWeight" <= $${params.length + 1}`)
+    params.push(explicitFilters.maxGrain)
   }
   
   const whereClause = conditions.join(' AND ')
@@ -242,35 +346,47 @@ async function vectorEnhancedSearch(
 }
 
 /**
- * Build Prisma where clause from search intent
+ * Build Prisma where clause from search intent and explicit filters
  */
-function buildWhereClause(intent: SearchIntent): any {
+function buildWhereClause(intent: SearchIntent, explicitFilters: ExplicitFilters): any {
   const where: any = {}
   const orConditions: any[] = []
   
-  // Caliber filter (with variations)
-  if (intent.calibers && intent.calibers.length > 0) {
-    where.caliber = { in: intent.calibers, mode: 'insensitive' }
+  // Caliber filter (explicit takes priority)
+  const calibers = explicitFilters.caliber ? [explicitFilters.caliber] : intent.calibers
+  if (calibers && calibers.length > 0) {
+    where.caliber = { in: calibers, mode: 'insensitive' }
   }
   
-  // Purpose filter
-  if (intent.purpose) {
-    where.purpose = { equals: intent.purpose, mode: 'insensitive' }
+  // Purpose filter (explicit takes priority)
+  const purpose = explicitFilters.purpose || intent.purpose
+  if (purpose) {
+    where.purpose = { equals: purpose, mode: 'insensitive' }
   }
   
-  // Grain weight filter
-  if (intent.grainWeights && intent.grainWeights.length > 0) {
+  // Grain weight filter - explicit range or AI-detected specific weights
+  if (explicitFilters.minGrain !== undefined || explicitFilters.maxGrain !== undefined) {
+    where.grainWeight = {}
+    if (explicitFilters.minGrain !== undefined) {
+      where.grainWeight.gte = explicitFilters.minGrain
+    }
+    if (explicitFilters.maxGrain !== undefined) {
+      where.grainWeight.lte = explicitFilters.maxGrain
+    }
+  } else if (intent.grainWeights && intent.grainWeights.length > 0) {
     where.grainWeight = { in: intent.grainWeights }
   }
   
-  // Case material filter
-  if (intent.caseMaterials && intent.caseMaterials.length > 0) {
-    where.caseMaterial = { in: intent.caseMaterials, mode: 'insensitive' }
+  // Case material filter (explicit takes priority)
+  const caseMaterials = explicitFilters.caseMaterial ? [explicitFilters.caseMaterial] : intent.caseMaterials
+  if (caseMaterials && caseMaterials.length > 0) {
+    where.caseMaterial = { in: caseMaterials, mode: 'insensitive' }
   }
   
-  // Brand filter
-  if (intent.brands && intent.brands.length > 0) {
-    where.brand = { in: intent.brands, mode: 'insensitive' }
+  // Brand filter (explicit takes priority)
+  const brands = explicitFilters.brand ? [explicitFilters.brand] : intent.brands
+  if (brands && brands.length > 0) {
+    where.brand = { in: brands, mode: 'insensitive' }
   }
   
   // If no structured filters matched, fall back to text search
@@ -297,20 +413,26 @@ function buildWhereClause(intent: SearchIntent): any {
 /**
  * Build price/stock conditions
  */
-function buildPriceConditions(intent: SearchIntent): any {
+function buildPriceConditions(intent: SearchIntent, explicitFilters: ExplicitFilters): any {
   const conditions: any = {}
   
-  if (intent.minPrice !== undefined) {
-    conditions.price = { gte: intent.minPrice }
+  // Explicit price range takes priority
+  const minPrice = explicitFilters.minPrice ?? intent.minPrice
+  const maxPrice = explicitFilters.maxPrice ?? intent.maxPrice
+  
+  if (minPrice !== undefined) {
+    conditions.price = { gte: minPrice }
   }
   
-  if (intent.maxPrice !== undefined) {
+  if (maxPrice !== undefined) {
     conditions.price = conditions.price 
-      ? { ...conditions.price, lte: intent.maxPrice }
-      : { lte: intent.maxPrice }
+      ? { ...conditions.price, lte: maxPrice }
+      : { lte: maxPrice }
   }
   
-  if (intent.inStockOnly) {
+  // Explicit in-stock takes priority
+  const inStock = explicitFilters.inStock ?? intent.inStockOnly
+  if (inStock) {
     conditions.inStock = true
   }
   
