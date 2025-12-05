@@ -56,7 +56,7 @@ export function Hero() {
           {/* Headline */}
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
             Search for Ammo Like You're
-            <span className="block mt-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="block mt-2 pb-1 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent box-decoration-clone">
               Talking to an Expert
             </span>
           </h1>

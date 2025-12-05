@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
+import { TIER_CONFIG, getMaxSearchResults, hasPriceHistoryAccess } from '../config/tiers'
 
 const router: any = Router()
 
@@ -23,6 +24,29 @@ const searchSchema = z.object({
   limit: z.string().default('20')
 })
 
+/**
+ * Get user tier from request
+ * Checks X-User-Id header and looks up user tier
+ * Falls back to FREE tier for anonymous users
+ */
+async function getUserTier(req: Request): Promise<keyof typeof TIER_CONFIG> {
+  const userId = req.headers['x-user-id'] as string
+  
+  if (!userId) {
+    return 'FREE'
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { tier: true }
+    })
+    return (user?.tier as keyof typeof TIER_CONFIG) || 'FREE'
+  } catch {
+    return 'FREE'
+  }
+}
+
 router.get('/search', async (req: Request, res: Response) => {
   try {
     const params = searchSchema.parse(req.query)
@@ -32,8 +56,15 @@ router.get('/search', async (req: Request, res: Response) => {
       sortBy, page, limit
     } = params
 
+    // Get user tier for result limiting
+    const userTier = await getUserTier(req)
+    const maxResults = getMaxSearchResults(userTier)
+
     const pageNum = parseInt(page)
-    const limitNum = parseInt(limit)
+    const requestedLimit = parseInt(limit)
+    
+    // Apply tier-based limit
+    const limitNum = Math.min(requestedLimit, maxResults)
     const skip = (pageNum - 1) * limitNum
 
     // Build where clause for search
@@ -214,14 +245,26 @@ router.get('/search', async (req: Request, res: Response) => {
     facets.brands = countValues('brand')
     facets.categories = countValues('category')
 
+    // Calculate if there are more results available (for upgrade prompt)
+    const hasMoreResults = total > maxResults && userTier === 'FREE'
+
     res.json({
       products: formattedProducts,
       facets,
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum)
+        total: userTier === 'FREE' ? Math.min(total, maxResults) : total,
+        totalPages: Math.ceil(Math.min(total, maxResults) / limitNum),
+        actualTotal: total // Always show the real total count
+      },
+      _meta: {
+        tier: userTier,
+        maxResults,
+        resultsLimited: hasMoreResults,
+        upgradeMessage: hasMoreResults 
+          ? `Showing ${maxResults} of ${total} results. Upgrade to Premium to see all results.`
+          : undefined
       }
     })
   } catch (error) {
@@ -377,11 +420,24 @@ router.get('/:id/prices', async (req: Request, res: Response) => {
   }
 })
 
-// Get price history for a product
+// Get price history for a product - PREMIUM ONLY
 router.get('/:id/history', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
     const { days = '30', retailerId } = req.query
+
+    // Check user tier for price history access
+    const userTier = await getUserTier(req)
+    
+    if (!hasPriceHistoryAccess(userTier)) {
+      return res.status(403).json({
+        error: 'Premium feature',
+        message: 'Price history is only available for Premium subscribers.',
+        tier: userTier,
+        requiredTier: 'PREMIUM',
+        upgradeUrl: '/pricing'
+      })
+    }
 
     const daysNum = parseInt(days as string)
     const startDate = new Date(Date.now() - daysNum * 24 * 60 * 60 * 1000)

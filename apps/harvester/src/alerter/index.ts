@@ -1,8 +1,14 @@
-import { Worker, Job } from 'bullmq'
+import { Worker, Job, Queue } from 'bullmq'
 import { prisma } from '@ironscout/db'
 import { redisConnection } from '../config/redis'
 import { AlertJobData } from '../config/queues'
 import { Resend } from 'resend'
+
+// Tier configuration (duplicated from API for harvester independence)
+const TIER_ALERT_DELAY_MS = {
+  FREE: 60 * 60 * 1000, // 1 hour delay
+  PREMIUM: 0, // Real-time
+}
 
 // Initialize Resend only if API key is provided
 let resend: Resend | null = null
@@ -15,6 +21,13 @@ try {
 }
 const FROM_EMAIL = process.env.FROM_EMAIL || 'alerts@ironscout.ai'
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
+
+// Queue for delayed notifications
+const delayedNotificationQueue = new Queue<{
+  alertId: string
+  triggerReason: string
+  executionId: string
+}>('delayed-notification', { connection: redisConnection })
 
 // Alerter worker - evaluates alerts and sends notifications
 export const alerterWorker = new Worker<AlertJobData>(
@@ -35,19 +48,27 @@ export const alerterWorker = new Worker<AlertJobData>(
         },
       })
 
-      // Find all active alerts for this product
+      // Find all active alerts for this product with user tier info
       const alerts = await prisma.alert.findMany({
         where: {
           productId,
           isActive: true,
         },
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              tier: true, // Include tier for delay calculation
+            }
+          },
           product: true,
         },
       })
 
       let triggeredCount = 0
+      let delayedCount = 0
 
       for (const alert of alerts) {
         let shouldTrigger = false
@@ -95,23 +116,66 @@ export const alerterWorker = new Worker<AlertJobData>(
             continue
           }
 
-          // Send notification
-          await sendNotification(alert, triggerReason)
+          // Get user tier and calculate delay
+          const userTier = (alert.user.tier || 'FREE') as keyof typeof TIER_ALERT_DELAY_MS
+          const delayMs = TIER_ALERT_DELAY_MS[userTier] || TIER_ALERT_DELAY_MS.FREE
 
-          await prisma.executionLog.create({
-            data: {
-              executionId,
-              level: 'INFO',
-              event: 'ALERT_NOTIFY',
-              message: `Alert triggered for user ${alert.user.email}: ${triggerReason}`,
-              metadata: {
+          if (delayMs > 0) {
+            // Queue delayed notification for FREE users
+            await delayedNotificationQueue.add(
+              'send-notification',
+              {
                 alertId: alert.id,
-                userId: alert.userId,
-                productId: alert.productId,
-                reason: triggerReason,
+                triggerReason,
+                executionId,
               },
-            },
-          })
+              {
+                delay: delayMs,
+                jobId: `alert-${alert.id}-${Date.now()}`, // Unique job ID
+              }
+            )
+
+            console.log(`[Alerter] Queued delayed notification for FREE user ${alert.user.email} (delay: ${delayMs / 60000} minutes)`)
+
+            await prisma.executionLog.create({
+              data: {
+                executionId,
+                level: 'INFO',
+                event: 'ALERT_DELAYED',
+                message: `Alert queued with ${delayMs / 60000} minute delay for ${alert.user.email} (${userTier} tier)`,
+                metadata: {
+                  alertId: alert.id,
+                  userId: alert.userId,
+                  userTier,
+                  delayMinutes: delayMs / 60000,
+                  reason: triggerReason,
+                },
+              },
+            })
+
+            delayedCount++
+          } else {
+            // Send immediately for PREMIUM users
+            await sendNotification(alert, triggerReason)
+
+            await prisma.executionLog.create({
+              data: {
+                executionId,
+                level: 'INFO',
+                event: 'ALERT_NOTIFY',
+                message: `Alert triggered immediately for PREMIUM user ${alert.user.email}: ${triggerReason}`,
+                metadata: {
+                  alertId: alert.id,
+                  userId: alert.userId,
+                  productId: alert.productId,
+                  userTier,
+                  reason: triggerReason,
+                },
+              },
+            })
+
+            triggeredCount++
+          }
 
           // Update lastTriggered timestamp
           await prisma.alert.update({
@@ -122,8 +186,6 @@ export const alerterWorker = new Worker<AlertJobData>(
               isActive: alert.alertType === 'BACK_IN_STOCK' ? false : true,
             },
           })
-
-          triggeredCount++
         }
       }
 
@@ -132,12 +194,12 @@ export const alerterWorker = new Worker<AlertJobData>(
           executionId,
           level: 'INFO',
           event: 'ALERT_EVALUATE_OK',
-          message: `Triggered ${triggeredCount} alerts for product ${productId}`,
-          metadata: { triggeredCount },
+          message: `Evaluated alerts: ${triggeredCount} sent immediately, ${delayedCount} delayed`,
+          metadata: { triggeredCount, delayedCount },
         },
       })
 
-      return { success: true, triggeredCount }
+      return { success: true, triggeredCount, delayedCount }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
@@ -160,6 +222,69 @@ export const alerterWorker = new Worker<AlertJobData>(
   }
 )
 
+// Worker for processing delayed notifications
+export const delayedNotificationWorker = new Worker<{
+  alertId: string
+  triggerReason: string
+  executionId: string
+}>(
+  'delayed-notification',
+  async (job) => {
+    const { alertId, triggerReason, executionId } = job.data
+
+    console.log(`[Alerter] Processing delayed notification for alert ${alertId}`)
+
+    try {
+      // Fetch the alert with user and product info
+      const alert = await prisma.alert.findUnique({
+        where: { id: alertId },
+        include: {
+          user: true,
+          product: true,
+        },
+      })
+
+      if (!alert) {
+        console.log(`[Alerter] Alert ${alertId} not found, skipping`)
+        return { success: false, reason: 'Alert not found' }
+      }
+
+      // Check if alert is still active (user might have disabled it)
+      if (!alert.isActive) {
+        console.log(`[Alerter] Alert ${alertId} is no longer active, skipping`)
+        return { success: false, reason: 'Alert no longer active' }
+      }
+
+      // Send the notification
+      await sendNotification(alert, triggerReason)
+
+      await prisma.executionLog.create({
+        data: {
+          executionId,
+          level: 'INFO',
+          event: 'ALERT_DELAYED_SENT',
+          message: `Delayed alert notification sent to ${alert.user.email}`,
+          metadata: {
+            alertId: alert.id,
+            userId: alert.userId,
+            productId: alert.productId,
+            reason: triggerReason,
+          },
+        },
+      })
+
+      return { success: true }
+    } catch (error) {
+      console.error(`[Alerter] Failed to process delayed notification:`, error)
+      throw error
+    }
+  },
+  {
+    connection: redisConnection,
+    concurrency: 5,
+  }
+)
+
 // Send notification to user
 async function sendNotification(alert: any, reason: string) {
   console.log(`[Alerter] NOTIFICATION:`)
@@ -167,6 +292,7 @@ async function sendNotification(alert: any, reason: string) {
   console.log(`  Product: ${alert.product.name}`)
   console.log(`  Reason: ${reason}`)
   console.log(`  Alert Type: ${alert.alertType}`)
+  console.log(`  User Tier: ${alert.user.tier}`)
 
   try {
     // Get the latest price for the product
@@ -197,7 +323,8 @@ async function sendNotification(alert: any, reason: string) {
         targetPrice,
         savings,
         retailerName: latestPrice.retailer.name,
-        retailerUrl: latestPrice.url
+        retailerUrl: latestPrice.url,
+        userTier: alert.user.tier,
       })
 
       if (resend) {
@@ -219,7 +346,8 @@ async function sendNotification(alert: any, reason: string) {
         productImageUrl: alert.product.imageUrl,
         currentPrice,
         retailerName: latestPrice.retailer.name,
-        retailerUrl: latestPrice.url
+        retailerUrl: latestPrice.url,
+        userTier: alert.user.tier,
       })
 
       if (resend) {
@@ -250,7 +378,15 @@ function generatePriceDropEmailHTML(data: {
   savings: number
   retailerName: string
   retailerUrl: string
+  userTier: string
 }): string {
+  const delayNotice = data.userTier === 'FREE' 
+    ? `<p style="margin: 20px 0 0 0; padding: 15px; background-color: #fef3c7; border-radius: 8px; font-size: 13px; color: #92400e;">
+        💡 <strong>Free account:</strong> This alert was delayed by 1 hour. 
+        <a href="${FRONTEND_URL}/pricing" style="color: #d97706; text-decoration: underline;">Upgrade to Premium</a> for real-time alerts!
+       </p>`
+    : ''
+
   return `
     <!DOCTYPE html>
     <html>
@@ -318,6 +454,7 @@ function generatePriceDropEmailHTML(data: {
                         </td>
                       </tr>
                     </table>
+                    ${delayNotice}
                   </td>
                 </tr>
                 <tr>
@@ -347,7 +484,15 @@ function generateBackInStockEmailHTML(data: {
   currentPrice: number
   retailerName: string
   retailerUrl: string
+  userTier: string
 }): string {
+  const delayNotice = data.userTier === 'FREE' 
+    ? `<p style="margin: 20px 0 0 0; padding: 15px; background-color: #fef3c7; border-radius: 8px; font-size: 13px; color: #92400e;">
+        💡 <strong>Free account:</strong> This alert was delayed by 1 hour. 
+        <a href="${FRONTEND_URL}/pricing" style="color: #d97706; text-decoration: underline;">Upgrade to Premium</a> for real-time alerts!
+       </p>`
+    : ''
+
   return `
     <!DOCTYPE html>
     <html>
@@ -404,6 +549,7 @@ function generateBackInStockEmailHTML(data: {
                         </td>
                       </tr>
                     </table>
+                    ${delayNotice}
                   </td>
                 </tr>
                 <tr>
@@ -431,4 +577,12 @@ alerterWorker.on('completed', (job) => {
 
 alerterWorker.on('failed', (job, err) => {
   console.error(`[Alerter] Job ${job?.id} failed:`, err.message)
+})
+
+delayedNotificationWorker.on('completed', (job) => {
+  console.log(`[Alerter] Delayed notification ${job.id} sent`)
+})
+
+delayedNotificationWorker.on('failed', (job, err) => {
+  console.error(`[Alerter] Delayed notification ${job?.id} failed:`, err.message)
 })

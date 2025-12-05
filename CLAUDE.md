@@ -11,7 +11,24 @@ IronScout.ai is an AI-powered shopping assistant platform that tracks and aggreg
 2. **API** (`apps/api/`) - Express.js REST API backend
 3. **Harvester** (`apps/harvester/`) - BullMQ-based distributed crawling system
 
-**Critical**: These are separate deployable services. The frontend CANNOT access the database directly and must use the API. The harvester runs independently as background workers.
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 11.8s
+   Linting and checking validity of types ...
+Failed to compile.
+./app/admin/embeddings/page.tsx:335:35
+Type error: 'progress.processed' is possibly 'undefined'.
+  333 |
+  334 |         {/* Completion Message */}
+> 335 |         {!progress?.inProgress && progress?.processed > 0 && (
+      |                                   ^
+  336 |           <div className="mt-6 p-4 bg-green-50 rounded-lg flex items-center gap-3">
+  337 |             <CheckCircle className="h-5 w-5 text-green-600" />
+  338 |             <div>
+Next.js build worker exited with code: 1 and signal: null
+/opt/render/project/src/apps/web:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @ironscout/web@1.0.0 build: `next build`
+Exit status 1
+==> Build failed 😞**Critical**: These are separate deployable services. The frontend CANNOT access the database directly and must use the API. The harvester runs independently as background workers.
 
 ## Development Commands
 

@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { SearchResults } from '@/components/search/search-results'
-import { AISearchBar } from '@/components/search/ai-search-bar'
+import { UnifiedSearch } from '@/components/search/unified-search'
 import { SortSelect } from '@/components/search/sort-select'
 
 interface SearchPageProps {
@@ -13,6 +13,8 @@ interface SearchPageProps {
     inStock?: string
     caliber?: string
     grainWeight?: string
+    minGrain?: string
+    maxGrain?: string
     caseMaterial?: string
     purpose?: string
     sortBy?: 'price_asc' | 'price_desc' | 'date_desc' | 'date_asc' | 'relevance'
@@ -26,12 +28,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      {/* AI Search Bar */}
+      {/* Unified Search Interface */}
       <div className="mb-8">
-        <AISearchBar initialQuery={query} />
+        <UnifiedSearch initialQuery={query} />
       </div>
 
-      {/* Main Content */}
+      {/* Sort & Results */}
       <div className="flex flex-col">
         {query && (
           <div className="flex justify-end mb-4">

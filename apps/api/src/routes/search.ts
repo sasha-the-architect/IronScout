@@ -3,32 +3,105 @@ import { z } from 'zod'
 import { aiSearch, getSearchSuggestions, parseSearchIntent, backfillProductEmbeddings, updateProductEmbedding } from '../services/ai-search'
 import { prisma } from '@ironscout/db'
 import { requireAdmin, rateLimit } from '../middleware/auth'
+import { TIER_CONFIG, getMaxSearchResults, hasPriceHistoryAccess } from '../config/tiers'
 
 const router: any = Router()
 
 /**
- * AI-powered semantic search
+ * Get user tier from request
+ * Checks X-User-Id header and looks up user tier
+ * Falls back to FREE tier for anonymous users
+ */
+async function getUserTier(req: Request): Promise<keyof typeof TIER_CONFIG> {
+  const userId = req.headers['x-user-id'] as string
+  
+  if (!userId) {
+    return 'FREE'
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { tier: true }
+    })
+    return (user?.tier as keyof typeof TIER_CONFIG) || 'FREE'
+  } catch {
+    return 'FREE'
+  }
+}
+
+/**
+ * AI-powered semantic search with optional explicit filters
  * POST /api/search/semantic
  * 
  * Accepts natural language queries like:
  * - "best ammo for target practice at long range with AR15"
  * - "cheap 9mm bulk ammo in stock"
  * - "match grade .308 for precision rifle competition"
+ * 
+ * Also accepts explicit filters that override/narrow AI intent:
+ * - caliber, purpose, caseMaterial, minPrice, maxPrice, minGrain, maxGrain, inStock
  */
 const semanticSearchSchema = z.object({
   query: z.string().min(1).max(500),
   page: z.number().int().positive().default(1),
   limit: z.number().int().min(1).max(100).default(20),
   sortBy: z.enum(['relevance', 'price_asc', 'price_desc', 'date_desc', 'date_asc']).default('relevance'),
+  // Explicit filters that override AI intent
+  filters: z.object({
+    caliber: z.string().optional(),
+    purpose: z.string().optional(),
+    caseMaterial: z.string().optional(),
+    minPrice: z.number().optional(),
+    maxPrice: z.number().optional(),
+    minGrain: z.number().optional(),
+    maxGrain: z.number().optional(),
+    inStock: z.boolean().optional(),
+    brand: z.string().optional(),
+  }).optional(),
 })
 
 router.post('/semantic', async (req: Request, res: Response) => {
   try {
-    const { query, page, limit, sortBy } = semanticSearchSchema.parse(req.body)
+    const { query, page, limit, sortBy, filters } = semanticSearchSchema.parse(req.body)
     
-    const result = await aiSearch(query, { page, limit, sortBy })
+    // Get user tier for result limiting
+    const userTier = await getUserTier(req)
+    const maxResults = getMaxSearchResults(userTier)
     
-    res.json(result)
+    // Apply tier-based limit
+    const tierLimitedLimit = Math.min(limit, maxResults)
+    
+    const result = await aiSearch(query, { 
+      page, 
+      limit: tierLimitedLimit, 
+      sortBy,
+      explicitFilters: filters, // Pass explicit filters to AI search
+    })
+    
+    // Check if results are limited
+    const hasMoreResults = result.pagination.total > maxResults && userTier === 'FREE'
+    
+    // Adjust pagination info for tier limits
+    const adjustedResult = {
+      ...result,
+      pagination: {
+        ...result.pagination,
+        total: userTier === 'FREE' ? Math.min(result.pagination.total, maxResults) : result.pagination.total,
+        totalPages: Math.ceil(Math.min(result.pagination.total, maxResults) / tierLimitedLimit),
+        actualTotal: result.pagination.total // Always show the real total count
+      },
+      _meta: {
+        tier: userTier,
+        maxResults,
+        resultsLimited: hasMoreResults,
+        upgradeMessage: hasMoreResults 
+          ? `Showing ${maxResults} of ${result.pagination.total} results. Upgrade to Premium to see all results.`
+          : undefined
+      }
+    }
+    
+    res.json(adjustedResult)
   } catch (error) {
     console.error('Semantic search error:', error)
     

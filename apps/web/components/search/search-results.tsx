@@ -1,9 +1,11 @@
-import { aiSearch, getAds, AISearchResponse } from '@/lib/api'
+import { auth } from '@/lib/auth'
+import { aiSearch, getAds, AISearchResponse, ExplicitFilters } from '@/lib/api'
 import { ProductCard } from '@/components/products/product-card'
 import { AdCard } from '@/components/ads/ad-card'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Sparkles, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Sparkles, Search, Crown, SlidersHorizontal } from 'lucide-react'
 import { SearchHeader } from './search-header'
+import Link from 'next/link'
 
 interface SearchResultsProps {
   searchParams: {
@@ -15,6 +17,8 @@ interface SearchResultsProps {
     inStock?: string
     caliber?: string
     grainWeight?: string
+    minGrain?: string
+    maxGrain?: string
     caseMaterial?: string
     purpose?: string
     sortBy?: 'price_asc' | 'price_desc' | 'date_desc' | 'date_asc' | 'relevance'
@@ -26,6 +30,25 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
   const query = searchParams.q || ''
   const page = parseInt(searchParams.page || '1')
   const sortBy = searchParams.sortBy || 'relevance'
+  
+  // Get session for user tier
+  const session = await auth()
+  const userId = session?.user?.id
+  
+  // Build explicit filters from URL params
+  const explicitFilters: ExplicitFilters = {}
+  if (searchParams.caliber) explicitFilters.caliber = searchParams.caliber
+  if (searchParams.purpose) explicitFilters.purpose = searchParams.purpose
+  if (searchParams.caseMaterial) explicitFilters.caseMaterial = searchParams.caseMaterial
+  if (searchParams.minPrice) explicitFilters.minPrice = parseFloat(searchParams.minPrice)
+  if (searchParams.maxPrice) explicitFilters.maxPrice = parseFloat(searchParams.maxPrice)
+  if (searchParams.minGrain) explicitFilters.minGrain = parseInt(searchParams.minGrain)
+  if (searchParams.maxGrain) explicitFilters.maxGrain = parseInt(searchParams.maxGrain)
+  if (searchParams.inStock === 'true') explicitFilters.inStock = true
+  if (searchParams.brand) explicitFilters.brand = searchParams.brand
+  
+  // Check if any explicit filters are active
+  const hasFilters = Object.keys(explicitFilters).length > 0
   
   if (!query) {
     return (
@@ -56,12 +79,14 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
         query, 
         page, 
         limit: 20, 
-        sortBy: sortBy as any 
+        sortBy: sortBy as any,
+        userId,
+        filters: hasFilters ? explicitFilters : undefined,
       }),
       getAds('middle', searchParams.category)
     ])
 
-    const { products, pagination, intent, searchMetadata } = searchData
+    const { products, pagination, intent, searchMetadata, _meta } = searchData as AISearchResponse & { _meta?: any }
     const { ads } = adsData
 
     if (products.length === 0) {
@@ -73,13 +98,20 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
             intent={intent}
             processingTimeMs={searchMetadata.processingTimeMs}
             vectorSearchUsed={searchMetadata.vectorSearchUsed}
+            hasFilters={hasFilters}
           />
           <div className="text-center py-12 mt-6">
             <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-lg font-medium mb-2">No products found for "{query}"</p>
-            <p className="text-muted-foreground mb-6">Try adjusting your search or being more specific</p>
+            {hasFilters ? (
+              <p className="text-muted-foreground mb-6">
+                Try removing some filters or adjusting your search
+              </p>
+            ) : (
+              <p className="text-muted-foreground mb-6">Try adjusting your search or being more specific</p>
+            )}
             
-            {intent && intent.confidence < 0.5 && (
+            {intent && intent.confidence < 0.5 && !hasFilters && (
               <div className="max-w-md mx-auto p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
                   <strong>Tip:</strong> Try being more specific about caliber or purpose. 
@@ -113,9 +145,35 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
           intent={intent}
           processingTimeMs={searchMetadata.processingTimeMs}
           vectorSearchUsed={searchMetadata.vectorSearchUsed}
+          hasFilters={hasFilters}
+          explicitFilters={explicitFilters}
         />
         
         <div className="space-y-6 mt-6">
+          {/* Results Limited Banner */}
+          {_meta?.resultsLimited && (
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
+                  <Crown className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-amber-900 dark:text-amber-100">
+                    Showing {_meta.maxResults} of {(pagination as any).actualTotal} results
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    Upgrade to Premium to see all results
+                  </p>
+                </div>
+              </div>
+              <Button asChild size="sm" className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white">
+                <Link href="/pricing">
+                  Upgrade
+                </Link>
+              </Button>
+            </div>
+          )}
+
           {/* Results Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {mixedResults.map((item, index) => (
