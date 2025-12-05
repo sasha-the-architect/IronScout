@@ -315,12 +315,16 @@ export function UnifiedSearch({ initialQuery = '' }: UnifiedSearchProps) {
       <div className="max-w-3xl mx-auto mt-4">
         <button
           onClick={() => setFiltersOpen(!filtersOpen)}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mx-auto"
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all mx-auto ${
+            filtersOpen 
+              ? 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-foreground' 
+              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+          }`}
         >
           <SlidersHorizontal className="h-4 w-4" />
-          <span>Advanced Filters</span>
+          <span className="font-medium text-sm">Advanced Filters</span>
           {activeFilterCount > 0 && (
-            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
+            <span className="px-2 py-0.5 bg-blue-500 text-white rounded-full text-xs font-semibold min-w-[20px] text-center">
               {activeFilterCount}
             </span>
           )}
