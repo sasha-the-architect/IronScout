@@ -2,22 +2,29 @@ import { NextResponse } from 'next/server';
 import { getSession, logAdminAction } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { headers } from 'next/headers';
+import { logger } from '@/lib/logger';
+import { sendApprovalEmail } from '@/lib/email';
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = crypto.randomUUID().slice(0, 8);
+  const reqLogger = logger.child({ requestId, endpoint: '/api/admin/dealers/[id]/reactivate' });
+  
   try {
     const session = await getSession();
     
     if (!session || session.type !== 'admin') {
+      reqLogger.warn('Unauthorized reactivate attempt');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const dealerId = params.id;
+    const { id: dealerId } = await params;
+    reqLogger.info('Dealer reactivate request', { dealerId, adminEmail: session.email });
 
     // Get current dealer state
     const dealer = await prisma.dealer.findUnique({
@@ -25,6 +32,7 @@ export async function POST(
     });
 
     if (!dealer) {
+      reqLogger.warn('Dealer not found', { dealerId });
       return NextResponse.json(
         { error: 'Dealer not found' },
         { status: 404 }
@@ -32,11 +40,17 @@ export async function POST(
     }
 
     if (dealer.status !== 'SUSPENDED') {
+      reqLogger.warn('Dealer is not suspended', { dealerId, currentStatus: dealer.status });
       return NextResponse.json(
         { error: 'Dealer is not suspended' },
         { status: 400 }
       );
     }
+
+    reqLogger.info('Reactivating dealer', { 
+      dealerId, 
+      businessName: dealer.businessName 
+    });
 
     // Update dealer status
     const updatedDealer = await prisma.dealer.update({
@@ -45,6 +59,8 @@ export async function POST(
         status: 'ACTIVE',
       },
     });
+
+    reqLogger.info('Dealer reactivated successfully', { dealerId });
 
     // Log admin action
     const headersList = await headers();
@@ -58,7 +74,24 @@ export async function POST(
       userAgent: headersList.get('user-agent') || undefined,
     });
 
-    // TODO: Send reactivation email to dealer
+    // Send reactivation email (same as approval)
+    reqLogger.debug('Sending reactivation email');
+    const emailResult = await sendApprovalEmail(
+      dealer.email,
+      dealer.businessName
+    );
+
+    if (!emailResult.success) {
+      reqLogger.warn('Failed to send reactivation email', { 
+        dealerId, 
+        error: emailResult.error 
+      });
+    } else {
+      reqLogger.info('Reactivation email sent', { 
+        dealerId, 
+        messageId: emailResult.messageId 
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -66,9 +99,10 @@ export async function POST(
         id: updatedDealer.id,
         status: updatedDealer.status,
       },
+      emailSent: emailResult.success,
     });
   } catch (error) {
-    console.error('Reactivate dealer error:', error);
+    reqLogger.error('Reactivate dealer error', {}, error);
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

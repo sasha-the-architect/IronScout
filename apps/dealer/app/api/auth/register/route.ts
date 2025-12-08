@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { registerDealer } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { sendVerificationEmail } from '@/lib/email';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -82,12 +83,32 @@ export async function POST(request: Request) {
       businessName 
     });
 
-    // TODO: Send verification email
-    // await sendVerificationEmail(result.dealer!.email, result.dealer!.verifyToken);
+    // Send verification email
+    reqLogger.debug('Sending verification email');
+    const emailResult = await sendVerificationEmail(
+      result.dealer!.email,
+      result.dealer!.businessName,
+      result.dealer!.verifyToken!
+    );
+
+    if (!emailResult.success) {
+      reqLogger.error('Failed to send verification email', { 
+        dealerId: result.dealer?.id,
+        error: emailResult.error 
+      });
+      // Don't fail registration, but log the issue
+      // The user can request a resend later
+    } else {
+      reqLogger.info('Verification email sent', { 
+        dealerId: result.dealer?.id,
+        messageId: emailResult.messageId 
+      });
+    }
 
     return NextResponse.json({
       success: true,
       message: 'Registration successful. Please check your email to verify your account.',
+      emailSent: emailResult.success,
     });
   } catch (error) {
     reqLogger.error('Registration failed - unexpected error', {}, error);

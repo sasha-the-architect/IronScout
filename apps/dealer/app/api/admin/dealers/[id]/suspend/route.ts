@@ -2,22 +2,28 @@ import { NextResponse } from 'next/server';
 import { getSession, logAdminAction } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { headers } from 'next/headers';
+import { logger } from '@/lib/logger';
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const requestId = crypto.randomUUID().slice(0, 8);
+  const reqLogger = logger.child({ requestId, endpoint: '/api/admin/dealers/[id]/suspend' });
+  
   try {
     const session = await getSession();
     
     if (!session || session.type !== 'admin') {
+      reqLogger.warn('Unauthorized suspend attempt');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const dealerId = params.id;
+    const { id: dealerId } = await params;
+    reqLogger.info('Dealer suspend request', { dealerId, adminEmail: session.email });
 
     // Get current dealer state
     const dealer = await prisma.dealer.findUnique({
@@ -25,6 +31,7 @@ export async function POST(
     });
 
     if (!dealer) {
+      reqLogger.warn('Dealer not found', { dealerId });
       return NextResponse.json(
         { error: 'Dealer not found' },
         { status: 404 }
@@ -32,11 +39,17 @@ export async function POST(
     }
 
     if (dealer.status === 'SUSPENDED') {
+      reqLogger.warn('Dealer already suspended', { dealerId });
       return NextResponse.json(
         { error: 'Dealer is already suspended' },
         { status: 400 }
       );
     }
+
+    reqLogger.info('Suspending dealer', { 
+      dealerId, 
+      businessName: dealer.businessName 
+    });
 
     // Update dealer status
     const updatedDealer = await prisma.dealer.update({
@@ -45,6 +58,8 @@ export async function POST(
         status: 'SUSPENDED',
       },
     });
+
+    reqLogger.info('Dealer suspended successfully', { dealerId });
 
     // Log admin action
     const headersList = await headers();
@@ -68,7 +83,7 @@ export async function POST(
       },
     });
   } catch (error) {
-    console.error('Suspend dealer error:', error);
+    reqLogger.error('Suspend dealer error', {}, error);
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }
