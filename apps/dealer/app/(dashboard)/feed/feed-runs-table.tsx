@@ -1,6 +1,6 @@
 'use client';
 
-import type { DealerFeedRun } from '@prisma/client';
+import type { DealerFeedRun } from '@ironscout/db';
 import { CheckCircle, AlertTriangle, XCircle, Clock, Loader2 } from 'lucide-react';
 
 interface FeedRunsTableProps {

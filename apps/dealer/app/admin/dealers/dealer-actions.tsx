@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Dealer, DealerStatus } from '@prisma/client';
+import type { Dealer, DealerStatus } from '@ironscout/db';
 
 interface DealerActionsProps {
   dealer: Dealer;

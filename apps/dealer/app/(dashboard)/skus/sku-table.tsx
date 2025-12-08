@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import type { DealerSku, CanonicalSku } from '@prisma/client';
+import type { DealerSku, CanonicalSku } from '@ironscout/db';
 import { 
   Package, 
   CheckCircle, 

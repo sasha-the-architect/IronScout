@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { FeedType } from '@prisma/client';
+import type { FeedType } from '@ironscout/db';
 
 interface FeedFormData {
   feedType: FeedType;

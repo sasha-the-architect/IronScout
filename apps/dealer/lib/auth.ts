@@ -12,7 +12,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { prisma } from '@ironscout/db';
-import type { Dealer, DealerStatus } from '@prisma/client';
+import type { Dealer, DealerStatus } from '@ironscout/db';
 
 // =============================================
 // Configuration
