@@ -508,6 +508,3 @@ export async function batchParseIntents(
 ): Promise<SearchIntent[]> {
   return Promise.all(queries.map(q => parseSearchIntent(q, options)))
 }
-
-// Re-export types
-export type { SafetyConstraint, PremiumSearchIntent, ParseOptions }

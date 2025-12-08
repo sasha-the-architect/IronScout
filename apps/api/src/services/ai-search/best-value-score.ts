@@ -12,8 +12,8 @@
  * The score answers: "Is this a good deal for what I need?"
  */
 
-import { prisma } from '@ironscout/db'
-import { Decimal } from '@prisma/client/runtime/library'
+import { prisma, Prisma } from '@ironscout/db'
+type Decimal = Prisma.Decimal
 
 /**
  * Best Value Score breakdown

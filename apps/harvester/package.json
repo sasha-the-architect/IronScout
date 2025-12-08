@@ -22,7 +22,7 @@
     "csv-parse": "^6.1.0",
     "fast-xml-parser": "^5.3.2",
     "ioredis": "^5.8.2",
-    "puppeteer": "^21.11.0",
+    "puppeteer": "^24.0.0",
     "resend": "^6.5.2"
   },
   "devDependencies": {

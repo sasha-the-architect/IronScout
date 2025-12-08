@@ -1,39 +1,66 @@
-# IronScout.ai - AI-Powered Shopping Assistant
+# IronScout.ai - AI-Powered Ammunition Search & Price Comparison
 
-IronScout.ai is an AI-native, responsive purchasing assistant platform that discovers, normalizes, and presents product deals across the internet. It supports user subscriptions, premium dealer prioritization, affiliate revenue, and display ads. The foundation includes stubs for a future Data as a Service (DaaS) offering.
+IronScout.ai is an AI-native ammunition search platform that goes beyond basic price comparison to provide expert-level guidance through advanced AI analysis. The platform helps shooters find ammunition optimized for their specific use cases (barrel length, suppressor compatibility, defensive vs. training, etc.) while providing the best value.
+
+## 🎯 What Makes IronScout Different
+
+Unlike competitors like AmmoSeek, IronScout provides:
+
+- **AI-Powered Natural Language Search**: "best 9mm for home defense with short barrel"
+- **Performance-Aware Recommendations**: Rankings based on bullet type, +P ratings, suppressor compatibility
+- **Best Value Scoring**: Composite algorithm beyond simple price comparison
+- **Expert-Level Guidance**: AI explanations for ammunition selection
+- **Dealer Portal**: Self-service tools for dealers to manage feeds and get market insights
 
 ## 🚀 Features
 
-### MVP Features
-- **Smart Product Search**: AI-powered search across millions of products
-- **Real-time Price Alerts**: Get notified when prices drop on products you're watching
-- **Premium Retailer Priority**: Enhanced visibility for premium dealer partners
-- **Responsive Design**: Fully responsive UI that works on all devices
-- **User Authentication**: Secure login with NextAuth.js
-- **Subscription Management**: Stripe-powered billing and subscription handling
+### Consumer Features
 
-### Monetization Strategy
-- **User Subscriptions**: Free and Premium tiers with different alert capabilities
-- **Dealer Partnerships**: Premium placement and enhanced visibility for retailers
-- **Affiliate Revenue**: Commission from purchases through tracked links
-- **Display Advertising**: Contextual ads mixed with search results
+**FREE Tier:**
+- Natural language search
+- Basic AI purpose detection
+- Up to 5 price alerts (60-min delay)
+- 20 search results per query
+- Standard relevance ranking
 
-### Post-MVP Features (Stubs Included)
-- **Data as a Service (DaaS)**: API access for market trends and price velocity data
-- **Advanced Analytics**: Detailed market insights and reporting
-- **Enterprise Solutions**: White-label options and custom integrations
+**PREMIUM Tier ($4.99/mo):**
+- Unlimited real-time alerts
+- 100 search results per query
+- 365-day price history
+- Advanced AI features:
+  - Purpose-optimized ranking
+  - Performance-aware matching
+  - Best Value Score
+  - AI explanations
+  - Premium filters (+P, subsonic, velocity, bullet type)
+  - Performance badges ("Low flash", "Short-barrel optimized")
+
+### Dealer Portal Features
+- Self-service feed management (CSV, XML, JSON)
+- Automatic SKU matching to canonical products
+- Market price benchmarking
+- Actionable insights (overpriced, underpriced, stock opportunities)
+- Attribution tracking
+
+### Admin Features
+- Harvester monitoring dashboard
+- Embedding coverage stats
+- Premium field population tracking
+- Manual crawl triggers
+- Product report management
 
 ## 🏗️ Architecture
 
-This project is built as a modern monorepo using:
+### Technology Stack
 
-- **Framework**: Next.js 14 with App Router
-- **Language**: TypeScript
-- **Database**: PostgreSQL with Prisma ORM
-- **Styling**: Tailwind CSS with Shadcn/UI components
-- **Authentication**: NextAuth.js
+- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Shadcn/UI
+- **API**: Express.js, TypeScript, Zod validation
+- **Database**: PostgreSQL with pgvector extension
+- **ORM**: Prisma with vector support
+- **Authentication**: NextAuth.js with Google OAuth
 - **Payments**: Stripe SDK
-- **Package Management**: pnpm workspaces
+- **Queue/Worker**: BullMQ + Redis
+- **AI**: OpenAI text-embedding-3-small (1536 dimensions)
 
 ### Project Structure
 
@@ -43,218 +70,210 @@ IronScout/
 │   ├── api/                 # Express.js backend API
 │   │   ├── src/
 │   │   │   ├── routes/      # API route handlers
+│   │   │   ├── services/    # Business logic (AI search, etc.)
+│   │   │   ├── config/      # Tier config, etc.
 │   │   │   └── index.ts     # Main server file
 │   │   └── package.json
-│   └── web/                 # Next.js frontend application
-│       ├── app/             # Next.js app router pages
-│       ├── components/      # React components
-│       ├── lib/             # Utility functions and API clients
+│   ├── web/                 # Next.js frontend application
+│   │   ├── app/             # Next.js app router pages
+│   │   ├── components/      # React components
+│   │   ├── lib/             # Utility functions and API clients
+│   │   └── package.json
+│   └── harvester/           # BullMQ worker system
+│       ├── src/
+│       │   ├── scheduler/   # Job scheduling
+│       │   ├── fetcher/     # Feed/page fetching
+│       │   ├── extractor/   # Content parsing
+│       │   ├── normalizer/  # Data standardization
+│       │   ├── writer/      # Database upserts
+│       │   ├── alerter/     # Notification triggers
+│       │   ├── dealer/      # Dealer portal workers
+│       │   └── worker.ts    # Main worker entry
 │       └── package.json
 ├── packages/
-│   └── db/                  # Shared database schema and utilities
+│   └── db/                  # Shared database schema
 │       ├── schema.prisma    # Prisma database schema
 │       └── index.ts         # Database client exports
-├── package.json             # Root package.json with workspace config
-└── pnpm-workspace.yaml     # pnpm workspace configuration
+├── docs/                    # Architecture documentation
+└── pnpm-workspace.yaml      # pnpm workspace configuration
+```
+
+### Service Architecture
+
+```
+User → Web App (3000) → API (8000) → PostgreSQL
+                                  ↗
+                       Redis ← Harvester (10 workers)
+
+Dealer → Dealer Portal → API → Redis → Dealer Workers (4)
 ```
 
 ## 🛠️ Local Development Setup
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - pnpm 8+
-- PostgreSQL 14+
+- PostgreSQL 14+ with pgvector extension
+- Redis 7+
 
 ### Installation
 
-1. **Clone the repository**
+1. **Clone and install**
    ```bash
    git clone <repository-url>
    cd IronScout
-   ```
-
-2. **Install dependencies**
-   ```bash
    pnpm install
    ```
 
-3. **Set up environment variables**
+2. **Set up environment variables**
    ```bash
-   # Copy environment files
    cp .env.example .env
    cp apps/api/.env.example apps/api/.env
    cp apps/web/.env.example apps/web/.env.local
-   
-   # Edit the files with your actual values
    ```
 
-4. **Set up the database**
+3. **Set up the database**
    ```bash
-   # Generate Prisma client
    cd packages/db
    pnpm db:generate
-   
-   # Run database migrations
    pnpm db:migrate
    ```
 
-5. **Start the development servers**
+4. **Start all services**
    ```bash
-   # From the root directory
+   # Terminal 1: Web + API
    pnpm dev
+   
+   # Terminal 2: Harvester workers
+   cd apps/harvester && pnpm worker
    ```
-
-   This will start:
-   - API server on http://localhost:8000
-   - Web application on http://localhost:3000
 
 ### Environment Variables
 
-#### Root `.env`
+**API `.env`:**
 ```env
-DATABASE_URL="postgresql://username:password@localhost:5432/ironscout"
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="your-secret-key-here"
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
-STRIPE_PUBLISHABLE_KEY="pk_test_your-stripe-publishable-key"
-STRIPE_SECRET_KEY="sk_test_your-stripe-secret-key"
-STRIPE_WEBHOOK_SECRET="whsec_your-webhook-secret"
-API_URL="http://localhost:8000"
-```
-
-#### API `.env` (`apps/api/.env`)
-```env
-DATABASE_URL="postgresql://username:password@localhost:5432/ironscout"
-STRIPE_SECRET_KEY="sk_test_your-stripe-secret-key"
-STRIPE_WEBHOOK_SECRET="whsec_your-webhook-secret"
+DATABASE_URL="postgresql://..."
+STRIPE_SECRET_KEY="sk_test_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
 FRONTEND_URL="http://localhost:3000"
+OPENAI_API_KEY="sk-..."
+REDIS_HOST="localhost"
+REDIS_PORT=6379
 PORT=8000
 ```
 
-#### Web `.env.local` (`apps/web/.env.local`)
+**Web `.env.local`:**
 ```env
 NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="your-secret-key-here"
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
+NEXTAUTH_SECRET="..."
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
 NEXT_PUBLIC_API_URL="http://localhost:8000"
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_your-stripe-publishable-key"
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_..."
 ```
-
-## 📱 Responsive Design
-
-The application is built with a mobile-first approach using Tailwind CSS responsive utilities:
-
-- **Mobile**: Single column layouts, collapsible navigation
-- **Tablet**: 2-3 column grids, expanded navigation
-- **Desktop**: 4-5 column grids, full navigation, sidebar layouts
-
-Key responsive breakpoints:
-- `sm:` 640px and up
-- `md:` 768px and up  
-- `lg:` 1024px and up
-- `xl:` 1280px and up
 
 ## 🔧 Available Scripts
 
 ### Root Level
-- `pnpm dev` - Start all development servers
-- `pnpm build` - Build all applications
-- `pnpm lint` - Run linting across all packages
+- `pnpm dev` - Start web + API
+- `pnpm build` - Build all apps
+- `pnpm lint` - Lint all packages
 
 ### Database (`packages/db`)
 - `pnpm db:generate` - Generate Prisma client
-- `pnpm db:push` - Push schema changes to database
-- `pnpm db:migrate` - Run database migrations
+- `pnpm db:migrate` - Run migrations
+- `pnpm db:push` - Push schema changes
 - `pnpm db:studio` - Open Prisma Studio
+- `pnpm db:seed` - Seed test data
 
-### API (`apps/api`)
-- `pnpm dev` - Start API development server
-- `pnpm build` - Build API for production
-- `pnpm start` - Start production API server
+### Harvester (`apps/harvester`)
+- `pnpm worker` - Start all workers
+- `pnpm dev run` - Trigger immediate crawl
+- `pnpm dev schedule` - Set up recurring crawls
+- `pnpm dev status` - Show queue status
 
-### Web (`apps/web`)
-- `pnpm dev` - Start Next.js development server
-- `pnpm build` - Build Next.js application
-- `pnpm start` - Start production Next.js server
-- `pnpm lint` - Run ESLint
+## 🗄️ Database Schema Highlights
 
-## 🗄️ Database Schema
+### Core Models
+- **User**: Auth, tier (FREE/PREMIUM)
+- **Product**: Catalog with Premium AI fields
+- **Retailer**: Stores with tier prioritization
+- **Price**: Price tracking with shipping
+- **Alert**: User price alerts
+- **Source/Execution**: Crawl tracking
 
-The application uses PostgreSQL with Prisma ORM. Key models include:
+### Premium AI Fields on Product
+```prisma
+bulletType         BulletType?      // JHP, FMJ, SP, etc.
+pressureRating     PressureRating?  // STANDARD, PLUS_P, NATO
+muzzleVelocityFps  Int?             // Subsonic detection
+isSubsonic         Boolean?         // Suppressor filtering
+shortBarrelOptimized Boolean?       // Compact pistol optimization
+suppressorSafe     Boolean?         // Suppressor compatibility
+lowFlash           Boolean?         // Low-light optimization
+lowRecoil          Boolean?         // Reduced recoil
+controlledExpansion Boolean?        // Overpenetration limit
+matchGrade         Boolean?         // Competition quality
+embedding          vector(1536)     // Semantic search
+```
 
-- **User**: User accounts with tier-based permissions
-- **Product**: Product catalog with categories and brands
-- **Retailer**: Retailer information with tier-based prioritization
-- **Price**: Price tracking across retailers
-- **Alert**: User-created price alerts
-- **Advertisement**: Sponsored content and ads
-- **Subscription**: User and retailer subscription management
+### Dealer Portal Models
+- **Dealer**: Registration, auth, verification
+- **DealerFeed**: Feed configuration and status
+- **DealerSku**: Individual prices from feeds
+- **CanonicalSku**: Product matching bridge
+- **MarketBenchmark**: Price benchmarks
+- **DealerInsight**: Actionable recommendations
 
-### Post-MVP Models (Stubs)
-- **DataSubscription**: DaaS API access management
-- **MarketReport**: Market analysis and trends data
+## 📊 API Endpoints
 
-## 🎨 UI Components
+### Search API (`/api/search`)
+- `POST /semantic` - AI-powered search
+- `POST /parse` - Parse intent (debug)
+- `GET /suggestions` - Autocomplete
+- `POST /nl-to-filters` - NL → filters
+- `GET /premium-filters` - Filter definitions
 
-Built with Shadcn/UI and Tailwind CSS:
-
-- **Layout**: Header, Footer, responsive navigation
-- **Forms**: Search, filters, authentication
-- **Cards**: Product cards, ad cards, dashboard widgets
-- **Data Display**: Tables, charts, statistics
-- **Feedback**: Alerts, toasts, loading states
-
-## 🔐 Authentication & Authorization
-
-- **NextAuth.js** for authentication
-- **Google OAuth** provider (configurable)
-- **JWT sessions** for stateless authentication
-- **Role-based access** (FREE/PREMIUM users)
-
-## 💳 Payment Integration
-
-- **Stripe** for subscription management
-- **Webhook handling** for subscription events
-- **Multiple subscription tiers** (Free, Premium, Pro)
-- **Dealer subscription plans** (Standard, Premium, Enterprise)
+### Admin Endpoints
+- `GET /api/search/admin/embedding-stats`
+- `GET /api/search/admin/ballistic-stats`
+- `POST /api/search/admin/backfill-embeddings`
 
 ## 🚀 Deployment
 
-The application is designed to be deployed on modern platforms:
+**Render.com Configuration:**
+- Web: Next.js static build
+- API: Node.js service
+- Database: PostgreSQL with pgvector
+- Redis: Managed Redis instance
 
-- **Frontend**: Vercel, Netlify, or similar
-- **Backend**: Railway, Render, or containerized deployment
-- **Database**: PostgreSQL on Railway, Supabase, or managed service
+See `render.yaml` for full deployment configuration.
 
-## 📈 Monitoring & Analytics
+## 📈 Current Status
 
-- **Error tracking**: Ready for Sentry integration
-- **Performance monitoring**: Web Vitals tracking
-- **User analytics**: Event tracking setup
-- **Business metrics**: Revenue and usage tracking
+### ✅ Completed
+- Tier system (FREE/PREMIUM)
+- AI semantic search with pgvector
+- Premium ranking algorithm
+- Best Value Score calculation
+- Premium filters and badges
+- Product reporting system
+- Dealer portal workers
+- Market benchmarking
+- Insight generation
 
-## 🤝 Contributing
+### 🔄 In Progress
+- Dealer portal frontend UI
+- Price history visualization
+- Additional affiliate networks
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🆘 Support
-
-For support and questions:
-- Create an issue in the repository
-- Contact the development team
-- Check the documentation in `/docs`
+### 📋 Planned
+- Playwright for JS-rendered sites
+- ML-based product matching
+- Image analysis verification
 
 ---
 
-Built with ❤️ by the IronScout.ai team
+*Built with ❤️ by the IronScout.ai team*
+*Last updated: December 7, 2025*

@@ -165,11 +165,34 @@ When you clicked "Run Now":
 1. **Scheduler** created a crawl job in Redis queue
 2. **Fetcher** downloaded JSON from Fake Store API
 3. **Extractor** parsed the JSON product data
-4. **Normalizer** standardized prices, categories, brands
+4. **Normalizer** standardized prices, categories, brands (including ammunition-specific fields)
 5. **Writer** upserted products, retailers, and prices to PostgreSQL
 6. **Alerter** checked for price changes (no alerts yet)
 
 All logged to database for monitoring!
+
+## Test AI Search Features
+
+### 1. Seed Ammunition Data (Recommended)
+```bash
+cd packages/db
+pnpm db:seed
+```
+
+### 2. Try AI Search
+Go to http://localhost:3000 and try queries like:
+- "cheap 9mm brass"
+- "best defensive .45 ACP"
+- "subsonic .300 blackout for suppressor"
+
+### 3. Check Embedding Stats (Admin)
+Go to Admin → Embeddings to see:
+- Embedding coverage percentage
+- Ballistic field population rates
+- Backfill progress
+
+### 4. Trigger Embedding Backfill
+If products don't have embeddings, click "Start Backfill" in the admin panel.
 
 ## Next Steps
 

@@ -100,7 +100,7 @@ export const TIER_CONFIG = {
 } as const
 
 export type UserTier = keyof typeof TIER_CONFIG
-export type TierFeatures = typeof TIER_CONFIG.FREE.features
+export type TierFeatures = typeof TIER_CONFIG[UserTier]['features']
 
 /**
  * Stripe Price IDs

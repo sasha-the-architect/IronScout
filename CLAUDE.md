@@ -4,31 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-IronScout.ai is an AI-powered shopping assistant platform that tracks and aggregates live product listings for ammunition, gun parts & accessories from multiple vendor sites. The platform provides proactive price monitoring, real-time alerts, and AI-powered product recommendations. Built as a pnpm monorepo with three main applications:
-
+IronScout.ai is an AI-powered ammunition search and price comparison platform that tracks and aggregates live product listings from multiple vendor sites. The platform provides proactive price monitoring, real-time alerts, AI-powered semantic search, and expert-level performance recommendations. Built as a pnpm monorepo with three main applications:
 
 1. **Web App** (`apps/web/`) - Next.js 14 frontend with App Router
 2. **API** (`apps/api/`) - Express.js REST API backend
-3. **Harvester** (`apps/harvester/`) - BullMQ-based distributed crawling system
+3. **Harvester** (`apps/harvester/`) - BullMQ-based distributed crawling system with dealer portal workers
 
-   Creating an optimized production build ...
- ✓ Compiled successfully in 11.8s
-   Linting and checking validity of types ...
-Failed to compile.
-./app/admin/embeddings/page.tsx:335:35
-Type error: 'progress.processed' is possibly 'undefined'.
-  333 |
-  334 |         {/* Completion Message */}
-> 335 |         {!progress?.inProgress && progress?.processed > 0 && (
-      |                                   ^
-  336 |           <div className="mt-6 p-4 bg-green-50 rounded-lg flex items-center gap-3">
-  337 |             <CheckCircle className="h-5 w-5 text-green-600" />
-  338 |             <div>
-Next.js build worker exited with code: 1 and signal: null
-/opt/render/project/src/apps/web:
- ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @ironscout/web@1.0.0 build: `next build`
-Exit status 1
-==> Build failed 😞**Critical**: These are separate deployable services. The frontend CANNOT access the database directly and must use the API. The harvester runs independently as background workers.
+**Critical**: These are separate deployable services. The frontend CANNOT access the database directly and must use the API. The harvester runs independently as background workers.
+
+## Key Differentiators
+
+IronScout differentiates from competitors (AmmoSeek, etc.) through:
+- **AI-Powered Semantic Search**: Natural language queries like "best 9mm for home defense with short barrel"
+- **Performance-Aware Recommendations**: Rankings based on bullet type, suppressor compatibility, barrel length optimization
+- **Best Value Scoring**: Composite algorithm considering price vs average, shipping, retailer trust, brand quality
+- **Premium AI Features**: Deep analysis for Premium users vs basic search for Free tier
+- **Dealer Portal**: Self-service portal for dealers to manage feeds and get market insights
 
 ## Development Commands
 
@@ -46,11 +37,11 @@ pnpm dev                           # Starts web (3000) + API (8000)
 # Start individual services
 cd apps/web && pnpm dev            # Frontend only (localhost:3000)
 cd apps/api && pnpm dev            # API only (localhost:8000)
-cd apps/harvester && pnpm worker   # Start harvester workers
+cd apps/harvester && pnpm worker   # Start harvester workers (including dealer workers)
 
 # Harvester commands
 cd apps/harvester
-pnpm worker                        # Start all 6 pipeline workers
+pnpm worker                        # Start all 10 pipeline workers
 pnpm dev run                       # Trigger immediate crawl
 pnpm dev schedule                  # Set up recurring hourly crawls
 pnpm dev status                    # Show queue status
@@ -89,12 +80,15 @@ pnpm type-check      # TypeScript check all apps (recursive)
 User → Web App (3000) → API (8000) → PostgreSQL
                                   ↗
 Admin UI → API → Redis → Harvester Workers → PostgreSQL
+
+Dealer → Dealer Portal → API → Redis → Dealer Workers → PostgreSQL
 ```
 
 ### Harvester Pipeline
 
-The harvester uses a 6-stage pipeline architecture with BullMQ queues:
+The harvester uses a 10-worker pipeline architecture with BullMQ queues:
 
+**Core Pipeline (6 workers):**
 1. **Scheduler** - Creates crawl jobs from Source records
 2. **Fetcher** - Downloads content (supports RSS, HTML, JSON, JS_RENDERED)
 3. **Extractor** - Parses content and extracts product data
@@ -102,186 +96,157 @@ The harvester uses a 6-stage pipeline architecture with BullMQ queues:
 5. **Writer** - Upserts products, retailers, and prices to PostgreSQL
 6. **Alerter** - Checks for price changes and triggers user alerts
 
+**Dealer Portal Pipeline (4 workers):**
+1. **DealerFeedIngest** - Downloads and parses dealer CSV/XML/JSON feeds
+2. **DealerSkuMatch** - Matches dealer SKUs to canonical products
+3. **DealerBenchmark** - Calculates market price benchmarks per caliber
+4. **DealerInsight** - Generates actionable insights for dealers
+
 **Key Files**:
-- `apps/harvester/src/worker.ts` - Starts all 6 workers
+- `apps/harvester/src/worker.ts` - Starts all 10 workers
 - `apps/harvester/src/scheduler/index.ts` - Job creation
+- `apps/harvester/src/dealer/` - Dealer portal workers
 - `apps/harvester/src/config/queues.ts` - Queue definitions
-- Each stage has its own worker and queue for parallel processing
 
-### Execution Tracking
+### Tier System
 
-Every crawl creates an `Execution` record with:
-- Status: PENDING → RUNNING → SUCCESS/FAILED
-- Metrics: itemsFound, itemsUpserted, duration
-- Detailed logs in `ExecutionLog` table (CRAWL_START, FETCH_OK, EXTRACT_OK, etc.)
+**FREE Tier:**
+- 5 alerts max, 60-minute delay
+- 20 search results
+- Basic AI purpose detection
+- Standard relevance ranking
 
-View in admin console at http://localhost:3000/admin
+**PREMIUM Tier ($4.99/mo):**
+- Unlimited real-time alerts
+- 100 search results, 365-day price history
+- Advanced AI: purpose-optimized ranking, Best Value scores
+- Premium filters: +P, subsonic, velocity, bullet type
+- Performance badges and AI explanations
+
+Configuration: `apps/api/src/config/tiers.ts`
 
 ## Database Schema (Prisma)
 
-### MVP Models
-
-Core models in active use:
+### Core Models
 
 - **User** - Authentication, tier (FREE/PREMIUM)
-- **Product** - Product catalog
+- **Product** - Product catalog with Premium AI fields
 - **Retailer** - Stores with tier (STANDARD/PREMIUM)
-- **Price** - Price tracking history
-- **Alert** - User price alerts (PRICE_DROP, BACK_IN_STOCK, NEW_PRODUCT)
-- **Advertisement** - Ads for search results
-- **Subscription** - User/retailer subscriptions (Stripe integration)
-- **Source** - Crawl source configuration (URL, type, interval)
-- **Execution** - Crawl job execution records
-- **ExecutionLog** - Detailed pipeline logs
+- **Price** - Price tracking with shipping costs
+- **Alert** - User price alerts
+- **ProductReport** - User-submitted data issues
+- **Source/Execution/ExecutionLog** - Crawl tracking
 
-### Post-MVP Models (Stubs Only)
+### Premium AI Fields on Product
 
-These models exist in schema but are NOT implemented in MVP:
-- **DataSubscription** - DaaS API access (marked with POST-MVP comment)
-- **MarketReport** - Market analytics (marked with POST-MVP comment)
+```prisma
+bulletType         BulletType?      // JHP, FMJ, SP, etc.
+pressureRating     PressureRating?  // STANDARD, PLUS_P, NATO
+muzzleVelocityFps  Int?             // For subsonic detection
+isSubsonic         Boolean?         // Suppressor filtering
+shortBarrelOptimized Boolean?       // Compact pistol optimization
+suppressorSafe     Boolean?         // Suppressor compatibility
+lowFlash           Boolean?         // Low-light optimization
+lowRecoil          Boolean?         // Reduced recoil
+controlledExpansion Boolean?        // Overpenetration limit
+matchGrade         Boolean?         // Competition quality
+dataSource         DataSource?      // How data was populated
+dataConfidence     Decimal?         // Quality score 0.00-1.00
+embedding          vector(1536)     // Semantic search vector
+```
 
-**Do NOT implement features using these models** unless explicitly requested.
+### Dealer Portal Models
 
-### Important Relations
+- **Dealer** - Dealer registration, auth, verification
+- **DealerFeed** - Feed configuration and status
+- **DealerSku** - Individual SKU prices from feeds
+- **CanonicalSku** - Product matching bridge
+- **MarketBenchmark** - Price benchmarks by caliber
+- **DealerInsight** - Actionable insights
+- **PixelEvent/ClickEvent** - Attribution tracking
 
-- User → Alert, Subscription (CASCADE delete)
-- Product → Price, Alert (CASCADE delete)
-- Retailer → Price, Subscription (CASCADE delete)
-- Source → Execution (CASCADE delete)
-- Execution → ExecutionLog (CASCADE delete)
+## API Routes (`apps/api/src/routes/`)
+
+### Core Routes
+- `products.ts` - Product search
+- `alerts.ts` - Price alert management
+- `ads.ts` - Advertisement retrieval
+- `payments.ts` - Stripe webhook handling
+- `sources.ts` - Crawl source CRUD
+- `executions.ts` - Execution management
+- `logs.ts` - Execution log retrieval
+- `harvester.ts` - Harvester control endpoints
+
+### AI Search Routes (`search.ts`)
+- `POST /api/search/semantic` - AI-powered semantic search
+- `POST /api/search/parse` - Parse query intent (debugging)
+- `GET /api/search/suggestions` - Autocomplete
+- `POST /api/search/nl-to-filters` - Natural language to filter conversion
+- `GET /api/search/premium-filters` - Premium filter definitions
+- `GET /api/search/admin/embedding-stats` - Embedding coverage
+- `GET /api/search/admin/ballistic-stats` - Premium field coverage
+- `POST /api/search/admin/backfill-embeddings` - Trigger backfill
+- `GET /api/search/debug/calibers` - Debug caliber values
+- `GET /api/search/debug/purposes` - Debug purpose values
+- `GET /api/search/debug/bullet-types` - Debug bullet types
+
+### Reports Routes (`reports.ts`)
+- `POST /api/reports` - Create product report
+- `GET /api/reports` - List reports (admin)
+- `GET /api/reports/:id` - Get single report
+- `GET /api/reports/product/:productId` - Reports for product
+- `PATCH /api/reports/:id` - Update report status
+- `GET /api/reports/stats/summary` - Report statistics
+
+## AI Search Services (`apps/api/src/services/ai-search/`)
+
+- `embedding-service.ts` - OpenAI text-embedding-3-small
+- `intent-parser.ts` - Natural language parsing
+- `search-service.ts` - Semantic search with pgvector
+- `premium-ranking.ts` - Performance-aware ranking
+- `best-value-score.ts` - Composite value algorithm
+- `ammo-knowledge.ts` - Domain knowledge
+
+**Key Functions:**
+```typescript
+// Main search function
+aiSearch(query, { page, limit, sortBy, explicitFilters, userTier })
+
+// Intent parsing
+parseSearchIntent(query, { userTier })
+
+// Premium ranking
+applyPremiumRanking(products, { premiumIntent, userPurpose, includeBestValue })
+
+// Best Value calculation
+calculateBestValueScore(product, userPurpose)
+```
 
 ## Frontend Patterns (`apps/web/`)
 
 ### Structure
 
-- `app/` - Next.js App Router pages (server components by default)
-- `app/admin/` - Admin console for managing crawl sources and viewing logs
+- `app/` - Next.js App Router pages
+- `app/admin/` - Admin console
 - `app/auth/` - Authentication pages
 - `components/` - Reusable React components
-- `components/admin/` - Admin-specific components
 - `components/ui/` - Shadcn/UI primitives
-- `lib/api.ts` - API client functions with TypeScript interfaces
-- `lib/utils.ts` - Utility functions
-
-### Server vs Client Components
-
-- **Server Components** (default): Layout, static pages, data fetching
-- **Client Components** (`'use client'`): Interactive features (search filters, forms, admin console)
-
-### API Integration
-
-Frontend calls API via functions in `lib/api.ts`:
-
-```typescript
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-
-export async function searchProducts(params: SearchParams) {
-  const response = await fetch(`${API_BASE}/api/products/search?...`)
-  return response.json()
-}
-```
-
-**Never access Prisma directly from frontend**. Always use API endpoints.
+- `lib/api.ts` - API client functions
 
 ### Authentication
 
 - NextAuth.js with Google OAuth
 - PrismaAdapter for user storage
 - JWT sessions with user.id injection
-- Configuration: `app/api/auth/[...nextauth]/route.ts`
-
-## API Patterns (`apps/api/`)
-
-### Route Structure
-
-Each feature area has a dedicated router in `src/routes/`:
-
-- `products.ts` - Product search
-- `alerts.ts` - Price alert management
-- `ads.ts` - Advertisement retrieval
-- `payments.ts` - Stripe webhook handling
-- `sources.ts` - Crawl source CRUD
-- `executions.ts` - Execution management and manual triggers
-- `logs.ts` - Execution log retrieval
-- `harvester.ts` - Harvester control endpoints
-- `data.ts` - DaaS endpoints (POST-MVP, stub only)
-
-### Standard Pattern
-
-```typescript
-import { Router } from 'express'
-import { prisma } from '@ironscout/db'
-import { z } from 'zod'
-
-const router = Router()
-
-// Zod schema for validation
-const searchSchema = z.object({
-  query: z.string(),
-  // ...
-})
-
-router.get('/search', async (req, res) => {
-  const params = searchSchema.parse(req.query)
-  const results = await prisma.product.findMany({ /* ... */ })
-  res.json(results)
-})
-
-export default router
-```
-
-### Database Access
-
-Always import Prisma from shared package:
-
-```typescript
-import { prisma } from '@ironscout/db'  // ✅ Correct
-```
-
-Never instantiate a new PrismaClient in API or web code.
-
-### CORS Configuration
-
-API allows requests from frontend URL (configured in `src/index.ts`). Environment variable `FRONTEND_URL` controls CORS origin.
-
-## Monorepo & Workspace Setup
-
-### Package Manager
-
-**CRITICAL**: This project uses `pnpm` workspaces. Do NOT use npm or yarn.
-
-### Workspace Structure
-
-```
-IronScout/
-├── apps/
-│   ├── api/         - Express backend
-│   ├── web/         - Next.js frontend
-│   └── harvester/   - BullMQ workers
-├── packages/
-│   └── db/          - Shared Prisma schema
-├── package.json     - Root workspace config
-└── pnpm-workspace.yaml
-```
-
-### Shared Dependencies
-
-The `@ironscout/db` package is shared across all apps:
-
-```typescript
-// In any app
-import { prisma } from '@ironscout/db'
-```
-
-When you modify `packages/db/schema.prisma`, all apps automatically get the updated types after running `pnpm db:generate`.
+- Tier passed via X-User-Id header
 
 ## Environment Configuration
 
 ### Required Variables
 
-**Root `.env`** (for database operations):
+**Root `.env`**:
 ```env
-DATABASE_URL="postgresql://username:password@host:5432/ironscout"
+DATABASE_URL="postgresql://..."
 ```
 
 **API `.env`** (`apps/api/.env`):
@@ -290,6 +255,7 @@ DATABASE_URL="postgresql://..."
 STRIPE_SECRET_KEY="sk_test_..."
 STRIPE_WEBHOOK_SECRET="whsec_..."
 FRONTEND_URL="http://localhost:3000"
+OPENAI_API_KEY="sk-..."  # For embeddings
 PORT=8000
 REDIS_HOST="localhost"
 REDIS_PORT=6379
@@ -298,165 +264,75 @@ REDIS_PORT=6379
 **Web `.env.local`** (`apps/web/.env.local`):
 ```env
 NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="generate-secure-secret"
+NEXTAUTH_SECRET="..."
 GOOGLE_CLIENT_ID="..."
 GOOGLE_CLIENT_SECRET="..."
 NEXT_PUBLIC_API_URL="http://localhost:8000"
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_..."
 ```
 
-**Harvester** uses same DATABASE_URL and REDIS_* variables as API (reads from packages/db/.env or apps/api/.env).
-
-### Setup from Examples
-
-```bash
-cp .env.example .env
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env.local
-```
-
-## External Dependencies
-
-### Required Services
-
-1. **PostgreSQL** - Database (tested with PostgreSQL 14+)
-   - Default connection: 10.10.9.28:5432
-   - Database name: ironscout
-
-2. **Redis** - Queue system for harvester
-   - Default: localhost:6379
-   - Install: `sudo apt install redis-server` (WSL/Linux)
-   - Start: `sudo service redis-server start`
-   - Test: `redis-cli ping` (should return PONG)
-
-### Payment Integration
-
-Stripe is configured for subscriptions:
-- Use test keys during development
-- Webhook endpoint: `/api/payments/webhook`
-- Set up webhook in Stripe dashboard for local testing (use Stripe CLI)
-
 ## Adding New Features
 
-### New API Endpoint
+### New AI Search Filter
 
-1. Create route file: `apps/api/src/routes/feature.ts`
-2. Define Zod validation schema
-3. Implement route handlers with Prisma queries
-4. Register in `apps/api/src/index.ts`: `app.use('/api/feature', featureRouter)`
-5. Add client function to `apps/web/lib/api.ts`
-6. Use in frontend components
+1. Add field to Product model in `schema.prisma`
+2. Add to BulletType/PressureRating enums if needed
+3. Update `intent-parser.ts` to extract from queries
+4. Update `premium-ranking.ts` boost logic
+5. Add to `search.ts` filter validation schema
+6. Update `search.ts` Premium filters endpoint
+7. Run `pnpm db:generate && pnpm db:migrate`
 
-### New Page
+### New Dealer Portal Feature
 
-1. Create directory: `apps/web/app/path-name/`
-2. Add `page.tsx` (server component by default)
-3. Add `'use client'` only if interactive features needed
-4. Import components from `components/`
-5. Fetch data via API client functions (not direct Prisma)
-
-### Database Model Change
-
-1. Edit `packages/db/schema.prisma`
-2. Create migration: `cd packages/db && pnpm db:migrate`
-3. Generate client: `pnpm db:generate`
-4. Update TypeScript interfaces in `apps/web/lib/api.ts` if needed
-5. Update API endpoints to use new fields
-
-### New Harvester Source Type
-
-1. Add new `SourceType` enum value to schema.prisma
-2. Update extractor logic in `apps/harvester/src/extractor/index.ts`
-3. Add type-specific parsing (e.g., XML, API format)
-4. Run migration and test with admin console
+1. Add model to `schema.prisma` in Dealer Portal section
+2. Create worker in `apps/harvester/src/dealer/`
+3. Add queue to `apps/harvester/src/config/queues.ts`
+4. Register worker in `apps/harvester/src/worker.ts`
+5. Add API routes for frontend access
 
 ## Testing the System
 
 ### Quick Test Flow
 
-1. Start all services:
-   ```bash
-   # Terminal 1
-   cd apps/harvester && pnpm worker
+1. Start all services (3 terminals)
+2. Access http://localhost:3000
+3. Test AI search with queries like:
+   - "cheap 9mm brass"
+   - "best defensive .45 ACP low flash"
+   - "subsonic .300 blackout for suppressor"
+4. Admin console: http://localhost:3000/admin
+   - View embedding stats
+   - Run embedding backfill
+   - Check ballistic field coverage
 
-   # Terminal 2
-   cd apps/api && pnpm dev
+### Admin Embedding Tools
 
-   # Terminal 3
-   cd apps/web && pnpm dev
-   ```
-
-2. Access admin console: http://localhost:3000/admin
-3. Navigate to Sources page
-4. Click "Run Now" on test source
-5. Watch Executions page for status updates
-6. View detailed logs in Logs page
-
-### Expected Results
-
-- Execution status: PENDING → RUNNING → SUCCESS
-- Dashboard stats increase (items harvested count)
-- Logs show: CRAWL_START, FETCH_OK, EXTRACT_OK, NORMALIZE_OK, WRITE_OK, EXEC_DONE
-- Products appear in main search
-
-## Common Issues & Solutions
-
-### Prisma Client Not Found
-
-```bash
-cd packages/db
-pnpm db:generate
-```
-
-### Redis Connection Error
-
-```bash
-# Start Redis
-sudo service redis-server start  # WSL/Linux
-docker start redis               # Docker
-
-# Verify
-redis-cli ping
-```
-
-### Workers Not Processing Jobs
-
-1. Check Redis is running
-2. Verify workers started: `cd apps/harvester && pnpm worker`
-3. Check worker terminal for errors
-4. Verify execution status in admin console
-
-### API 404 Errors
-
-- Check `NEXT_PUBLIC_API_URL` is set correctly in web app
-- Verify API server is running on correct port
-- Check CORS configuration in API allows frontend origin
+1. Navigate to Admin > Embeddings
+2. View embedding coverage stats
+3. View ballistic field stats (Phase 2)
+4. Trigger backfill for products without embeddings
+5. Monitor progress
 
 ## Important Constraints
 
 1. **No direct database access from frontend** - Always use API
 2. **pnpm only** - npm/yarn will break workspace references
-3. **Always import `prisma` from `@ironscout/db`** - Never instantiate PrismaClient
-4. **Post-MVP features** - Do not implement DataSubscription or MarketReport features unless explicitly requested
-5. **Redis required** - Harvester cannot function without Redis
-6. **Cascading deletes** - Be aware that deleting users/products/sources will cascade delete related records
+3. **Always import `prisma` from `@ironscout/db`**
+4. **Tier checks in API** - Use `getUserTier()` helper and `hasFeature()`
+5. **Premium filters stripped for FREE** - Backend enforces tier limits
+6. **Redis required** - Both harvester and AI search cache need Redis
+7. **OpenAI API key required** - For embedding generation
 
 ## Code Style & Conventions
 
 - TypeScript strict mode enabled
-- Frontend interfaces defined in `lib/api.ts`
 - Zod schemas for API validation
-- Async/await preferred over promises
-- Error handling: try/catch in API routes, error responses with proper status codes
-- Component naming: PascalCase for components, kebab-case for files
-- Mobile-first responsive design with Tailwind breakpoints
+- Async/await preferred
+- Error handling in API routes
+- Component naming: PascalCase
+- Mobile-first responsive design
+- CommonMark for markdown (blank lines before lists)
 
-## Responsive Design
-
-Tailwind breakpoints used throughout:
-- `sm:` 640px and up
-- `md:` 768px and up
-- `lg:` 1024px and up
-- `xl:` 1280px and up
-
-Layout adapts from single-column (mobile) to multi-column grids (desktop).
+---
+*Last updated: December 7, 2025*
