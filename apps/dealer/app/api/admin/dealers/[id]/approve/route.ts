@@ -26,9 +26,15 @@ export async function POST(
     const { id: dealerId } = await params;
     reqLogger.info('Dealer approval request', { dealerId, adminEmail: session.email });
 
-    // Get current dealer state
+    // Get current dealer state with owner user
     const dealer = await prisma.dealer.findUnique({
       where: { id: dealerId },
+      include: {
+        users: {
+          where: { role: 'OWNER' },
+          take: 1,
+        },
+      },
     });
 
     if (!dealer) {
@@ -36,6 +42,15 @@ export async function POST(
       return NextResponse.json(
         { error: 'Dealer not found' },
         { status: 404 }
+      );
+    }
+
+    const ownerUser = dealer.users[0];
+    if (!ownerUser) {
+      reqLogger.warn('Dealer has no owner user', { dealerId });
+      return NextResponse.json(
+        { error: 'Dealer account configuration error' },
+        { status: 500 }
       );
     }
 
@@ -50,7 +65,7 @@ export async function POST(
     reqLogger.info('Approving dealer', { 
       dealerId, 
       businessName: dealer.businessName,
-      email: dealer.email 
+      ownerEmail: ownerUser.email 
     });
 
     // Update dealer status
@@ -58,9 +73,16 @@ export async function POST(
       where: { id: dealerId },
       data: {
         status: 'ACTIVE',
-        emailVerified: true, // Auto-verify on approval
       },
     });
+
+    // Also ensure owner's email is verified
+    if (!ownerUser.emailVerified) {
+      await prisma.dealerUser.update({
+        where: { id: ownerUser.id },
+        data: { emailVerified: true },
+      });
+    }
 
     reqLogger.info('Dealer approved successfully', { dealerId });
 
@@ -76,10 +98,10 @@ export async function POST(
       userAgent: headersList.get('user-agent') || undefined,
     });
 
-    // Send approval email to dealer
+    // Send approval email to dealer owner
     reqLogger.debug('Sending approval email');
     const emailResult = await sendApprovalEmail(
-      dealer.email,
+      ownerUser.email,
       dealer.businessName
     );
 

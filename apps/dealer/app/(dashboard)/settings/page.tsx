@@ -69,7 +69,7 @@ export default async function SettingsPage() {
           <div className="flex items-start justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">{dealer.businessName}</h3>
-              <p className="text-sm text-gray-500">{dealer.email}</p>
+              <p className="text-sm text-gray-500">{session.email}</p>
               <div className="mt-2 flex items-center gap-2">
                 <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                   dealer.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
