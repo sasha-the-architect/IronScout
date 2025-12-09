@@ -18,6 +18,7 @@
     "db:seed-price-history": "tsx seed-price-history.ts",
     "db:seed-comprehensive": "tsx seed-comprehensive-products-simple.ts",
     "db:clear": "tsx clear-seed-data.ts",
+    "db:seed-dealer-test": "tsx seed-dealer-portal-test.ts",
     "db:indexes": "tsx apply-indexes-simple.ts",
     "db:indexes:status": "psql $DATABASE_URL -c \"SELECT schemaname, tablename, indexname, idx_scan, pg_size_pretty(pg_relation_size(indexrelid)) as size FROM pg_stat_user_indexes WHERE schemaname = 'public' ORDER BY tablename, indexname;\""
   },

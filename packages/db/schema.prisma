@@ -491,12 +491,6 @@ enum DataSource {
 
 model Dealer {
   id              String        @id @default(cuid())
-  email           String        @unique
-  passwordHash    String
-  emailVerified   Boolean       @default(false)
-  verifyToken     String?       // Email verification token
-  resetToken      String?       // Password reset token
-  resetTokenExp   DateTime?     // Reset token expiration
   
   // Business info
   businessName    String
@@ -521,6 +515,10 @@ model Dealer {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  // Team members
+  users           DealerUser[]
+  invites         DealerInvite[]
+  
   feeds           DealerFeed[]
   skus            DealerSku[]
   insights        DealerInsight[]
@@ -533,6 +531,55 @@ model Dealer {
   retailerId      String?       @unique
 
   @@map("dealers")
+}
+
+model DealerUser {
+  id              String          @id @default(cuid())
+  dealerId        String
+  email           String
+  passwordHash    String
+  name            String
+  role            DealerUserRole  @default(MEMBER)
+  
+  // Auth state
+  emailVerified   Boolean         @default(false)
+  verifyToken     String?         // Email verification token
+  resetToken      String?         // Password reset token
+  resetTokenExp   DateTime?       // Reset token expiration
+  
+  // Activity tracking
+  lastLoginAt     DateTime?
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  dealer          Dealer          @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  invitesSent     DealerInvite[]  @relation("InvitedBy")
+
+  @@unique([dealerId, email])
+  @@index([email])
+  @@index([dealerId])
+  @@map("dealer_users")
+}
+
+model DealerInvite {
+  id              String          @id @default(cuid())
+  dealerId        String
+  email           String
+  role            DealerUserRole  @default(MEMBER)
+  inviteToken     String          @unique
+  invitedById     String          // DealerUser who sent the invite
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  createdAt       DateTime        @default(now())
+
+  dealer          Dealer          @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  invitedBy       DealerUser      @relation("InvitedBy", fields: [invitedById], references: [id])
+
+  @@unique([dealerId, email])
+  @@index([inviteToken])
+  @@index([dealerId])
+  @@map("dealer_invites")
 }
 
 model DealerFeed {
@@ -847,6 +894,13 @@ enum DealerTier {
   BASIC             // Free limited features (post-founding)
   PRO               // Paid full features
   ENTERPRISE        // Custom pricing
+}
+
+enum DealerUserRole {
+  OWNER             // Original account creator, full access, cannot be removed
+  ADMIN             // Can manage team, settings, full access
+  MEMBER            // Standard access to dashboard, SKUs, insights
+  VIEWER            // Read-only access
 }
 
 enum StoreType {
