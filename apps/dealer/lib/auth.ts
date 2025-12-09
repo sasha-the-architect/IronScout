@@ -2,17 +2,18 @@
  * Dealer Portal Authentication Library
  * 
  * Handles:
- * - Dealer email/password authentication
+ * - Dealer user email/password authentication
  * - Admin session detection (from main ironscout.ai)
  * - JWT token generation/verification
  * - Password hashing
+ * - Team member management
  */
 
 import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { prisma } from '@ironscout/db';
-import type { Dealer, DealerStatus } from '@ironscout/db';
+import type { Dealer, DealerUser, DealerStatus, DealerUserRole } from '@ironscout/db';
 import { logger } from './logger';
 
 // =============================================
@@ -36,8 +37,11 @@ export type SessionType = 'dealer' | 'admin';
 
 export interface DealerSession {
   type: 'dealer';
+  dealerUserId: string;
   dealerId: string;
   email: string;
+  name: string;
+  role: DealerUserRole;
   businessName: string;
   status: DealerStatus;
   tier: string;
@@ -50,6 +54,8 @@ export interface AdminSession {
 }
 
 export type Session = DealerSession | AdminSession;
+
+export type DealerUserWithDealer = DealerUser & { dealer: Dealer };
 
 // =============================================
 // Password Utilities
@@ -69,14 +75,21 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 // JWT Utilities
 // =============================================
 
-export async function createDealerToken(dealer: Dealer): Promise<string> {
-  logger.debug('Creating dealer JWT token', { dealerId: dealer.id, email: dealer.email });
+export async function createDealerToken(dealerUser: DealerUserWithDealer): Promise<string> {
+  logger.debug('Creating dealer JWT token', { 
+    dealerUserId: dealerUser.id, 
+    dealerId: dealerUser.dealerId,
+    email: dealerUser.email 
+  });
   return new SignJWT({
-    dealerId: dealer.id,
-    email: dealer.email,
-    businessName: dealer.businessName,
-    status: dealer.status,
-    tier: dealer.tier,
+    dealerUserId: dealerUser.id,
+    dealerId: dealerUser.dealerId,
+    email: dealerUser.email,
+    name: dealerUser.name,
+    role: dealerUser.role,
+    businessName: dealerUser.dealer.businessName,
+    status: dealerUser.dealer.status,
+    tier: dealerUser.dealer.tier,
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -88,11 +101,14 @@ export async function verifyDealerToken(token: string): Promise<DealerSession | 
   try {
     logger.debug('Verifying dealer JWT token');
     const { payload } = await jwtVerify(token, JWT_SECRET);
-    logger.debug('Token verified successfully', { dealerId: payload.dealerId });
+    logger.debug('Token verified successfully', { dealerUserId: payload.dealerUserId });
     return {
       type: 'dealer',
+      dealerUserId: payload.dealerUserId as string,
       dealerId: payload.dealerId as string,
       email: payload.email as string,
+      name: payload.name as string,
+      role: payload.role as DealerUserRole,
       businessName: payload.businessName as string,
       status: payload.status as DealerStatus,
       tier: payload.tier as string,
@@ -208,25 +224,44 @@ export async function isAdmin(): Promise<boolean> {
 }
 
 /**
+ * Check if current dealer user can manage team (OWNER or ADMIN role)
+ */
+export function canManageTeam(session: DealerSession): boolean {
+  return session.role === 'OWNER' || session.role === 'ADMIN';
+}
+
+/**
+ * Check if current dealer user can edit settings (OWNER, ADMIN, or MEMBER role)
+ */
+export function canEditSettings(session: DealerSession): boolean {
+  return session.role !== 'VIEWER';
+}
+
+/**
  * Get session with fresh dealer data from database
  */
-export async function getSessionWithDealer(): Promise<{ session: Session; dealer?: Dealer } | null> {
+export async function getSessionWithDealer(): Promise<{ 
+  session: Session; 
+  dealer?: Dealer;
+  dealerUser?: DealerUser;
+} | null> {
   const session = await getSession();
   
   if (!session) return null;
   
   if (session.type === 'dealer') {
-    logger.debug('Fetching fresh dealer data', { dealerId: session.dealerId });
-    const dealer = await prisma.dealer.findUnique({
-      where: { id: session.dealerId },
+    logger.debug('Fetching fresh dealer data', { dealerUserId: session.dealerUserId });
+    const dealerUser = await prisma.dealerUser.findUnique({
+      where: { id: session.dealerUserId },
+      include: { dealer: true },
     });
     
-    if (!dealer) {
-      logger.warn('Dealer not found for session', { dealerId: session.dealerId });
+    if (!dealerUser) {
+      logger.warn('Dealer user not found for session', { dealerUserId: session.dealerUserId });
       return null;
     }
     
-    return { session, dealer };
+    return { session, dealer: dealerUser.dealer, dealerUser };
   }
   
   return { session };
@@ -241,6 +276,7 @@ export interface LoginResult {
   error?: string;
   token?: string;
   dealer?: Dealer;
+  dealerUser?: DealerUser;
 }
 
 export async function authenticateDealer(
@@ -252,28 +288,35 @@ export async function authenticateDealer(
   authLogger.info('Login attempt started');
   
   try {
-    const dealer = await prisma.dealer.findUnique({
+    // Find dealer user by email (with dealer info)
+    const dealerUser = await prisma.dealerUser.findFirst({
       where: { email: email.toLowerCase() },
+      include: { dealer: true },
     });
     
-    if (!dealer) {
-      authLogger.warn('Login failed - dealer not found');
+    if (!dealerUser) {
+      authLogger.warn('Login failed - user not found');
       return { success: false, error: 'Invalid email or password' };
     }
     
-    authLogger.debug('Dealer found, verifying password', { dealerId: dealer.id });
+    authLogger.debug('Dealer user found, verifying password', { 
+      dealerUserId: dealerUser.id,
+      dealerId: dealerUser.dealerId 
+    });
     
-    const isValid = await verifyPassword(password, dealer.passwordHash);
+    const isValid = await verifyPassword(password, dealerUser.passwordHash);
     
     if (!isValid) {
-      authLogger.warn('Login failed - invalid password', { dealerId: dealer.id });
+      authLogger.warn('Login failed - invalid password', { dealerUserId: dealerUser.id });
       return { success: false, error: 'Invalid email or password' };
     }
     
-    if (!dealer.emailVerified) {
-      authLogger.warn('Login failed - email not verified', { dealerId: dealer.id });
+    if (!dealerUser.emailVerified) {
+      authLogger.warn('Login failed - email not verified', { dealerUserId: dealerUser.id });
       return { success: false, error: 'Please verify your email address' };
     }
+    
+    const dealer = dealerUser.dealer;
     
     if (dealer.status === 'PENDING') {
       authLogger.warn('Login failed - account pending', { dealerId: dealer.id });
@@ -285,11 +328,22 @@ export async function authenticateDealer(
       return { success: false, error: 'Your account has been suspended' };
     }
     
-    const token = await createDealerToken(dealer);
+    // Update last login timestamp
+    await prisma.dealerUser.update({
+      where: { id: dealerUser.id },
+      data: { lastLoginAt: new Date() },
+    });
     
-    authLogger.info('Login successful', { dealerId: dealer.id, status: dealer.status });
+    const token = await createDealerToken(dealerUser as DealerUserWithDealer);
     
-    return { success: true, token, dealer };
+    authLogger.info('Login successful', { 
+      dealerUserId: dealerUser.id,
+      dealerId: dealer.id, 
+      status: dealer.status,
+      role: dealerUser.role
+    });
+    
+    return { success: true, token, dealer, dealerUser };
   } catch (error) {
     authLogger.error('Login failed - unexpected error', {}, error);
     throw error;
@@ -309,6 +363,7 @@ export interface RegisterResult {
   success: boolean;
   error?: string;
   dealer?: Dealer;
+  dealerUser?: DealerUser;
 }
 
 export async function registerDealer(input: RegisterInput): Promise<RegisterResult> {
@@ -325,7 +380,7 @@ export async function registerDealer(input: RegisterInput): Promise<RegisterResu
   try {
     // Check if email already exists
     regLogger.debug('Checking for existing account');
-    const existing = await prisma.dealer.findUnique({
+    const existing = await prisma.dealerUser.findFirst({
       where: { email: email.toLowerCase() },
     });
     
@@ -342,34 +397,211 @@ export async function registerDealer(input: RegisterInput): Promise<RegisterResu
     const verifyToken = crypto.randomUUID();
     regLogger.debug('Generated verification token');
     
-    // Create dealer
-    regLogger.debug('Creating dealer record in database');
-    const dealer = await prisma.dealer.create({
-      data: {
-        email: email.toLowerCase(),
-        passwordHash,
-        businessName,
-        contactName,
-        websiteUrl,
-        phone,
-        verifyToken,
-        status: 'PENDING',
-        tier: 'FOUNDING',
-      },
+    // Create dealer and owner user in a transaction
+    regLogger.debug('Creating dealer and owner user in database');
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the dealer (business account)
+      const dealer = await tx.dealer.create({
+        data: {
+          businessName,
+          contactName,
+          websiteUrl,
+          phone,
+          status: 'PENDING',
+          tier: 'FOUNDING',
+        },
+      });
+      
+      // Create the owner user
+      const dealerUser = await tx.dealerUser.create({
+        data: {
+          dealerId: dealer.id,
+          email: email.toLowerCase(),
+          passwordHash,
+          name: contactName,
+          role: 'OWNER',
+          verifyToken,
+          emailVerified: false,
+        },
+      });
+      
+      return { dealer, dealerUser };
     });
     
     regLogger.info('Registration successful', { 
-      dealerId: dealer.id, 
-      status: dealer.status,
-      tier: dealer.tier 
+      dealerId: result.dealer.id,
+      dealerUserId: result.dealerUser.id,
+      status: result.dealer.status,
+      tier: result.dealer.tier 
     });
     
-    return { success: true, dealer };
+    return { success: true, dealer: result.dealer, dealerUser: result.dealerUser };
   } catch (error) {
     regLogger.error('Registration failed - database error', { 
       websiteUrl,
       contactName 
     }, error);
+    throw error;
+  }
+}
+
+// =============================================
+// Team Management
+// =============================================
+
+export interface InviteResult {
+  success: boolean;
+  error?: string;
+  inviteToken?: string;
+}
+
+export async function inviteTeamMember(
+  dealerId: string,
+  invitedById: string,
+  email: string,
+  role: DealerUserRole = 'MEMBER'
+): Promise<InviteResult> {
+  const inviteLogger = logger.child({ 
+    action: 'invite', 
+    dealerId,
+    email: email.toLowerCase(),
+    role
+  });
+  
+  inviteLogger.info('Invite attempt started');
+  
+  try {
+    // Check if user already exists for this dealer
+    const existingUser = await prisma.dealerUser.findFirst({
+      where: { 
+        dealerId,
+        email: email.toLowerCase(),
+      },
+    });
+    
+    if (existingUser) {
+      inviteLogger.warn('Invite failed - user already exists');
+      return { success: false, error: 'This user is already a team member' };
+    }
+    
+    // Check for existing pending invite
+    const existingInvite = await prisma.dealerInvite.findFirst({
+      where: {
+        dealerId,
+        email: email.toLowerCase(),
+        acceptedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+    
+    if (existingInvite) {
+      inviteLogger.warn('Invite failed - pending invite exists');
+      return { success: false, error: 'An invite has already been sent to this email' };
+    }
+    
+    // Cannot invite as OWNER
+    if (role === 'OWNER') {
+      inviteLogger.warn('Invite failed - cannot invite as owner');
+      return { success: false, error: 'Cannot invite someone as owner' };
+    }
+    
+    // Generate invite token
+    const inviteToken = crypto.randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 day expiry
+    
+    // Create invite
+    await prisma.dealerInvite.create({
+      data: {
+        dealerId,
+        email: email.toLowerCase(),
+        role,
+        inviteToken,
+        invitedById,
+        expiresAt,
+      },
+    });
+    
+    inviteLogger.info('Invite created successfully', { inviteToken });
+    
+    // TODO: Send invite email
+    
+    return { success: true, inviteToken };
+  } catch (error) {
+    inviteLogger.error('Invite failed - unexpected error', {}, error);
+    throw error;
+  }
+}
+
+export interface AcceptInviteResult {
+  success: boolean;
+  error?: string;
+  dealerUser?: DealerUser;
+}
+
+export async function acceptInvite(
+  inviteToken: string,
+  password: string,
+  name: string
+): Promise<AcceptInviteResult> {
+  const acceptLogger = logger.child({ action: 'accept-invite' });
+  
+  acceptLogger.info('Accept invite attempt started');
+  
+  try {
+    // Find the invite
+    const invite = await prisma.dealerInvite.findUnique({
+      where: { inviteToken },
+      include: { dealer: true },
+    });
+    
+    if (!invite) {
+      acceptLogger.warn('Accept failed - invite not found');
+      return { success: false, error: 'Invalid invite link' };
+    }
+    
+    if (invite.acceptedAt) {
+      acceptLogger.warn('Accept failed - invite already used');
+      return { success: false, error: 'This invite has already been used' };
+    }
+    
+    if (invite.expiresAt < new Date()) {
+      acceptLogger.warn('Accept failed - invite expired');
+      return { success: false, error: 'This invite has expired' };
+    }
+    
+    // Hash password
+    const passwordHash = await hashPassword(password);
+    
+    // Create user and mark invite as accepted in transaction
+    const result = await prisma.$transaction(async (tx) => {
+      const dealerUser = await tx.dealerUser.create({
+        data: {
+          dealerId: invite.dealerId,
+          email: invite.email,
+          passwordHash,
+          name,
+          role: invite.role,
+          emailVerified: true, // Already verified via invite email
+        },
+      });
+      
+      await tx.dealerInvite.update({
+        where: { id: invite.id },
+        data: { acceptedAt: new Date() },
+      });
+      
+      return dealerUser;
+    });
+    
+    acceptLogger.info('Invite accepted successfully', { 
+      dealerUserId: result.id,
+      dealerId: invite.dealerId
+    });
+    
+    return { success: true, dealerUser: result };
+  } catch (error) {
+    acceptLogger.error('Accept invite failed - unexpected error', {}, error);
     throw error;
   }
 }
