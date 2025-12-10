@@ -7,31 +7,33 @@ This guide covers deploying IronScout.ai to Render.com using Infrastructure as C
 IronScout.ai is deployed as a microservices architecture on Render.com:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Render.com Cloud                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
-│  │  Web Frontend│    │  API Backend │    │   Harvester  │  │
-│  │  (Next.js)   │◄───┤  (Express)   │    │   (Worker)   │  │
-│  │  Port: 3000  │    │  Port: 8000  │    │              │  │
-│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘  │
-│         │                   │                   │           │
-│         │                   │                   │           │
-│         ▼                   ▼                   ▼           │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │           PostgreSQL Database (ironscout)            │  │
-│  │                   Port: 5432                          │  │
-│  └──────────────────────────────────────────────────────┘  │
-│         ▲                                     ▲              │
-│         │                                     │              │
-│         │           ┌──────────────┐          │              │
-│         └───────────┤    Redis     │──────────┘              │
-│                     │  (BullMQ)    │                         │
-│                     │  Port: 6379  │                         │
-│                     └──────────────┘                         │
-│                                                               │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                         Render.com Cloud                              │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐  │
+│  │ Web App    │  │ Admin      │  │ Dealer     │  │ API        │  │
+│  │ (Next.js)  │  │ Portal     │  │ Portal     │  │ (Express)  │  │
+│  │            │  │ (Next.js)  │  │ (Next.js)  │  │            │  │
+│  └────┬───────┘  └─────┬──────┘  └─────┬──────┘  └────┬───────┘  │
+│       │              │              │              │            │
+│       │     JWT Cookie (domain: .ironscout.ai)    │            │
+│       └─────────────┼──────────────┼──────────────┘            │
+│                      │              │                           │
+│                      ▼              ▼                           │
+│  ┌─────────────────────────────────────────────────────────────┐  │
+│  │              PostgreSQL Database (ironscout)                 │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│              ▲                                    ▲                 │
+│              │          ┌──────────────┐          │                 │
+│              └──────────┤    Redis     │──────────┘                 │
+│                         │  (BullMQ)    │                            │
+│  ┌──────────────┐       └──────┬───────┘                            │
+│  │  Harvester   │              │                                    │
+│  │  (Worker)    │◄─────────────┘                                    │
+│  └──────────────┘                                                   │
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Services
@@ -54,12 +56,29 @@ IronScout.ai is deployed as a microservices architecture on Render.com:
 - Plan: Free (can upgrade to Starter/Standard)
 
 ### 4. **Web Frontend** (`ironscout-web`)
-- Next.js 15 application with App Router
+- Next.js 14 application with App Router
 - Server-side rendering and static generation
+- Sets JWT cookies with `domain: .ironscout.ai` for cross-subdomain auth
 - Health check: `/`
 - Plan: Free (can upgrade to Starter/Standard)
 
-### 5. **Harvester Worker** (`ironscout-harvester`)
+### 5. **Admin Portal** (`ironscout-admin`)
+- Next.js 15 admin dashboard
+- Dealer management and approvals
+- Shares authentication via JWT cookie from web app
+- Access restricted to `ADMIN_EMAILS` whitelist
+- Custom domain: `admin.ironscout.ai`
+- Health check: `/`
+- Plan: Starter (required for custom domain)
+
+### 6. **Dealer Portal** (`ironscout-dealer`)
+- Next.js 15 dealer self-service dashboard
+- Feed management, insights, analytics
+- Custom domain: `dealer.ironscout.ai`
+- Health check: `/`
+- Plan: Free (can upgrade to Starter/Standard)
+
+### 7. **Harvester Worker** (`ironscout-harvester`)
 - Background worker running BullMQ job processors
 - 6-stage pipeline: Scheduler → Fetcher → Extractor → Normalizer → Writer → Alerter
 - No health check (worker service)

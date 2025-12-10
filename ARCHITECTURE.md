@@ -8,6 +8,9 @@
 [Scrapers] ────────┘
 
 [Dealer Feeds] ─> [Feed Ingest] -> [SKU Match] -> [Benchmark] -> [Insight]
+
+[Admin Portal] ─> [JWT Cookie Auth] -> [Admin API] -> [DB]
+     └── Shares auth with main Web App via cookie domain .ironscout.ai
 ```
 
 ## Implementation Status
@@ -372,4 +375,64 @@ CREATE INDEX idx_prices_in_stock ON prices(in_stock);
 4. Predictive pricing models
 
 ---
-*Last updated: December 7, 2025*
+## Admin Portal Architecture
+
+The admin portal (`apps/admin/`) is a separate Next.js application for dealer management.
+
+### Authentication Flow
+
+```
+┌──────────────────┐     ┌──────────────────┐
+│  ironscout.ai    │     │ admin.ironscout.ai│
+│   (Web App)      │     │  (Admin Portal)  │
+├──────────────────┤     ├──────────────────┤
+│                  │     │                  │
+│  NextAuth Login  │     │  Read JWT Cookie │
+│        │        │     │        │        │
+│        ▼        │     │        ▼        │
+│  Set Cookie      │─────▶  Verify JWT     │
+│  domain:         │     │        │        │
+│  .ironscout.ai   │     │        ▼        │
+│                  │     │  Check email in  │
+│                  │     │  ADMIN_EMAILS    │
+└──────────────────┘     └──────────────────┘
+```
+
+### Key Points
+
+1. **No separate login** - Admin uses main site's NextAuth
+2. **Cookie sharing** - JWT cookie set with `domain: .ironscout.ai`
+3. **Auto-redirect** - Unauthenticated users redirected to main login
+4. **Email whitelist** - Only `ADMIN_EMAILS` can access
+5. **OAuth required** - Admins must use Google OAuth (verified email)
+
+### Environment Variables
+
+**Web App** (sets cookie):
+```env
+COOKIE_DOMAIN=.ironscout.ai
+ADMIN_URL=https://admin.ironscout.ai  # Allow redirect after login
+```
+
+**Admin App** (reads cookie):
+```env
+NEXTAUTH_SECRET=same-as-web-app  # Must match!
+ADMIN_EMAILS=admin@example.com,another@admin.com
+```
+
+### Deployment
+
+| Service | URL | Render Service |
+|---------|-----|----------------|
+| Web | ironscout.ai | ironscout-web |
+| Admin | admin.ironscout.ai | ironscout-admin |
+
+Cloudflare DNS:
+```
+CNAME admin -> ironscout-admin.onrender.com (proxy: OFF)
+```
+
+See `docs/ADMIN_PORTAL.md` for complete documentation.
+
+---
+*Last updated: December 10, 2025*

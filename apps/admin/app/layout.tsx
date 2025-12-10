@@ -81,7 +81,7 @@ export default async function RootLayout({
   // If not logged in as admin, redirect to main site login
   if (!session) {
     const webUrl = process.env.NEXT_PUBLIC_WEB_URL || 'https://ironscout.ai';
-    const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'https://ironscout-admin.onrender.com';
+    const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'https://admin.ironscout.ai';
     const loginUrl = `${webUrl}/auth/signin?callbackUrl=${encodeURIComponent(adminUrl)}`;
     
     return (

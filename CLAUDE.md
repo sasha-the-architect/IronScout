@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-IronScout.ai is an AI-powered ammunition search and price comparison platform that tracks and aggregates live product listings from multiple vendor sites. The platform provides proactive price monitoring, real-time alerts, AI-powered semantic search, and expert-level performance recommendations. Built as a pnpm monorepo with three main applications:
+IronScout.ai is an AI-powered ammunition search and price comparison platform that tracks and aggregates live product listings from multiple vendor sites. The platform provides proactive price monitoring, real-time alerts, AI-powered semantic search, and expert-level performance recommendations. Built as a pnpm monorepo with four main applications:
 
 1. **Web App** (`apps/web/`) - Next.js 14 frontend with App Router
 2. **API** (`apps/api/`) - Express.js REST API backend
 3. **Harvester** (`apps/harvester/`) - BullMQ-based distributed crawling system with dealer portal workers
+4. **Admin Portal** (`apps/admin/`) - Next.js admin dashboard for dealer management
+5. **Dealer Portal** (`apps/dealer/`) - Next.js dealer self-service dashboard
 
 **Critical**: These are separate deployable services. The frontend CANNOT access the database directly and must use the API. The harvester runs independently as background workers.
 
@@ -79,9 +81,13 @@ pnpm type-check      # TypeScript check all apps (recursive)
 ```
 User → Web App (3000) → API (8000) → PostgreSQL
                                   ↗
-Admin UI → API → Redis → Harvester Workers → PostgreSQL
+Admin Portal (3002) ──────────────┘
+         │
+         └── Shares auth via JWT cookie (domain: .ironscout.ai)
+         
+Dealer → Dealer Portal (3003) → API → Redis → Dealer Workers → PostgreSQL
 
-Dealer → Dealer Portal → API → Redis → Dealer Workers → PostgreSQL
+Harvester Workers → Redis → PostgreSQL
 ```
 
 ### Harvester Pipeline
@@ -335,4 +341,47 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_..."
 - CommonMark for markdown (blank lines before lists)
 
 ---
-*Last updated: December 7, 2025*
+## Admin Portal Authentication
+
+The admin portal (`apps/admin/`) shares authentication with the main web app:
+
+1. **Cookie-based auth**: Web app sets JWT cookie with `domain: .ironscout.ai`
+2. **Admin verification**: Admin app reads cookie, verifies JWT, checks email in `ADMIN_EMAILS`
+3. **Auto-redirect**: Unauthenticated users redirected to main site login with callback URL
+
+**Key files:**
+- `apps/admin/lib/auth.ts` - JWT verification and admin check
+- `apps/web/lib/auth.ts` - NextAuth config with redirect callback
+
+**Environment variables for admin:**
+```env
+NEXTAUTH_SECRET=same-as-web-app
+ADMIN_EMAILS=admin@example.com,another@admin.com
+NEXT_PUBLIC_WEB_URL=https://ironscout.ai
+NEXT_PUBLIC_ADMIN_URL=https://admin.ironscout.ai
+```
+
+See `docs/ADMIN_PORTAL.md` for full documentation.
+
+## Deployment URLs
+
+| Service | Production URL | Render URL |
+|---------|---------------|------------|
+| Web | ironscout.ai | ironscout-web.onrender.com |
+| API | api.ironscout.ai | ironscout-api.onrender.com |
+| Admin | admin.ironscout.ai | ironscout-admin.onrender.com |
+| Dealer | dealer.ironscout.ai | ironscout-dealer.onrender.com |
+
+## Future: Email Microservice
+
+Planned architecture for centralized email handling:
+- Multi-provider support (Resend, SendGrid, SES)
+- BullMQ queuing with retry logic
+- Delivery tracking and analytics
+- Automatic failover between providers
+- Provider interface abstraction
+
+See chat history for detailed architecture design.
+
+---
+*Last updated: December 10, 2025*

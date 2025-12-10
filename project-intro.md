@@ -79,6 +79,14 @@ IronScout/
 │   │   ├── components/      # React components
 │   │   ├── lib/             # Utility functions and API clients
 │   │   └── package.json
+│   ├── admin/               # Admin portal (dealer management)
+│   │   ├── app/             # Admin pages
+│   │   ├── lib/             # Auth (JWT verify), utilities
+│   │   └── package.json
+│   ├── dealer/              # Dealer self-service portal
+│   │   ├── app/             # Dealer dashboard pages
+│   │   ├── lib/             # Auth, utilities
+│   │   └── package.json
 │   └── harvester/           # BullMQ worker system
 │       ├── src/
 │       │   ├── scheduler/   # Job scheduling
@@ -105,7 +113,10 @@ User → Web App (3000) → API (8000) → PostgreSQL
                                   ↗
                        Redis ← Harvester (10 workers)
 
-Dealer → Dealer Portal → API → Redis → Dealer Workers (4)
+Admin → Admin Portal (3002) ───┼─── JWT Cookie Auth ───┘
+         (shares auth via cookie domain: .ironscout.ai)
+
+Dealer → Dealer Portal (3003) → API → Redis → Dealer Workers (4)
 ```
 
 ## 🛠️ Local Development Setup
@@ -275,5 +286,16 @@ See `render.yaml` for full deployment configuration.
 
 ---
 
+## Deployment URLs
+
+| Service | Production | Render |
+|---------|------------|--------|
+| Web | ironscout.ai | ironscout-web.onrender.com |
+| Admin | admin.ironscout.ai | ironscout-admin.onrender.com |
+| Dealer | dealer.ironscout.ai | ironscout-dealer.onrender.com |
+| API | api.ironscout.ai | ironscout-api.onrender.com |
+
+---
+
 *Built with ❤️ by the IronScout.ai team*
-*Last updated: December 7, 2025*
+*Last updated: December 10, 2025*
