@@ -344,9 +344,12 @@ IronScout Dealer Portal
  * Send admin notification when new dealer registers
  */
 export async function sendAdminNewDealerNotification(
+  dealerId: string,
   dealerEmail: string,
   businessName: string,
-  websiteUrl: string
+  contactName: string,
+  websiteUrl: string,
+  phone?: string | null
 ): Promise<SendEmailResult> {
   const emailLogger = logger.child({ 
     action: 'sendAdminNewDealerNotification', 
@@ -356,22 +359,18 @@ export async function sendAdminNewDealerNotification(
   
   emailLogger.info('Sending admin notification for new dealer');
   
-  const adminEmails = (process.env.ADMIN_NOTIFICATION_EMAILS || process.env.ADMIN_EMAILS || '').split(',').filter(Boolean);
-  
-  if (adminEmails.length === 0) {
-    emailLogger.warn('No admin emails configured for notifications');
-    return { success: false, error: 'No admin emails configured' };
-  }
-  
-  const adminUrl = `${BASE_URL}/admin/dealers`;
+  // Send to operations@ironscout.ai for new dealer notifications
+  const notificationEmail = 'operations@ironscout.ai';
+  const adminUrl = process.env.ADMIN_PORTAL_URL || 'https://admin.ironscout.ai';
+  const dealerDetailUrl = `${adminUrl}/dealers/${dealerId}`;
   
   try {
     const resend = getResendClient();
     
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
-      to: adminEmails,
-      subject: `New Dealer Registration: ${businessName}`,
+      to: notificationEmail,
+      subject: `🆕 New Dealer Registration: ${businessName}`,
       html: `
 <!DOCTYPE html>
 <html>
@@ -380,32 +379,78 @@ export async function sendAdminNewDealerNotification(
   <title>New Dealer Registration</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <h2 style="color: #111;">New Dealer Registration</h2>
-  
-  <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin: 20px 0;">
-    <p style="margin: 0 0 10px 0;"><strong>Business:</strong> ${businessName}</p>
-    <p style="margin: 0 0 10px 0;"><strong>Email:</strong> ${dealerEmail}</p>
-    <p style="margin: 0;"><strong>Website:</strong> <a href="${websiteUrl}">${websiteUrl}</a></p>
+  <div style="text-align: center; margin-bottom: 30px;">
+    <h1 style="color: #111; font-size: 24px; margin: 0;">IronScout</h1>
+    <p style="color: #666; font-size: 14px; margin: 5px 0 0 0;">Dealer Management</p>
   </div>
   
-  <p>A new dealer has registered and verified their email. Please review their application.</p>
+  <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+    <p style="margin: 0; font-weight: 600; color: #92400e;">⏳ New Dealer Awaiting Approval</p>
+  </div>
   
-  <div style="margin: 30px 0;">
-    <a href="${adminUrl}" style="display: inline-block; background: #111; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600;">Review in Admin Panel</a>
+  <div style="background: #f9fafb; border-radius: 8px; padding: 25px; margin: 20px 0;">
+    <h2 style="color: #111; font-size: 18px; margin: 0 0 20px 0;">${businessName}</h2>
+    
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr>
+        <td style="padding: 8px 0; color: #666; width: 120px;">Contact:</td>
+        <td style="padding: 8px 0; color: #111;">${contactName}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px 0; color: #666;">Email:</td>
+        <td style="padding: 8px 0; color: #111;"><a href="mailto:${dealerEmail}" style="color: #2563eb;">${dealerEmail}</a></td>
+      </tr>
+      ${phone ? `
+      <tr>
+        <td style="padding: 8px 0; color: #666;">Phone:</td>
+        <td style="padding: 8px 0; color: #111;">${phone}</td>
+      </tr>
+      ` : ''}
+      <tr>
+        <td style="padding: 8px 0; color: #666;">Website:</td>
+        <td style="padding: 8px 0; color: #111;"><a href="${websiteUrl}" style="color: #2563eb;" target="_blank">${websiteUrl}</a></td>
+      </tr>
+      <tr>
+        <td style="padding: 8px 0; color: #666;">Status:</td>
+        <td style="padding: 8px 0;"><span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">PENDING</span></td>
+      </tr>
+    </table>
+  </div>
+  
+  <div style="text-align: center; margin: 30px 0;">
+    <a href="${dealerDetailUrl}" style="display: inline-block; background: #111; color: #fff; text-decoration: none; padding: 14px 30px; border-radius: 6px; font-weight: 600; font-size: 16px;">Review & Approve</a>
+  </div>
+  
+  <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 15px; margin: 20px 0;">
+    <p style="margin: 0; font-size: 14px; color: #0369a1;">💡 <strong>Tip:</strong> Check the dealer's website to verify they are a legitimate firearms retailer before approving.</p>
+  </div>
+  
+  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+  
+  <div style="text-align: center; color: #888; font-size: 12px;">
+    <p style="margin: 0;">Dealer ID: ${dealerId}</p>
+    <p style="margin: 10px 0 0 0;">&copy; ${new Date().getFullYear()} IronScout. All rights reserved.</p>
   </div>
 </body>
 </html>
       `,
       text: `
-New Dealer Registration
+New Dealer Registration - Awaiting Approval
 
 Business: ${businessName}
-Email: ${dealerEmail}
+Contact: ${contactName}
+Email: ${dealerEmail}${phone ? `\nPhone: ${phone}` : ''}
 Website: ${websiteUrl}
+Status: PENDING
 
-A new dealer has registered and verified their email. Please review their application.
+Review and approve this dealer:
+${dealerDetailUrl}
 
-Review in Admin Panel: ${adminUrl}
+Tip: Check the dealer's website to verify they are a legitimate firearms retailer before approving.
+
+---
+Dealer ID: ${dealerId}
+IronScout Dealer Management
       `.trim(),
     });
 

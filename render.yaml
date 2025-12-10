@@ -137,6 +137,10 @@ services:
         value: https://dealer.ironscout.ai
       - key: RESEND_API_KEY
         sync: false  # Set manually in Render dashboard
+      - key: EMAIL_FROM
+        value: IronScout <noreply@ironscout.ai>
+      - key: ADMIN_PORTAL_URL
+        value: https://admin.ironscout.ai
       - key: ADMIN_EMAILS
         sync: false  # Set manually: comma-separated admin emails
 

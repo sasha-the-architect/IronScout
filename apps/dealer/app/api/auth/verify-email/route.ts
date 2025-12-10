@@ -81,9 +81,12 @@ export async function POST(request: Request) {
     // Send admin notification that a new dealer needs approval
     reqLogger.debug('Sending admin notification');
     const adminEmailResult = await sendAdminNewDealerNotification(
+      dealerUser.dealer.id,
       dealerUser.email,
       dealerUser.dealer.businessName,
-      dealerUser.dealer.websiteUrl
+      dealerUser.dealer.contactName,
+      dealerUser.dealer.websiteUrl,
+      dealerUser.dealer.phone
     );
 
     if (!adminEmailResult.success) {
