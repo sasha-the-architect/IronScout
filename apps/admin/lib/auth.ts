@@ -34,19 +34,39 @@ export interface AdminSession {
 export async function getAdminSession(): Promise<AdminSession | null> {
   try {
     const cookieStore = await cookies();
+    
+    // Debug: Log all available cookies (names only for security)
+    const allCookies = cookieStore.getAll();
+    logger.debug('Available cookies', { 
+      cookieNames: allCookies.map(c => c.name),
+      expectedCookie: SESSION_COOKIE_NAME,
+      nodeEnv: process.env.NODE_ENV,
+    });
+    
     const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
     if (!token) {
-      logger.debug('No session cookie found', { cookieName: SESSION_COOKIE_NAME });
+      logger.warn('No session cookie found', { 
+        cookieName: SESSION_COOKIE_NAME,
+        availableCookies: allCookies.map(c => c.name),
+        hint: 'User may need to log in at main site first',
+      });
       return null;
     }
+    
+    logger.debug('Session cookie found', { tokenLength: token.length });
 
     // Verify the JWT
     const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET;
     if (!secret) {
-      logger.error('NEXTAUTH_SECRET not configured');
+      logger.error('NEXTAUTH_SECRET not configured', {
+        hasNextAuthSecret: !!process.env.NEXTAUTH_SECRET,
+        hasAuthSecret: !!process.env.AUTH_SECRET,
+      });
       return null;
     }
+    
+    logger.debug('Secret configured', { secretLength: secret.length });
 
     const secretKey = new TextEncoder().encode(secret);
     
@@ -64,8 +84,18 @@ export async function getAdminSession(): Promise<AdminSession | null> {
       }
 
       // Check if user is in admin list
+      logger.debug('Checking admin access', { 
+        email, 
+        adminEmailsCount: ADMIN_EMAILS.length,
+        adminEmails: ADMIN_EMAILS, // Safe to log since it's server-side
+      });
+      
       if (!ADMIN_EMAILS.includes(email)) {
-        logger.warn('User not in admin list', { email });
+        logger.warn('User not in admin list', { 
+          email, 
+          adminEmails: ADMIN_EMAILS,
+          hint: 'Add email to ADMIN_EMAILS env var',
+        });
         return null;
       }
 
@@ -78,7 +108,10 @@ export async function getAdminSession(): Promise<AdminSession | null> {
         image: payload.picture as string | undefined,
       };
     } catch (jwtError) {
-      logger.warn('JWT verification failed', {}, jwtError);
+      logger.warn('JWT verification failed', {
+        errorType: jwtError instanceof Error ? jwtError.name : 'unknown',
+        hint: 'Check that NEXTAUTH_SECRET matches between web and admin apps',
+      }, jwtError);
       return null;
     }
   } catch (error) {
