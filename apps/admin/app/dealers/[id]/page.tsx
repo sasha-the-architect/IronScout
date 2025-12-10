@@ -13,6 +13,7 @@ import {
   Rss,
   MousePointerClick
 } from 'lucide-react';
+import { EditDealerForm } from './edit-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,9 +76,21 @@ export default async function DealerDetailPage({
           <h1 className="text-2xl font-bold text-gray-900">{dealer.businessName}</h1>
           <p className="mt-1 text-sm text-gray-500">Dealer ID: {dealer.id}</p>
         </div>
-        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${status.color}`}>
-          {status.label}
-        </span>
+        <div className="flex items-center gap-3">
+          <EditDealerForm dealer={{
+            id: dealer.id,
+            businessName: dealer.businessName,
+            contactName: dealer.contactName,
+            phone: dealer.phone,
+            websiteUrl: dealer.websiteUrl,
+            tier: dealer.tier,
+            storeType: dealer.storeType,
+            status: dealer.status,
+          }} />
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${status.color}`}>
+            {status.label}
+          </span>
+        </div>
       </div>
 
       {/* Info Cards */}
