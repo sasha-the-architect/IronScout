@@ -136,19 +136,48 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // Allow redirects to admin subdomain
-      const adminUrl = process.env.ADMIN_URL || 'https://admin.ironscout.ai';
-      if (url.startsWith(adminUrl)) {
-        return url;
-      }
+      console.log('[Auth] Redirect callback:', { url, baseUrl });
+      
       // Allow relative URLs
       if (url.startsWith('/')) {
         return `${baseUrl}${url}`;
       }
-      // Allow same origin
-      if (new URL(url).origin === baseUrl) {
-        return url;
+      
+      try {
+        const urlObj = new URL(url);
+        const baseUrlObj = new URL(baseUrl);
+        
+        // Allow same origin
+        if (urlObj.origin === baseUrlObj.origin) {
+          return url;
+        }
+        
+        // Allow any subdomain of ironscout.ai
+        const allowedDomains = [
+          'ironscout.ai',
+          'admin.ironscout.ai',
+          'dealer.ironscout.ai',
+        ];
+        
+        // Also allow Render URLs during development/testing
+        const allowedRenderDomains = [
+          'ironscout-admin.onrender.com',
+          'ironscout-dealer.onrender.com',
+          'ironscout-web.onrender.com',
+        ];
+        
+        if (allowedDomains.includes(urlObj.hostname) || 
+            allowedRenderDomains.includes(urlObj.hostname) ||
+            urlObj.hostname.endsWith('.ironscout.ai')) {
+          console.log('[Auth] Allowing redirect to:', url);
+          return url;
+        }
+        
+        console.log('[Auth] Blocked redirect to:', url);
+      } catch (e) {
+        console.error('[Auth] Error parsing URL:', e);
       }
+      
       return baseUrl;
     },
     async session({ session, token, user }) {
