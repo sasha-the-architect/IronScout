@@ -1,7 +1,7 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@ironscout/db';
-import { Settings, User, Code, Bell, Truck } from 'lucide-react';
+import { Settings, User, Code, Bell, Truck, Users } from 'lucide-react';
 import Link from 'next/link';
 
 export default async function SettingsPage() {
@@ -15,6 +15,9 @@ export default async function SettingsPage() {
     where: { id: session.dealerId },
     include: {
       notificationPref: true,
+      _count: {
+        select: { contacts: { where: { isActive: true } } },
+      },
     },
   });
 
@@ -29,6 +32,13 @@ export default async function SettingsPage() {
       icon: User,
       href: '/settings/account',
       status: 'Complete',
+    },
+    {
+      title: 'Contacts',
+      description: 'Manage contacts who receive communications from IronScout',
+      icon: Users,
+      href: '/settings/contacts',
+      status: dealer._count?.contacts > 0 ? `${dealer._count.contacts} contact${dealer._count.contacts !== 1 ? 's' : ''}` : 'Not Set',
     },
     {
       title: 'Shipping',

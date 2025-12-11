@@ -45,6 +45,10 @@ export interface DealerSession {
   businessName: string;
   status: DealerStatus;
   tier: string;
+  // Impersonation metadata (optional)
+  isImpersonating?: boolean;
+  impersonatedBy?: string;
+  impersonatedAt?: string;
 }
 
 export interface AdminSession {
@@ -102,7 +106,8 @@ export async function verifyDealerToken(token: string): Promise<DealerSession | 
     logger.debug('Verifying dealer JWT token');
     const { payload } = await jwtVerify(token, JWT_SECRET);
     logger.debug('Token verified successfully', { dealerUserId: payload.dealerUserId });
-    return {
+    
+    const session: DealerSession = {
       type: 'dealer',
       dealerUserId: payload.dealerUserId as string,
       dealerId: payload.dealerId as string,
@@ -113,6 +118,19 @@ export async function verifyDealerToken(token: string): Promise<DealerSession | 
       status: payload.status as DealerStatus,
       tier: payload.tier as string,
     };
+    
+    // Include impersonation metadata if present
+    if (payload.isImpersonating) {
+      session.isImpersonating = true;
+      session.impersonatedBy = payload.impersonatedBy as string;
+      session.impersonatedAt = payload.impersonatedAt as string;
+      logger.info('Impersonation session detected', { 
+        impersonatedBy: session.impersonatedBy,
+        dealerId: session.dealerId 
+      });
+    }
+    
+    return session;
   } catch (error) {
     logger.warn('Token verification failed', {}, error);
     return null;
@@ -354,7 +372,8 @@ export interface RegisterInput {
   email: string;
   password: string;
   businessName: string;
-  contactName: string;
+  contactFirstName: string;
+  contactLastName: string;
   websiteUrl: string;
   phone?: string;
 }
@@ -367,7 +386,7 @@ export interface RegisterResult {
 }
 
 export async function registerDealer(input: RegisterInput): Promise<RegisterResult> {
-  const { email, password, businessName, contactName, websiteUrl, phone } = input;
+  const { email, password, businessName, contactFirstName, contactLastName, websiteUrl, phone } = input;
   
   const regLogger = logger.child({ 
     action: 'register', 
@@ -397,14 +416,18 @@ export async function registerDealer(input: RegisterInput): Promise<RegisterResu
     const verifyToken = crypto.randomUUID();
     regLogger.debug('Generated verification token');
     
-    // Create dealer and owner user in a transaction
-    regLogger.debug('Creating dealer and owner user in database');
+    // Full name for user display
+    const fullName = `${contactFirstName} ${contactLastName}`.trim();
+    
+    // Create dealer, owner user, and initial contact in a transaction
+    regLogger.debug('Creating dealer, owner user, and contact in database');
     const result = await prisma.$transaction(async (tx) => {
       // Create the dealer (business account)
       const dealer = await tx.dealer.create({
         data: {
           businessName,
-          contactName,
+          contactFirstName,
+          contactLastName,
           websiteUrl,
           phone,
           status: 'PENDING',
@@ -418,10 +441,25 @@ export async function registerDealer(input: RegisterInput): Promise<RegisterResu
           dealerId: dealer.id,
           email: email.toLowerCase(),
           passwordHash,
-          name: contactName,
+          name: fullName,
           role: 'OWNER',
           verifyToken,
           emailVerified: false,
+        },
+      });
+      
+      // Create the initial primary contact
+      await tx.dealerContact.create({
+        data: {
+          dealerId: dealer.id,
+          firstName: contactFirstName,
+          lastName: contactLastName,
+          email: email.toLowerCase(),
+          phone,
+          role: 'PRIMARY',
+          isPrimary: true,
+          marketingOptIn: false,
+          communicationOptIn: true,
         },
       });
       
@@ -439,7 +477,8 @@ export async function registerDealer(input: RegisterInput): Promise<RegisterResu
   } catch (error) {
     regLogger.error('Registration failed - database error', { 
       websiteUrl,
-      contactName 
+      contactFirstName,
+      contactLastName 
     }, error);
     throw error;
   }

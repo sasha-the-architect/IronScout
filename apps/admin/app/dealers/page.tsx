@@ -164,7 +164,7 @@ export default async function DealersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm text-gray-900">{dealer.contactName}</div>
+                      <div className="text-sm text-gray-900">{dealer.contactFirstName} {dealer.contactLastName}</div>
                       <div className="text-sm text-gray-500">{ownerUser?.email || 'No owner'}</div>
                     </div>
                   </td>

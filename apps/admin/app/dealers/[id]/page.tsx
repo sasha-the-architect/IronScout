@@ -11,9 +11,12 @@ import {
   Calendar,
   Package,
   Rss,
-  MousePointerClick
+  MousePointerClick,
+  User
 } from 'lucide-react';
 import { EditDealerForm } from './edit-form';
+import { ContactsSection } from './contacts-section';
+import { AdminActions } from './admin-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +40,13 @@ export default async function DealerDetailPage({
         where: { role: 'OWNER' },
         take: 1,
       },
+      contacts: {
+        where: { isActive: true },
+        orderBy: [
+          { isPrimary: 'desc' },
+          { createdAt: 'asc' },
+        ],
+      },
       feeds: {
         orderBy: { createdAt: 'desc' },
         take: 5,
@@ -58,6 +68,7 @@ export default async function DealerDetailPage({
 
   const status = statusConfig[dealer.status];
   const ownerUser = dealer.users[0];
+  const mainContactName = `${dealer.contactFirstName} ${dealer.contactLastName}`.trim();
 
   return (
     <div className="space-y-6">
@@ -80,7 +91,8 @@ export default async function DealerDetailPage({
           <EditDealerForm dealer={{
             id: dealer.id,
             businessName: dealer.businessName,
-            contactName: dealer.contactName,
+            contactFirstName: dealer.contactFirstName,
+            contactLastName: dealer.contactLastName,
             phone: dealer.phone,
             websiteUrl: dealer.websiteUrl,
             tier: dealer.tier,
@@ -95,39 +107,35 @@ export default async function DealerDetailPage({
 
       {/* Info Cards */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Contact Info */}
+        {/* Business Info */}
         <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Contact Information</h2>
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Business Information</h2>
           <dl className="space-y-4">
             <div className="flex items-start gap-3">
-              <Building2 className="h-5 w-5 text-gray-400 mt-0.5" />
+              <User className="h-5 w-5 text-gray-400 mt-0.5" />
               <div>
-                <dt className="text-sm font-medium text-gray-500">Contact Name</dt>
-                <dd className="text-sm text-gray-900">{dealer.contactName}</dd>
+                <dt className="text-sm font-medium text-gray-500">Main Contact</dt>
+                <dd className="text-sm text-gray-900">{mainContactName}</dd>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <Mail className="h-5 w-5 text-gray-400 mt-0.5" />
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Email</dt>
-                <dd className="text-sm text-gray-900">
-                  {ownerUser ? (
-                    <>
-                      <a href={`mailto:${ownerUser.email}`} className="text-blue-600 hover:underline">
-                        {ownerUser.email}
-                      </a>
-                      {ownerUser.emailVerified && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                          Verified
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-gray-500">No owner</span>
-                  )}
-                </dd>
+            {ownerUser && (
+              <div className="flex items-start gap-3">
+                <Mail className="h-5 w-5 text-gray-400 mt-0.5" />
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Portal Login Email</dt>
+                  <dd className="text-sm text-gray-900">
+                    <a href={`mailto:${ownerUser.email}`} className="text-blue-600 hover:underline">
+                      {ownerUser.email}
+                    </a>
+                    {ownerUser.emailVerified && (
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                        Verified
+                      </span>
+                    )}
+                  </dd>
+                </div>
               </div>
-            </div>
+            )}
             {dealer.phone && (
               <div className="flex items-start gap-3">
                 <Phone className="h-5 w-5 text-gray-400 mt-0.5" />
@@ -206,6 +214,20 @@ export default async function DealerDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Admin Actions */}
+      <AdminActions 
+        dealerId={dealer.id}
+        businessName={dealer.businessName}
+        ownerEmail={ownerUser?.email || null}
+        emailVerified={ownerUser?.emailVerified || false}
+      />
+
+      {/* Contacts Section */}
+      <ContactsSection 
+        dealerId={dealer.id} 
+        contacts={dealer.contacts}
+      />
 
       {/* Account Details */}
       <div className="bg-white shadow rounded-lg p-6">

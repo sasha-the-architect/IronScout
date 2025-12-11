@@ -10,7 +10,8 @@ export default function RegisterPage() {
     password: '',
     confirmPassword: '',
     businessName: '',
-    contactName: '',
+    contactFirstName: '',
+    contactLastName: '',
     websiteUrl: '',
     phone: '',
   });
@@ -47,7 +48,8 @@ export default function RegisterPage() {
           email: formData.email,
           password: formData.password,
           businessName: formData.businessName,
-          contactName: formData.contactName,
+          contactFirstName: formData.contactFirstName,
+          contactLastName: formData.contactLastName,
           websiteUrl: formData.websiteUrl,
           phone: formData.phone || undefined,
         }),
@@ -187,21 +189,38 @@ export default function RegisterPage() {
           />
         </div>
 
-        {/* Contact Name */}
-        <div>
-          <label htmlFor="contactName" className="block text-sm font-medium text-gray-700">
-            Contact Name *
-          </label>
-          <input
-            id="contactName"
-            name="contactName"
-            type="text"
-            required
-            value={formData.contactName}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            placeholder="John Smith"
-          />
+        {/* Contact First Name & Last Name */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="contactFirstName" className="block text-sm font-medium text-gray-700">
+              First Name *
+            </label>
+            <input
+              id="contactFirstName"
+              name="contactFirstName"
+              type="text"
+              required
+              value={formData.contactFirstName}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="John"
+            />
+          </div>
+          <div>
+            <label htmlFor="contactLastName" className="block text-sm font-medium text-gray-700">
+              Last Name *
+            </label>
+            <input
+              id="contactLastName"
+              name="contactLastName"
+              type="text"
+              required
+              value={formData.contactLastName}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="Smith"
+            />
+          </div>
         </div>
 
         {/* Website URL */}

@@ -8,7 +8,8 @@ const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   businessName: z.string().min(2, 'Business name is required'),
-  contactName: z.string().min(2, 'Contact name is required'),
+  contactFirstName: z.string().min(1, 'First name is required'),
+  contactLastName: z.string().min(1, 'Last name is required'),
   websiteUrl: z.string().url('Invalid website URL'),
   phone: z.string().optional(),
 });
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { email, password, businessName, contactName, websiteUrl, phone } = validationResult.data;
+    const { email, password, businessName, contactFirstName, contactLastName, websiteUrl, phone } = validationResult.data;
     
     reqLogger.info('Registration validation passed', { 
       email, 
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
       email,
       password,
       businessName,
-      contactName,
+      contactFirstName,
+      contactLastName,
       websiteUrl,
       phone,
     });

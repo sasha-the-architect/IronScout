@@ -494,7 +494,8 @@ model Dealer {
   
   // Business info
   businessName    String
-  contactName     String
+  contactFirstName String       // Main contact first name
+  contactLastName  String       // Main contact last name
   websiteUrl      String
   phone           String?
   storeType       StoreType     @default(ONLINE_ONLY)
@@ -515,9 +516,12 @@ model Dealer {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  // Team members
+  // Team members (portal login users)
   users           DealerUser[]
   invites         DealerInvite[]
+  
+  // Business contacts (for communications/notifications)
+  contacts        DealerContact[]
   
   feeds           DealerFeed[]
   skus            DealerSku[]
@@ -580,6 +584,39 @@ model DealerInvite {
   @@index([inviteToken])
   @@index([dealerId])
   @@map("dealer_invites")
+}
+
+// Business contacts for dealer communications (separate from portal login users)
+model DealerContact {
+  id              String              @id @default(cuid())
+  dealerId        String
+  
+  // Contact info
+  firstName       String
+  lastName        String
+  email           String
+  phone           String?
+  
+  // Role (stubbed for future use)
+  role            DealerContactRole   @default(PRIMARY)
+  
+  // Email opt-in preferences
+  marketingOptIn      Boolean         @default(false)  // Promotional/marketing emails
+  communicationOptIn  Boolean         @default(true)   // Operational/transactional emails
+  
+  // Tracking
+  isPrimary       Boolean             @default(false)  // Is this the main contact?
+  isActive        Boolean             @default(true)
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  dealer          Dealer              @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+
+  @@unique([dealerId, email])
+  @@index([dealerId])
+  @@index([email])
+  @@map("dealer_contacts")
 }
 
 model DealerFeed {
@@ -901,6 +938,15 @@ enum DealerUserRole {
   ADMIN             // Can manage team, settings, full access
   MEMBER            // Standard access to dashboard, SKUs, insights
   VIEWER            // Read-only access
+}
+
+// Contact roles for dealer business contacts (stubbed for future expansion)
+enum DealerContactRole {
+  PRIMARY           // Primary business contact
+  BILLING           // Billing/accounting contact (future)
+  TECHNICAL         // Technical/feed support contact (future)
+  MARKETING         // Marketing communications contact (future)
+  OTHER             // Other contact type
 }
 
 enum StoreType {
