@@ -9,8 +9,8 @@ export interface UpdateDealerData {
   contactName?: string;
   phone?: string;
   websiteUrl?: string;
-  tier?: 'FREE' | 'STARTER' | 'PRO' | 'ENTERPRISE';
-  storeType?: 'ONLINE_ONLY' | 'BRICK_AND_MORTAR' | 'HYBRID';
+  tier?: 'FOUNDING' | 'BASIC' | 'PRO' | 'ENTERPRISE';
+  storeType?: 'ONLINE_ONLY' | 'RETAIL_AND_ONLINE';
   status?: 'PENDING' | 'ACTIVE' | 'SUSPENDED';
 }
 

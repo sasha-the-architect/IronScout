@@ -193,8 +193,8 @@ export function EditDealerForm({ dealer }: EditDealerFormProps) {
                       onChange={(e) => setFormData({ ...formData, tier: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
                     >
-                      <option value="FREE">Free</option>
-                      <option value="STARTER">Starter</option>
+                      <option value="FOUNDING">Founding (Free 12-month)</option>
+                      <option value="BASIC">Basic</option>
                       <option value="PRO">Pro</option>
                       <option value="ENTERPRISE">Enterprise</option>
                     </select>
@@ -212,8 +212,7 @@ export function EditDealerForm({ dealer }: EditDealerFormProps) {
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
                     >
                       <option value="ONLINE_ONLY">Online Only</option>
-                      <option value="BRICK_AND_MORTAR">Brick and Mortar</option>
-                      <option value="HYBRID">Hybrid</option>
+                      <option value="RETAIL_AND_ONLINE">Retail & Online</option>
                     </select>
                   </div>
                 </div>
