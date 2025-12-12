@@ -7,14 +7,26 @@ const DEALER_JWT_SECRET = new TextEncoder().encode(
   process.env.DEALER_JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dealer-secret-change-me'
 );
 
+// Get the base URL for redirects
+function getBaseUrl(request: NextRequest): string {
+  // In production, use the configured URL or derive from request
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.NEXTAUTH_URL || process.env.DEALER_PORTAL_URL || 'https://dealer.ironscout.ai';
+  }
+  // In development, use the request origin
+  return request.nextUrl.origin;
+}
+
 // This endpoint receives a one-time impersonation token from admin
 // and exchanges it for a dealer session cookie
 export async function GET(request: NextRequest) {
+  const baseUrl = getBaseUrl(request);
   const searchParams = request.nextUrl.searchParams;
   const token = searchParams.get('token');
 
   if (!token) {
-    return NextResponse.redirect(new URL('/login?error=missing_token', request.url));
+    console.error('Impersonation: No token provided');
+    return NextResponse.redirect(`${baseUrl}/login?error=missing_token`);
   }
 
   try {
@@ -23,7 +35,8 @@ export async function GET(request: NextRequest) {
 
     // Check if this is an impersonation token
     if (!payload.isImpersonating) {
-      return NextResponse.redirect(new URL('/login?error=invalid_token', request.url));
+      console.error('Impersonation: Token is not an impersonation token');
+      return NextResponse.redirect(`${baseUrl}/login?error=invalid_token`);
     }
 
     // Verify the dealer still exists and is valid
@@ -33,7 +46,8 @@ export async function GET(request: NextRequest) {
     });
 
     if (!dealerUser) {
-      return NextResponse.redirect(new URL('/login?error=dealer_not_found', request.url));
+      console.error('Impersonation: Dealer user not found:', payload.dealerUserId);
+      return NextResponse.redirect(`${baseUrl}/login?error=dealer_not_found`);
     }
 
     // Create a fresh session token
@@ -79,10 +93,17 @@ export async function GET(request: NextRequest) {
       path: '/',
     });
 
+    console.log('Impersonation: Success for', dealerUser.email, 'by', payload.impersonatedBy);
+    
     // Redirect to dashboard
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(`${baseUrl}/dashboard`);
   } catch (error) {
     console.error('Impersonation error:', error);
-    return NextResponse.redirect(new URL('/login?error=invalid_token', request.url));
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error name:', error.name);
+    }
+    return NextResponse.redirect(`${baseUrl}/login?error=invalid_token`);
   }
 }

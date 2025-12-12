@@ -446,7 +446,7 @@ export async function impersonateDealer(dealerId: string) {
 
     // Build the redirect URL with the token
     // The dealer portal will exchange this token for a session cookie
-    const baseUrl = process.env.DEALER_PORTAL_URL || 'https://dealer.ironscout.ai';
+    const baseUrl = (process.env.DEALER_PORTAL_URL || 'https://dealer.ironscout.ai').replace(/\/$/, '');
     const redirectUrl = `${baseUrl}/api/auth/impersonate?token=${encodeURIComponent(token)}`;
 
     return { 
