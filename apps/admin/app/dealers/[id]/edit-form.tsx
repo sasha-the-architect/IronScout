@@ -9,6 +9,7 @@ interface DealerData {
   businessName: string;
   contactFirstName: string;
   contactLastName: string;
+  ownerEmail: string | null;
   phone: string | null;
   websiteUrl: string;
   tier: string;
@@ -28,6 +29,7 @@ export function EditDealerForm({ dealer }: EditDealerFormProps) {
     businessName: dealer.businessName,
     contactFirstName: dealer.contactFirstName,
     contactLastName: dealer.contactLastName,
+    ownerEmail: dealer.ownerEmail || '',
     phone: dealer.phone || '',
     websiteUrl: dealer.websiteUrl,
     tier: dealer.tier,
@@ -60,6 +62,7 @@ export function EditDealerForm({ dealer }: EditDealerFormProps) {
       businessName: dealer.businessName,
       contactFirstName: dealer.contactFirstName,
       contactLastName: dealer.contactLastName,
+      ownerEmail: dealer.ownerEmail || '',
       phone: dealer.phone || '',
       websiteUrl: dealer.websiteUrl,
       tier: dealer.tier,
@@ -152,6 +155,24 @@ export function EditDealerForm({ dealer }: EditDealerFormProps) {
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
                       required
                     />
+                  </div>
+
+                  {/* Portal Login Email */}
+                  <div className="sm:col-span-2">
+                    <label htmlFor="ownerEmail" className="block text-sm font-medium text-gray-700">
+                      Portal Login Email
+                    </label>
+                    <input
+                      type="email"
+                      id="ownerEmail"
+                      value={formData.ownerEmail}
+                      onChange={(e) => setFormData({ ...formData, ownerEmail: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
+                      placeholder="dealer@example.com"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      This is the email used to log into the dealer portal. Changing this will require re-verification.
+                    </p>
                   </div>
 
                   {/* Phone */}

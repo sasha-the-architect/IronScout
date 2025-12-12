@@ -93,6 +93,7 @@ export default async function DealerDetailPage({
             businessName: dealer.businessName,
             contactFirstName: dealer.contactFirstName,
             contactLastName: dealer.contactLastName,
+            ownerEmail: ownerUser?.email || null,
             phone: dealer.phone,
             websiteUrl: dealer.websiteUrl,
             tier: dealer.tier,

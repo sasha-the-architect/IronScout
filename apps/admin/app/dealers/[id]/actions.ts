@@ -10,6 +10,7 @@ export interface UpdateDealerData {
   businessName?: string;
   contactFirstName?: string;
   contactLastName?: string;
+  ownerEmail?: string;
   phone?: string;
   websiteUrl?: string;
   tier?: 'FOUNDING' | 'BASIC' | 'PRO' | 'ENTERPRISE';
@@ -28,15 +29,11 @@ export async function updateDealer(dealerId: string, data: UpdateDealerData) {
     // Get old values for audit log
     const oldDealer = await prisma.dealer.findUnique({
       where: { id: dealerId },
-      select: {
-        businessName: true,
-        contactFirstName: true,
-        contactLastName: true,
-        phone: true,
-        websiteUrl: true,
-        tier: true,
-        storeType: true,
-        status: true,
+      include: {
+        users: {
+          where: { role: 'OWNER' },
+          take: 1,
+        },
       },
     });
 
@@ -44,34 +41,73 @@ export async function updateDealer(dealerId: string, data: UpdateDealerData) {
       return { success: false, error: 'Dealer not found' };
     }
 
-    // Update dealer
+    const ownerUser = oldDealer.users[0];
+
+    // If email is being changed, check if it's already in use
+    if (data.ownerEmail && ownerUser && data.ownerEmail !== ownerUser.email) {
+      const existingUser = await prisma.dealerUser.findUnique({
+        where: { email: data.ownerEmail },
+      });
+
+      if (existingUser) {
+        return { success: false, error: 'This email is already in use by another dealer account' };
+      }
+    }
+
+    // Update dealer (excluding ownerEmail which is on DealerUser)
+    const { ownerEmail, ...dealerData } = data;
+    
     const updatedDealer = await prisma.dealer.update({
       where: { id: dealerId },
       data: {
-        businessName: data.businessName,
-        contactFirstName: data.contactFirstName,
-        contactLastName: data.contactLastName,
-        phone: data.phone,
-        websiteUrl: data.websiteUrl,
-        tier: data.tier,
-        storeType: data.storeType,
-        status: data.status,
+        businessName: dealerData.businessName,
+        contactFirstName: dealerData.contactFirstName,
+        contactLastName: dealerData.contactLastName,
+        phone: dealerData.phone,
+        websiteUrl: dealerData.websiteUrl,
+        tier: dealerData.tier,
+        storeType: dealerData.storeType,
+        status: dealerData.status,
       },
     });
+
+    // Update owner user email if changed
+    let emailChanged = false;
+    if (ownerEmail && ownerUser && ownerEmail !== ownerUser.email) {
+      await prisma.dealerUser.update({
+        where: { id: ownerUser.id },
+        data: {
+          email: ownerEmail,
+          emailVerified: false, // Reset verification when email changes
+          verifyToken: crypto.randomUUID(), // Generate new verification token
+        },
+      });
+      emailChanged = true;
+    }
 
     // Log the action
     await logAdminAction(session.userId, 'UPDATE_DEALER', {
       dealerId,
       resource: 'Dealer',
       resourceId: dealerId,
-      oldValue: oldDealer,
-      newValue: data,
+      oldValue: {
+        ...oldDealer,
+        ownerEmail: ownerUser?.email,
+      },
+      newValue: {
+        ...data,
+        emailChanged,
+      },
     });
 
     revalidatePath(`/dealers/${dealerId}`);
     revalidatePath('/dealers');
 
-    return { success: true, dealer: updatedDealer };
+    return { 
+      success: true, 
+      dealer: updatedDealer,
+      emailChanged,
+    };
   } catch (error) {
     console.error('Failed to update dealer:', error);
     return { success: false, error: 'Failed to update dealer' };
