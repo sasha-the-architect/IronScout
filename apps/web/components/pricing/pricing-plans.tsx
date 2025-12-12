@@ -50,7 +50,7 @@ const featureComparison = [
   { 
     category: 'Alerts',
     features: [
-      { name: 'Price drop alerts', free: 'Up to 3, daily digest', premium: 'Unlimited, instant' },
+      { name: 'Price drop alerts', free: 'Up to 3, delayed', premium: 'Unlimited, instant' },
       { name: 'Get notified before deals sell out', free: false, premium: true },
     ]
   },
@@ -69,7 +69,7 @@ const plans = [
       'Search by caliber, brand, grain & more',
       'Price-per-round breakdown',
       'Purpose badges (range, defense, hunting)',
-      'Daily price alerts (up to 3)',
+      'Price alerts (up to 3, delayed)',
       'Basic AI search assistance',
     ],
     limitations: [],

@@ -159,9 +159,9 @@ For Premium users, show:
 
 ### Pricing Page Accuracy
 
-Current `pricing-plans.tsx` is accurate EXCEPT:
-- Free tier says "up to 3" alerts - matches intent but config says 5
-- "Daily digest" messaging - config only does 60min delay, not true digest
+Current `pricing-plans.tsx` is accurate:
+- Free tier: "up to 3" alerts with "delayed" - matches config
+- Premium tier: "Unlimited, instant" - matches config
 
 ---
 
