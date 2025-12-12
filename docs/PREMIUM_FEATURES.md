@@ -43,7 +43,7 @@
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| **Price history charts** | Backend exists, UI unclear | Need to verify `apps/web` has price history visualization for Premium |
+| **Price history charts** | ✅ Implemented | Backend + UI integrated, Premium-gated |
 | **"What should I buy?" personalization** | AI ranking works | Need explicit "recommendation mode" in UI |
 | **Instant alerts** | Config exists | Need to verify harvester/alerter respects tier delay |
 

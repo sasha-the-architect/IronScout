@@ -2,19 +2,25 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Bell, ExternalLink, Crown, TrendingDown, Store, Package } from 'lucide-react'
 import type { Product } from '@/lib/api'
 import { CreateAlertDialog } from './create-alert-dialog'
+import { PriceHistoryChart } from './price-history-chart'
 
 interface ProductDetailsProps {
   product: Product
 }
 
 export function ProductDetails({ product }: ProductDetailsProps) {
+  const { data: session } = useSession()
   const [showAlertDialog, setShowAlertDialog] = useState(false)
+
+  // Check if user is Premium
+  const isPremium = (session?.user as any)?.tier === 'PREMIUM'
 
   const lowestPrice = product.prices.reduce((min, price) =>
     price.price < min.price ? price : min
@@ -233,19 +239,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         </CardContent>
       </Card>
 
-      {/* Price History Placeholder */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Price History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 flex items-center justify-center bg-muted/20 rounded-lg">
-            <p className="text-muted-foreground">
-              Price history chart coming soon
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Price History Chart */}
+      <PriceHistoryChart productId={product.id} isPremium={isPremium} />
 
       <CreateAlertDialog
         product={product}

@@ -317,7 +317,7 @@ export interface PriceHistory {
 }
 
 export async function getProductPriceHistory(productId: string): Promise<PriceHistory> {
-  const response = await fetch(`${API_BASE_URL}/api/products/${productId}/price-history`)
+  const response = await fetch(`${API_BASE_URL}/api/products/${productId}/history`)
   if (!response.ok) {
     throw new Error('Failed to fetch price history')
   }
