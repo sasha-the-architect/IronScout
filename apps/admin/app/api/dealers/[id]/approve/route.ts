@@ -3,7 +3,7 @@ import { getAdminSession, logAdminAction } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { headers } from 'next/headers';
 import { logger } from '@/lib/logger';
-import { sendApprovalEmail } from '@/lib/email';
+import { notifyDealerApproved } from '@ironscout/notifications';
 
 export async function POST(
   request: Request,
@@ -76,18 +76,27 @@ export async function POST(
     });
 
     if (ownerUser) {
-      const emailResult = await sendApprovalEmail(ownerUser.email, dealer.businessName);
+      // Send approval notification (email + Slack)
+      const notifyResult = await notifyDealerApproved({
+        id: dealer.id,
+        email: ownerUser.email,
+        businessName: dealer.businessName,
+      });
 
-      if (!emailResult.success) {
-        reqLogger.warn('Failed to send approval email', { dealerId, error: emailResult.error });
+      if (!notifyResult.email.success) {
+        reqLogger.warn('Failed to send approval email', { dealerId, error: notifyResult.email.error });
       } else {
-        reqLogger.info('Approval email sent', { dealerId, messageId: emailResult.messageId });
+        reqLogger.info('Approval email sent', { dealerId, messageId: notifyResult.email.messageId });
+      }
+      
+      if (!notifyResult.slack.success) {
+        reqLogger.warn('Failed to send Slack notification', { dealerId, error: notifyResult.slack.error });
       }
 
       return NextResponse.json({
         success: true,
         dealer: { id: updatedDealer.id, status: updatedDealer.status },
-        emailSent: emailResult.success,
+        emailSent: notifyResult.email.success,
       });
     }
 

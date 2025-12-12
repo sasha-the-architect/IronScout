@@ -3,6 +3,7 @@ import { getAdminSession, logAdminAction } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { headers } from 'next/headers';
 import { logger } from '@/lib/logger';
+import { notifyDealerSuspended } from '@ironscout/notifications';
 
 export async function POST(
   request: Request,
@@ -20,16 +21,34 @@ export async function POST(
     }
 
     const { id: dealerId } = await params;
-    reqLogger.info('Dealer suspend request', { dealerId, adminEmail: session.email });
+    
+    // Parse optional reason from request body
+    let reason: string | undefined;
+    try {
+      const body = await request.json();
+      reason = body.reason;
+    } catch {
+      // No body or invalid JSON, continue without reason
+    }
+    
+    reqLogger.info('Dealer suspend request', { dealerId, adminEmail: session.email, reason });
 
     const dealer = await prisma.dealer.findUnique({
       where: { id: dealerId },
+      include: {
+        users: {
+          where: { role: 'OWNER' },
+          take: 1,
+        },
+      },
     });
 
     if (!dealer) {
       reqLogger.warn('Dealer not found', { dealerId });
       return NextResponse.json({ error: 'Dealer not found' }, { status: 404 });
     }
+
+    const ownerUser = dealer.users[0];
 
     if (dealer.status === 'SUSPENDED') {
       reqLogger.warn('Dealer already suspended', { dealerId });
@@ -51,10 +70,32 @@ export async function POST(
       resource: 'dealer',
       resourceId: dealerId,
       oldValue: { status: dealer.status },
-      newValue: { status: 'SUSPENDED' },
+      newValue: { status: 'SUSPENDED', reason },
       ipAddress: headersList.get('x-forwarded-for') || undefined,
       userAgent: headersList.get('user-agent') || undefined,
     });
+
+    // Send suspension notification (email + Slack)
+    if (ownerUser) {
+      const notifyResult = await notifyDealerSuspended(
+        {
+          id: dealer.id,
+          email: ownerUser.email,
+          businessName: dealer.businessName,
+        },
+        reason
+      );
+
+      if (!notifyResult.email.success) {
+        reqLogger.warn('Failed to send suspension email', { dealerId, error: notifyResult.email.error });
+      } else {
+        reqLogger.info('Suspension email sent', { dealerId, messageId: notifyResult.email.messageId });
+      }
+      
+      if (!notifyResult.slack.success) {
+        reqLogger.warn('Failed to send Slack notification', { dealerId, error: notifyResult.slack.error });
+      }
+    }
 
     return NextResponse.json({
       success: true,
