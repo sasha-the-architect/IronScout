@@ -11,8 +11,8 @@
 export const TIER_CONFIG = {
   FREE: {
     // Alerts
-    maxActiveAlerts: 5,
-    alertDelayMinutes: 60, // 1 hour delay on notifications
+    maxActiveAlerts: 3, // Up to 3 alerts, daily digest
+    alertDelayMinutes: 60, // Delayed notifications (daily digest planned)
     
     // Search
     maxSearchResults: 20,

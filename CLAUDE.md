@@ -117,19 +117,26 @@ The harvester uses a 10-worker pipeline architecture with BullMQ queues:
 ### Tier System
 
 **FREE Tier:**
-- 5 alerts max, 60-minute delay
+- 3 alerts max, delayed notifications (daily digest planned)
 - 20 search results
 - Basic AI purpose detection
 - Standard relevance ranking
+- Purpose badges (range, defense, hunting)
 
-**PREMIUM Tier ($4.99/mo):**
+**PREMIUM Tier ($4.99/mo or $49.99/yr):**
 - Unlimited real-time alerts
 - 100 search results, 365-day price history
 - Advanced AI: purpose-optimized ranking, Best Value scores
 - Premium filters: +P, subsonic, velocity, bullet type
 - Performance badges and AI explanations
+- "What should I buy?" personalized recommendations
+
+**Pricing Page Copy (Option A - Benefit-Focused):**
+- Free: "Find Ammo Fast" - Search, filter, compare prices
+- Premium: "Never Overpay Again" - AI-powered recommendations
 
 Configuration: `apps/api/src/config/tiers.ts`
+Pricing UI: `apps/web/components/pricing/pricing-plans.tsx`
 
 ## Database Schema (Prisma)
 
