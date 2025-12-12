@@ -413,20 +413,89 @@ See chat history for detailed architecture design.
 Dealers can manage multiple contacts who receive IronScout communications:
 
 - **CRUD operations** for contacts (OWNER/ADMIN roles only)
-- **Primary contact** designation for default communications
+- **Account owner designation** - exactly ONE per dealer (database-enforced via unique constraint)
 - **Email preferences**: `communicationOptIn` (operational), `marketingOptIn` (promotional)
-- **Contact roles**: PRIMARY, BILLING, TECHNICAL, MARKETING, OTHER (future email routing)
+- **Contact roles**: PRIMARY, BILLING, TECHNICAL, MARKETING (OTHER role removed)
+- **Account ownership transfer** - Only current owner can transfer to another contact
+
+**Database Constraint:**
+```prisma
+@@unique([dealerId, isAccountOwner])
+```
+This unique constraint enforces that only ONE contact per dealer can have `isAccountOwner: true`. When `isAccountOwner: false`, multiple contacts are allowed. At PostgreSQL level, this prevents race conditions and concurrent violations.
+
+**Schema Changes:**
+- `DealerContact.isAccountOwner` - Boolean field (default: false)
+- Removed `DealerContactRole.OTHER` enum value
+- Migration: `20251212_enforce_account_ownership.sql`
 
 **Key files:**
-- `apps/dealer/app/(dashboard)/settings/contacts/` - Contact management UI
-- `apps/dealer/components/impersonation-banner.tsx` - Shows when admin is impersonating
+- `packages/db/schema.prisma` - DealerContact model with unique constraint
+- `apps/dealer/app/(dashboard)/settings/contacts/contacts-list.tsx` - Dealer contact UI with transfer
+- `apps/dealer/app/(dashboard)/settings/contacts/actions.ts` - Server actions for contact CRUD + transfer
+- `apps/admin/app/dealers/[id]/contacts-section.tsx` - Admin contact UI with transfer
+- `apps/admin/app/dealers/[id]/actions.ts` - Admin server actions for contact CRUD + transfer
+
+**Transfer Ownership Feature:**
+
+Dealer Portal - **`transferOwnership(newOwnerId)`**
+- Only callable by OWNER role
+- Validates both contacts belong to dealer
+- Updates current owner: `isAccountOwner: false`
+- Updates new owner: `isAccountOwner: true`
+- Uses atomic Promise.all() to prevent partial updates
+- Revalidates path on success
+- Returns success message with new owner name
+
+Admin Portal - **`transferAccountOwnership(dealerId, newOwnerId)`**
+- Callable by any admin
+- Validates both contacts belong to dealer
+- Performs atomic transfer (same as dealer action)
+- Creates audit log entry via `logAdminAction()`
+- Revalidates dealer page
+- Returns success message with old/new owner emails
+
+**UI Components:**
+
+Both portals show:
+- Crown icon (👑) on current account owner contact card
+- "Account Owner" badge in blue
+- "Transfer" button on owner card (only if 2+ contacts exist)
+- Transfer confirmation modal showing:
+  - Current owner with crown icon
+  - Down arrow indicating transfer direction
+  - New owner (gray crown) receiving ownership
+  - Warning about full account control transfer
+- Success message after transfer completes
+- Page auto-refresh to show updated owner status
+
+**Protection Rules:**
+- Cannot delete account owner contact (deletion returns error message)
+- Must transfer ownership first before deletion
+- Delete button hidden for account owner in UI
+- Transfer only available if dealer has 2+ contacts
+
+**Testing Ownership Transfer:**
+
+```typescript
+// Dealer portal flow
+1. Navigate to Settings > Contacts
+2. Find current owner contact (has Crown icon + "Account Owner" badge)
+3. If 2+ contacts exist, see "Transfer" button
+4. Click "Transfer"
+5. Modal shows current owner → new owner
+6. Click "Transfer Ownership" in modal
+7. Success message appears
+8. Page refreshes, new owner has crown icon
+```
 
 ### Registration Flow
 
 When a dealer registers:
 1. Creates `Dealer` with split name fields (`contactFirstName`, `contactLastName`)
-2. Creates `DealerUser` (owner account)
-3. Auto-creates initial `DealerContact` (primary, communication opt-in only)
+2. Creates `DealerUser` with OWNER role
+3. Auto-creates initial `DealerContact` with `isAccountOwner: true` (primary contact)
+4. Sets initial contact with `communicationOptIn: true` and `marketingOptIn: false`
 
 ---
-*Last updated: December 11, 2025*
+*Last updated: December 12, 2025*
