@@ -45,7 +45,7 @@ export async function updateDealer(dealerId: string, data: UpdateDealerData) {
 
     // If email is being changed, check if it's already in use
     if (data.ownerEmail && ownerUser && data.ownerEmail !== ownerUser.email) {
-      const existingUser = await prisma.dealerUser.findUnique({
+      const existingUser = await prisma.dealerUser.findFirst({
         where: { email: data.ownerEmail },
       });
 
