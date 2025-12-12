@@ -29,7 +29,7 @@ interface Contact {
   role: string;
   marketingOptIn: boolean;
   communicationOptIn: boolean;
-  isPrimary: boolean;
+  isAccountOwner: boolean;
   isActive: boolean;
 }
 
@@ -39,7 +39,7 @@ interface ContactsListProps {
 }
 
 const roleLabels: Record<string, string> = {
-  PRIMARY: 'Primary',
+  PRIMARY: 'General',
   BILLING: 'Billing',
   TECHNICAL: 'Technical',
   MARKETING: 'Marketing',
@@ -60,7 +60,7 @@ export function ContactsList({ contacts, canManage }: ContactsListProps) {
     role: 'PRIMARY',
     marketingOptIn: false,
     communicationOptIn: true,
-    isPrimary: false,
+    isAccountOwner: false,
   });
 
   const openCreateModal = () => {
@@ -73,7 +73,7 @@ export function ContactsList({ contacts, canManage }: ContactsListProps) {
       role: 'PRIMARY',
       marketingOptIn: false,
       communicationOptIn: true,
-      isPrimary: contacts.length === 0,
+      isAccountOwner: contacts.length === 0,
     });
     setError(null);
     setIsModalOpen(true);
@@ -89,7 +89,7 @@ export function ContactsList({ contacts, canManage }: ContactsListProps) {
       role: contact.role as ContactData['role'],
       marketingOptIn: contact.marketingOptIn,
       communicationOptIn: contact.communicationOptIn,
-      isPrimary: contact.isPrimary,
+      isAccountOwner: contact.isAccountOwner,
     });
     setError(null);
     setIsModalOpen(true);
@@ -172,7 +172,7 @@ export function ContactsList({ contacts, canManage }: ContactsListProps) {
             {contacts.map((contact) => (
               <div
                 key={contact.id}
-                className={`border rounded-lg p-4 ${contact.isPrimary ? 'border-blue-200 bg-blue-50' : 'border-gray-200'}`}
+                className={`border rounded-lg p-4 ${contact.isAccountOwner ? 'border-blue-200 bg-blue-50' : 'border-gray-200'}`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -180,10 +180,10 @@ export function ContactsList({ contacts, canManage }: ContactsListProps) {
                       <span className="font-medium text-gray-900">
                         {contact.firstName} {contact.lastName}
                       </span>
-                      {contact.isPrimary && (
+                      {contact.isAccountOwner && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           <Star className="h-3 w-3" />
-                          Primary
+                          Account Owner
                         </span>
                       )}
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
@@ -330,7 +330,7 @@ export function ContactsList({ contacts, canManage }: ContactsListProps) {
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as ContactData['role'] })}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border px-3 py-2"
                   >
-                    <option value="PRIMARY">Primary Contact</option>
+                    <option value="PRIMARY">General</option>
                     <option value="BILLING">Billing</option>
                     <option value="TECHNICAL">Technical</option>
                     <option value="MARKETING">Marketing</option>
@@ -371,12 +371,12 @@ export function ContactsList({ contacts, canManage }: ContactsListProps) {
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={formData.isPrimary}
-                    onChange={(e) => setFormData({ ...formData, isPrimary: e.target.checked })}
+                    checked={formData.isAccountOwner}
+                    onChange={(e) => setFormData({ ...formData, isAccountOwner: e.target.checked })}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-sm text-gray-700">
-                    Set as primary contact
+                    Set as account owner
                   </span>
                 </label>
 

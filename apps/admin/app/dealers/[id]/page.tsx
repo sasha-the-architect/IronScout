@@ -43,7 +43,7 @@ export default async function DealerDetailPage({
       contacts: {
         where: { isActive: true },
         orderBy: [
-          { isPrimary: 'desc' },
+          { isAccountOwner: 'desc' },
           { createdAt: 'asc' },
         ],
       },

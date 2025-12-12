@@ -12,7 +12,7 @@ export interface ContactData {
   role?: 'PRIMARY' | 'BILLING' | 'TECHNICAL' | 'MARKETING' | 'OTHER';
   marketingOptIn?: boolean;
   communicationOptIn?: boolean;
-  isPrimary?: boolean;
+  isAccountOwner?: boolean;
 }
 
 export async function createContact(data: ContactData) {
@@ -42,11 +42,11 @@ export async function createContact(data: ContactData) {
       return { success: false, error: 'A contact with this email already exists' };
     }
 
-    // If this is being set as primary, unset other primary contacts
-    if (data.isPrimary) {
+    // If this is being set as account owner, unset other account owners
+    if (data.isAccountOwner) {
       await prisma.dealerContact.updateMany({
-        where: { dealerId: session.dealerId, isPrimary: true },
-        data: { isPrimary: false },
+        where: { dealerId: session.dealerId, isAccountOwner: true },
+        data: { isAccountOwner: false },
       });
     }
 
@@ -60,7 +60,7 @@ export async function createContact(data: ContactData) {
         role: data.role || 'PRIMARY',
         marketingOptIn: data.marketingOptIn ?? false,
         communicationOptIn: data.communicationOptIn ?? true,
-        isPrimary: data.isPrimary ?? false,
+        isAccountOwner: data.isAccountOwner ?? false,
       },
     });
 
@@ -111,11 +111,11 @@ export async function updateContact(contactId: string, data: Partial<ContactData
       }
     }
 
-    // If this is being set as primary, unset other primary contacts
-    if (data.isPrimary && !existingContact.isPrimary) {
+    // If this is being set as account owner, unset other account owners
+    if (data.isAccountOwner && !existingContact.isAccountOwner) {
       await prisma.dealerContact.updateMany({
-        where: { dealerId: session.dealerId, isPrimary: true },
-        data: { isPrimary: false },
+        where: { dealerId: session.dealerId, isAccountOwner: true },
+        data: { isAccountOwner: false },
       });
     }
 
@@ -129,7 +129,7 @@ export async function updateContact(contactId: string, data: Partial<ContactData
         role: data.role,
         marketingOptIn: data.marketingOptIn,
         communicationOptIn: data.communicationOptIn,
-        isPrimary: data.isPrimary,
+        isAccountOwner: data.isAccountOwner,
       },
     });
 

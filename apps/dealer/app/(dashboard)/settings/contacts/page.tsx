@@ -18,7 +18,7 @@ export default async function ContactsPage() {
       contacts: {
         where: { isActive: true },
         orderBy: [
-          { isPrimary: 'desc' },
+          { isAccountOwner: 'desc' },
           { createdAt: 'asc' },
         ],
       },
@@ -54,7 +54,7 @@ export default async function ContactsPage() {
       <div className="rounded-lg bg-blue-50 p-4">
         <p className="text-sm text-blue-700">
           <strong>Note:</strong> Contacts receive notifications about feed status, insights, and weekly reports 
-          based on their email preferences. The primary contact is the default recipient for all communications.
+          based on their email preferences. The account owner is the default recipient for all communications.
         </p>
       </div>
 

@@ -133,7 +133,7 @@ export interface ContactData {
   role?: 'PRIMARY' | 'BILLING' | 'TECHNICAL' | 'MARKETING' | 'OTHER';
   marketingOptIn?: boolean;
   communicationOptIn?: boolean;
-  isPrimary?: boolean;
+  isAccountOwner?: boolean;
 }
 
 export async function createDealerContact(dealerId: string, data: ContactData) {
@@ -158,11 +158,11 @@ export async function createDealerContact(dealerId: string, data: ContactData) {
       return { success: false, error: 'A contact with this email already exists for this dealer' };
     }
 
-    // If this is being set as primary, unset other primary contacts
-    if (data.isPrimary) {
+    // If this is being set as account owner, unset other account owners
+    if (data.isAccountOwner) {
       await prisma.dealerContact.updateMany({
-        where: { dealerId, isPrimary: true },
-        data: { isPrimary: false },
+        where: { dealerId, isAccountOwner: true },
+        data: { isAccountOwner: false },
       });
     }
 
@@ -176,7 +176,7 @@ export async function createDealerContact(dealerId: string, data: ContactData) {
         role: data.role || 'PRIMARY',
         marketingOptIn: data.marketingOptIn ?? false,
         communicationOptIn: data.communicationOptIn ?? true,
-        isPrimary: data.isPrimary ?? false,
+        isAccountOwner: data.isAccountOwner ?? false,
       },
     });
 
@@ -228,11 +228,11 @@ export async function updateDealerContact(contactId: string, dealerId: string, d
       }
     }
 
-    // If this is being set as primary, unset other primary contacts
-    if (data.isPrimary && !oldContact.isPrimary) {
+    // If this is being set as account owner, unset other account owners
+    if (data.isAccountOwner && !oldContact.isAccountOwner) {
       await prisma.dealerContact.updateMany({
-        where: { dealerId, isPrimary: true },
-        data: { isPrimary: false },
+        where: { dealerId, isAccountOwner: true },
+        data: { isAccountOwner: false },
       });
     }
 
@@ -246,7 +246,7 @@ export async function updateDealerContact(contactId: string, dealerId: string, d
         role: data.role,
         marketingOptIn: data.marketingOptIn,
         communicationOptIn: data.communicationOptIn,
-        isPrimary: data.isPrimary,
+        isAccountOwner: data.isAccountOwner,
       },
     });
 
