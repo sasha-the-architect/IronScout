@@ -18,6 +18,7 @@ import { ContactsSection } from './contacts-section';
 import { AdminActions } from './admin-actions';
 import { FeedsSection } from './feeds-section';
 import { SubscriptionSection } from './subscription-section';
+import { PaymentSection } from './payment-section';
 
 export const dynamic = 'force-dynamic';
 
@@ -262,6 +263,15 @@ export default async function DealerDetailPage({
         subscriptionStatus={dealer.subscriptionStatus}
         subscriptionExpiresAt={dealer.subscriptionExpiresAt}
         subscriptionGraceDays={dealer.subscriptionGraceDays}
+      />
+
+      {/* Payment Details */}
+      <PaymentSection
+        dealerId={dealer.id}
+        paymentMethod={dealer.paymentMethod}
+        stripeCustomerId={dealer.stripeCustomerId}
+        stripeSubscriptionId={dealer.stripeSubscriptionId}
+        autoRenew={dealer.autoRenew}
       />
 
       {/* Contacts Section */}

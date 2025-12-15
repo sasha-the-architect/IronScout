@@ -1,7 +1,7 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@ironscout/db';
-import { Settings, User, Code, Bell, Truck, Users } from 'lucide-react';
+import { Settings, User, Code, Bell, Truck, Users, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 
 export default async function SettingsPage() {
@@ -25,6 +25,15 @@ export default async function SettingsPage() {
     redirect('/login');
   }
 
+  // Determine billing status
+  const getBillingStatus = () => {
+    if (dealer.subscriptionStatus === 'ACTIVE') return 'Active';
+    if (dealer.subscriptionStatus === 'EXPIRED') return 'Expired';
+    if (dealer.subscriptionStatus === 'CANCELLED') return 'Cancelled';
+    if (dealer.subscriptionStatus === 'SUSPENDED') return 'Suspended';
+    return 'Not Set';
+  };
+
   const settingsSections = [
     {
       title: 'Account',
@@ -32,6 +41,13 @@ export default async function SettingsPage() {
       icon: User,
       href: '/settings/account',
       status: 'Complete',
+    },
+    {
+      title: 'Billing',
+      description: 'Manage your subscription and payment information',
+      icon: CreditCard,
+      href: '/settings/billing',
+      status: getBillingStatus(),
     },
     {
       title: 'Contacts',

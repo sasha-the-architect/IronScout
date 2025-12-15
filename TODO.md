@@ -38,8 +38,8 @@ Implement subscription-based access control for dealers:
    - ✅ Migration: `20251215_add_dealer_stripe_fields.sql`
 
 **Remaining Work:**
-- Dealer portal billing UI (checkout flow, plan selection)
-- Admin visibility for payment method and Stripe IDs
+- ~~Dealer portal billing UI (checkout flow, plan selection)~~ ✅ Complete
+- ~~Admin visibility for payment method and Stripe IDs~~ ✅ Complete
 - Stripe reconciliation report (email report comparing Stripe vs local subscription status, detect drift from missed webhooks)
 
 ---
@@ -131,6 +131,30 @@ Implement subscription-based access control for end users (consumers):
   - `customer.subscription.paused` - Sets status to SUSPENDED
   - `customer.subscription.resumed` - Reactivates subscription
 - Webhook routing based on metadata (`type: 'dealer'` vs `type: 'consumer'`)
+
+### Dealer Portal Billing UI (December 15, 2025)
+- Created `/settings/billing` page in dealer portal for subscription management
+- Server component (`page.tsx`) fetches dealer billing data with role-based access
+- Client component (`billing-settings.tsx`) displays:
+  - Current subscription status with color-coded badges
+  - Plan cards (Standard $99/mo, Pro $299/mo) with feature lists
+  - Subscription expiration date and auto-renew status
+  - Stripe checkout integration for new subscriptions
+  - Stripe Customer Portal for managing existing billing
+- Server actions (`actions.ts`) for:
+  - `createCheckoutSession()` - Creates Stripe Checkout for plan upgrade
+  - `createPortalSession()` - Opens Stripe billing portal
+- Permission model: Only OWNER/ADMIN roles can manage billing
+- Added Billing section to Settings hub with dynamic status display
+- Updated docs: `docs/deployment/stripe.md`, `docs/apps/dealer.md`
+
+### Admin Payment Visibility (December 15, 2025)
+- Created `payment-section.tsx` component for dealer detail page
+- Shows payment method (Stripe/Purchase Order), auto-renew status
+- Displays Stripe Customer ID and Subscription ID with direct links to Stripe Dashboard
+- Info banners for Purchase Order billing and dealers without payment method
+- Added Payment column to dealers list page (`/dealers`)
+- Updated admin documentation (`docs/apps/admin.md`)
 
 ---
 

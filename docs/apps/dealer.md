@@ -390,7 +390,12 @@ apps/dealer/
 │   │   │   ├── page.tsx            # Analytics overview
 │   │   │   └── revenue/page.tsx    # Revenue (pixel-enabled)
 │   │   ├── settings/
-│   │   │   ├── page.tsx            # Account settings
+│   │   │   ├── page.tsx            # Settings hub
+│   │   │   ├── account/page.tsx    # Account settings
+│   │   │   ├── billing/            # Subscription billing
+│   │   │   │   ├── page.tsx        # Billing page (server)
+│   │   │   │   ├── billing-settings.tsx  # Billing UI (client)
+│   │   │   │   └── actions.ts      # Checkout/portal actions
 │   │   │   ├── feed/page.tsx       # Feed settings
 │   │   │   ├── pixel/page.tsx      # Pixel setup
 │   │   │   ├── notifications/page.tsx
@@ -946,6 +951,73 @@ When a dealer registers:
    - Sets `isPrimary = true`
    - Email matches owner user email
    - `marketingOptIn = false`, `communicationOptIn = true`
+
+---
+
+## 12.2 Billing Management
+
+### Overview
+
+Dealers manage their subscription and billing through the `/settings/billing` page. The system integrates with Stripe for payment processing.
+
+### Features
+
+**Billing Settings Page (`/settings/billing`):**
+- View current subscription status (ACTIVE/EXPIRED/SUSPENDED/CANCELLED)
+- View plan tier (STANDARD/PRO/FOUNDING)
+- View next billing date and payment method
+- Subscribe to a plan via Stripe Checkout
+- Manage billing via Stripe Customer Portal (update payment, cancel, view invoices)
+
+**Plan Options:**
+| Plan | Price | Features |
+|------|-------|----------|
+| Standard | $99/month | Feed ingestion, basic insights, standard support |
+| Pro | $299/month | Competitive intelligence, API access, priority support |
+| Founding | Free (1 year) | All Pro features during founding period |
+
+### Implementation Files
+
+- `apps/dealer/app/(dashboard)/settings/billing/page.tsx` - Server component
+- `apps/dealer/app/(dashboard)/settings/billing/billing-settings.tsx` - Client component
+- `apps/dealer/app/(dashboard)/settings/billing/actions.ts` - Server actions
+
+### Server Actions
+
+**`createCheckoutSession(dealerId, planId)`**
+- Creates Stripe Checkout session for subscription
+- Calls `POST /api/payments/dealer/create-checkout` on API server
+- Returns Stripe Checkout URL for redirect
+
+**`createPortalSession(dealerId)`**
+- Creates Stripe Customer Portal session
+- Calls `POST /api/payments/dealer/create-portal-session` on API server
+- Returns portal URL for billing management
+
+### Permission Model
+
+- Only OWNER and ADMIN roles can manage billing
+- MEMBER and VIEWER roles see read-only subscription status
+
+### Environment Variables
+
+```env
+# Dealer Portal
+STRIPE_PRICE_ID_DEALER_STANDARD_MONTHLY=price_...
+STRIPE_PRICE_ID_DEALER_PRO_MONTHLY=price_...
+NEXT_PUBLIC_DEALER_URL=https://dealer.ironscout.ai
+INTERNAL_API_URL=http://localhost:8000
+```
+
+### Webhook Integration
+
+Stripe webhooks update dealer subscription status automatically:
+- `checkout.session.completed` → Sets status to ACTIVE
+- `invoice.paid` → Updates `subscriptionExpiresAt`
+- `invoice.payment_failed` → Sets status to EXPIRED
+- `customer.subscription.deleted` → Sets status to CANCELLED
+
+See `docs/deployment/stripe.md` for full webhook documentation.
 
 ---
 

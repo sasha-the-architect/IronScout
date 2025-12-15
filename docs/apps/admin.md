@@ -130,6 +130,7 @@ Set these in the admin service:
 - Approve/reject dealers
 - Suspend active dealers
 - View dealer details (SKUs, feeds, etc.)
+- Payment visibility (Stripe IDs, payment method, auto-renew)
 
 ### Analytics (`/analytics`)
 - Platform usage metrics
@@ -221,6 +222,29 @@ Admins can log in as a dealer to provide support assistance:
 - `apps/dealer/components/impersonation-banner.tsx` - Banner component
 - `apps/dealer/lib/auth.ts` - Session includes impersonation metadata
 
+### Payment Details Section
+
+The dealer detail page (`/dealers/[id]`) includes a Payment Details section showing:
+
+- **Payment Method**: STRIPE (automated billing) or PURCHASE_ORDER (manual invoicing)
+- **Auto Renew**: Whether automatic renewal is enabled
+- **Stripe Customer ID**: Link to Stripe Dashboard customer page
+- **Stripe Subscription ID**: Link to Stripe Dashboard subscription page
+
+The section provides:
+- Direct links to Stripe Dashboard for quick access
+- Info banners explaining Purchase Order billing
+- Warnings for dealers without payment methods
+
+**Key file:** `apps/admin/app/dealers/[id]/payment-section.tsx`
+
+### Dealers List Payment Column
+
+The dealers list page (`/dealers`) includes a Payment column showing:
+- "Stripe" with credit card icon for Stripe-enabled dealers
+- "PO" for Purchase Order dealers
+- "—" for dealers without payment method set
+
 ## Security Considerations
 
 1. **Admin emails hardcoded** - Only accounts in `ADMIN_EMAILS` can access
@@ -251,6 +275,16 @@ apps/admin/
 │   │   └── debug/       # Debug endpoint
 │   ├── analytics/       # Analytics page
 │   ├── dealers/         # Dealer management UI
+│   │   ├── page.tsx     # Dealers list with payment column
+│   │   └── [id]/
+│   │       ├── page.tsx           # Dealer detail page
+│   │       ├── admin-actions.tsx  # Impersonation, verification
+│   │       ├── contacts-section.tsx
+│   │       ├── feeds-section.tsx
+│   │       ├── subscription-section.tsx
+│   │       ├── payment-section.tsx  # Stripe payment details
+│   │       ├── edit-form.tsx
+│   │       └── actions.ts         # Server actions
 │   ├── settings/        # Settings page
 │   ├── layout.tsx       # Root layout with auth check
 │   └── page.tsx         # Redirects to /dealers

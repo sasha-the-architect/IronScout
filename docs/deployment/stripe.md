@@ -290,8 +290,40 @@ The webhook handler routes events based on metadata (`type: 'dealer'` vs `type: 
 - [ ] Invoice paid webhook updates subscriptionExpiresAt
 - [ ] Payment failed webhook sets dealer status to EXPIRED
 - [ ] Subscription cancelled webhook sets dealer status to CANCELLED
-- [ ] Dealer portal shows correct subscription status
+- [ ] Dealer portal billing page shows correct subscription status
+- [ ] Dealer can subscribe via billing settings page
 - [ ] Dealer can access Stripe Customer Portal for billing management
+
+## 🖥️ Dealer Portal Billing UI
+
+The dealer portal includes a billing settings page at `/settings/billing`:
+
+**Features:**
+- Current subscription status display (ACTIVE/EXPIRED/SUSPENDED/CANCELLED)
+- Plan tier display (STANDARD/PRO/FOUNDING)
+- Next billing date and payment method
+- Plan selection cards for Standard ($99/mo) and Pro ($299/mo)
+- "Manage Billing" button opens Stripe Customer Portal
+- Founding member benefits notice
+- Billing FAQ section
+
+**Files:**
+- `apps/dealer/app/(dashboard)/settings/billing/page.tsx` - Server component
+- `apps/dealer/app/(dashboard)/settings/billing/billing-settings.tsx` - Client component
+- `apps/dealer/app/(dashboard)/settings/billing/actions.ts` - Server actions
+
+**Environment Variables (Dealer Portal):**
+```env
+# Required for billing actions
+STRIPE_PRICE_ID_DEALER_STANDARD_MONTHLY=price_...
+STRIPE_PRICE_ID_DEALER_PRO_MONTHLY=price_...
+NEXT_PUBLIC_DEALER_URL=https://dealer.ironscout.ai
+INTERNAL_API_URL=http://localhost:8000  # or production API URL
+```
+
+**Permission Model:**
+- Only OWNER and ADMIN roles can manage billing
+- MEMBER and VIEWER roles see read-only billing status
 
 ## 🆘 Troubleshooting
 

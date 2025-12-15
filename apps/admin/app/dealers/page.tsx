@@ -1,6 +1,6 @@
 import { prisma } from '@ironscout/db';
 import { DealerActions } from './dealer-actions';
-import { Users, Clock, CheckCircle, AlertTriangle, XCircle, Rss } from 'lucide-react';
+import { Users, Clock, CheckCircle, AlertTriangle, XCircle, Rss, CreditCard } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -152,6 +152,9 @@ export default async function DealersPage() {
                 Expires
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Payment
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Feed
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -237,6 +240,18 @@ export default async function DealersPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    {dealer.paymentMethod === 'STRIPE' ? (
+                      <span className="inline-flex items-center gap-1 text-sm text-purple-600">
+                        <CreditCard className="h-3.5 w-3.5" />
+                        Stripe
+                      </span>
+                    ) : dealer.paymentMethod === 'PURCHASE_ORDER' ? (
+                      <span className="text-sm text-blue-600">PO</span>
+                    ) : (
+                      <span className="text-sm text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     {feed ? (
                       <span className={`inline-flex items-center gap-1 text-sm ${feedStatus?.color || 'text-gray-500'}`}>
                         <Rss className="h-3.5 w-3.5" />
@@ -258,7 +273,7 @@ export default async function DealersPage() {
             
             {dealers.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                   No dealers registered yet.
                 </td>
               </tr>
