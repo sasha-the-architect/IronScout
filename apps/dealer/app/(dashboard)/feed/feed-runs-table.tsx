@@ -1,7 +1,7 @@
 'use client';
 
 import type { DealerFeedRun } from '@ironscout/db';
-import { CheckCircle, AlertTriangle, XCircle, Clock, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, Clock, Loader2, SkipForward } from 'lucide-react';
 
 interface FeedRunsTableProps {
   runs: DealerFeedRun[];
@@ -13,6 +13,7 @@ const statusConfig = {
   SUCCESS: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100', label: 'Success', iconClass: '' },
   WARNING: { icon: AlertTriangle, color: 'text-yellow-600', bg: 'bg-yellow-100', label: 'Warning', iconClass: '' },
   FAILURE: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-100', label: 'Failed', iconClass: '' },
+  SKIPPED: { icon: SkipForward, color: 'text-amber-600', bg: 'bg-amber-100', label: 'Skipped', iconClass: '' },
 };
 
 function formatDuration(ms: number | null): string {
