@@ -89,6 +89,12 @@ export {
   type FeedAlertInfo,
 } from './notifications/feed-alerts.js';
 
+export {
+  // Subscription Expired
+  notifyDealerSubscriptionExpired,
+  type SubscriptionExpiredInfo,
+} from './notifications/subscription-expired.js';
+
 // =============================================================================
 // Common Types
 // =============================================================================

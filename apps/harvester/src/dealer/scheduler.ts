@@ -118,16 +118,30 @@ export async function scheduleDealerFeeds(): Promise<number> {
 }
 
 /**
+ * Options for immediate feed ingestion
+ */
+export interface ImmediateFeedIngestOptions {
+  adminOverride?: boolean // Bypass subscription checks
+  adminId?: string // Admin who triggered the run (for audit logging)
+}
+
+/**
  * Schedule a single feed for immediate ingestion
  * - Ignores enabled flag (manual trigger)
  * - Resets feed status if previously failed
+ * - Supports admin override to bypass subscription checks
  */
-export async function scheduleImmediateFeedIngest(feedId: string): Promise<string> {
+export async function scheduleImmediateFeedIngest(
+  feedId: string,
+  options: ImmediateFeedIngestOptions = {}
+): Promise<string> {
+  const { adminOverride = false, adminId } = options
+
   const feed = await prisma.dealerFeed.findUnique({
     where: { id: feedId },
     include: {
       dealer: {
-        select: { id: true, status: true },
+        select: { id: true, status: true, businessName: true },
       },
     },
   })
@@ -163,7 +177,7 @@ export async function scheduleImmediateFeedIngest(feedId: string): Promise<strin
 
   // Queue the job with high priority (no jitter for manual triggers)
   await dealerFeedIngestQueue.add(
-    'ingest-immediate',
+    adminOverride ? 'ingest-admin-override' : 'ingest-immediate',
     {
       dealerId: feed.dealerId,
       feedId: feed.id,
@@ -173,6 +187,9 @@ export async function scheduleImmediateFeedIngest(feedId: string): Promise<strin
       url: feed.url || undefined,
       username: feed.username || undefined,
       password: feed.password || undefined,
+      // Admin override fields
+      adminOverride,
+      adminId,
     },
     {
       attempts: 3,
@@ -180,6 +197,12 @@ export async function scheduleImmediateFeedIngest(feedId: string): Promise<strin
       priority: 1, // High priority
     }
   )
+
+  if (adminOverride) {
+    console.log(
+      `[Dealer Scheduler] Admin override feed ingestion for ${feed.dealer.businessName} (admin: ${adminId || 'unknown'})`
+    )
+  }
 
   return feedRun.id
 }

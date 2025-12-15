@@ -271,6 +271,13 @@ model Dealer {
   retailerId       String?                 @unique
   contactFirstName String
   contactLastName  String
+
+  // Subscription fields
+  subscriptionStatus       DealerSubscriptionStatus @default(ACTIVE)
+  subscriptionExpiresAt    DateTime?                // null = no expiration (lifetime/founding)
+  subscriptionGraceDays    Int                      @default(7) // Grace period after expiration
+  lastSubscriptionNotifyAt DateTime?                // Rate limit: one notification per day
+
   clickEvents      ClickEvent[]
   contacts         DealerContact[]
   feeds            DealerFeed[]
@@ -874,6 +881,13 @@ enum DealerTier {
   ENTERPRISE
 }
 
+enum DealerSubscriptionStatus {
+  ACTIVE           // Subscription is active and valid
+  EXPIRED          // Subscription has expired (within grace period)
+  SUSPENDED        // Subscription suspended (past grace period or payment failed)
+  CANCELLED        // Subscription cancelled by dealer
+}
+
 enum DealerUserRole {
   OWNER
   ADMIN
@@ -941,6 +955,7 @@ enum FeedRunStatus {
   SUCCESS
   WARNING
   FAILURE
+  SKIPPED   // Feed run skipped (e.g., subscription expired)
 }
 
 enum MappingConfidence {

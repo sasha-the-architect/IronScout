@@ -120,6 +120,9 @@ export interface DealerFeedIngestJobData {
   url?: string
   username?: string
   password?: string
+  // Admin override: bypass subscription check
+  adminOverride?: boolean
+  adminId?: string // For audit logging
 }
 
 export interface DealerSkuMatchJobData {

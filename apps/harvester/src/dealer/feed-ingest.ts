@@ -30,6 +30,10 @@ import {
   notifyFeedWarning,
   type FeedAlertInfo,
 } from '@ironscout/notifications'
+import {
+  checkDealerSubscription,
+  sendSubscriptionExpiryNotification,
+} from './subscription'
 
 // ============================================================================
 // NOTIFICATION HELPERS
@@ -181,12 +185,58 @@ function generateMatchKey(title: string, sku?: string): string {
 // ============================================================================
 
 async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
-  const { dealerId, feedId, feedRunId, accessType, formatType, url, username, password } = job.data
+  const { dealerId, feedId, feedRunId, accessType, formatType, url, username, password, adminOverride, adminId } = job.data
 
   const startTime = Date.now()
   let parseResult: FeedParseResult | null = null
 
   try {
+    // =========================================================================
+    // SUBSCRIPTION CHECK
+    // =========================================================================
+    // Check dealer subscription status before processing (unless admin override)
+    if (!adminOverride) {
+      const subscriptionResult = await checkDealerSubscription(dealerId)
+
+      if (!subscriptionResult.isActive) {
+        console.log(
+          `[Dealer Feed] Skipping feed for dealer ${dealerId} - subscription ${subscriptionResult.status}: ${subscriptionResult.reason}`
+        )
+
+        // Update feed run as skipped
+        await prisma.dealerFeedRun.update({
+          where: { id: feedRunId },
+          data: {
+            status: 'SKIPPED',
+            completedAt: new Date(),
+            duration: Date.now() - startTime,
+            primaryErrorCode: 'SUBSCRIPTION_EXPIRED',
+            errors: [{
+              row: 0,
+              error: `Feed skipped: ${subscriptionResult.reason}`,
+              code: 'SUBSCRIPTION_EXPIRED',
+            }],
+          },
+        })
+
+        // Send notification (rate-limited to once per day)
+        if (subscriptionResult.shouldNotify) {
+          await sendSubscriptionExpiryNotification(dealerId, feedId, subscriptionResult)
+        }
+
+        return {
+          skipped: true,
+          reason: 'subscription_expired',
+          subscriptionStatus: subscriptionResult.status,
+          message: subscriptionResult.reason,
+        }
+      }
+    } else {
+      console.log(
+        `[Dealer Feed] Admin override active for dealer ${dealerId} (admin: ${adminId || 'unknown'})`
+      )
+    }
+
     // Update feed run status
     await prisma.dealerFeedRun.update({
       where: { id: feedRunId },

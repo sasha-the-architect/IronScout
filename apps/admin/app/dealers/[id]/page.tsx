@@ -2,21 +2,23 @@ import { prisma } from '@ironscout/db';
 import { notFound } from 'next/navigation';
 import { formatDateTime } from '@/lib/utils';
 import Link from 'next/link';
-import { 
-  ArrowLeft, 
-  Building2, 
-  Mail, 
-  Phone, 
-  Globe, 
+import {
+  ArrowLeft,
+  Building2,
+  Mail,
+  Phone,
+  Globe,
   Calendar,
   Package,
   Rss,
   MousePointerClick,
-  User
+  User,
+  CreditCard
 } from 'lucide-react';
 import { EditDealerForm } from './edit-form';
 import { ContactsSection } from './contacts-section';
 import { AdminActions } from './admin-actions';
+import { FeedsSection } from './feeds-section';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +85,24 @@ export default async function DealerDetailPage({
     isAccountOwner: contact.isAccountOwner,
     isActive: contact.isActive,
   }));
+
+  // Serialize feeds for client component
+  const feeds = dealer.feeds.map(feed => ({
+    id: feed.id,
+    name: feed.name,
+    accessType: feed.accessType,
+    formatType: feed.formatType,
+    url: feed.url,
+    status: feed.status,
+    enabled: feed.enabled,
+    lastSuccessAt: feed.lastSuccessAt,
+    lastFailureAt: feed.lastFailureAt,
+    lastError: feed.lastError,
+    createdAt: feed.createdAt,
+  }));
+
+  // Get subscription status (with fallback for dealers without the new field)
+  const subscriptionStatus = (dealer as { subscriptionStatus?: string }).subscriptionStatus || 'ACTIVE';
 
   return (
     <div className="space-y-6">
@@ -273,47 +293,12 @@ export default async function DealerDetailPage({
         </dl>
       </div>
 
-      {/* Recent Feeds */}
-      {dealer.feeds.length > 0 && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Feeds</h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Success</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {dealer.feeds.map((feed) => (
-                  <tr key={feed.id}>
-                    <td className="px-4 py-3 text-sm text-gray-900">{feed.accessType} / {feed.formatType}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        feed.status === 'HEALTHY' ? 'bg-green-100 text-green-700' :
-                        feed.status === 'WARNING' ? 'bg-yellow-100 text-yellow-700' :
-                        feed.status === 'FAILED' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {feed.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {feed.lastSuccessAt ? formatDateTime(feed.lastSuccessAt) : 'Never'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {formatDateTime(feed.createdAt)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* Feeds Section with Manual Trigger */}
+      <FeedsSection
+        dealerId={dealer.id}
+        feeds={feeds}
+        subscriptionStatus={subscriptionStatus}
+      />
     </div>
   );
 }
