@@ -7,7 +7,7 @@ The Web App (`apps/web/`) is the consumer-facing Next.js frontend for IronScout.
 - **Framework**: Next.js 14 with App Router
 - **Port**: 3000 (default)
 - **Styling**: Tailwind CSS + Shadcn/UI
-- **Auth**: NextAuth.js with Google OAuth
+- **Auth**: NextAuth.js with Google OAuth plus email/password (admins must use OAuth; admin emails are blocked from credentials login). Other providers can be added later.
 
 ---
 
@@ -107,7 +107,7 @@ Internal admin tools:
 
 ## Authentication
 
-### NextAuth.js Configuration
+### NextAuth.js Configuration (Google + email/password; admin safeguards)
 
 **File**: `lib/auth.ts`
 
@@ -115,10 +115,17 @@ Internal admin tools:
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
+    // Email/password for consumers (non-admins)
+    CredentialsProvider({
+      /* ... */
+    }),
+
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
+
+    // Future: additional OAuth providers can be added behind env guards
   ],
   session: {
     strategy: 'jwt',
@@ -139,6 +146,8 @@ export const authOptions: NextAuthOptions = {
   },
 };
 ```
+
+**Admin safeguard:** admin emails (from `ADMIN_EMAILS`) are blocked from credentials sign-in and must authenticate via OAuth to ensure verified identity and shared cookies across subdomains.
 
 ### Using Session
 
