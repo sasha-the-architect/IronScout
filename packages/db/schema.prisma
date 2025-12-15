@@ -45,7 +45,7 @@ model Product {
   metadata              Json?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
-  embedding             Unsupported("vector")?
+  embedding             Unsupported("vector(1536)")?
   barrelLengthReference Decimal?               @db.Decimal(4, 2)
   bulletType            BulletType?
   controlledExpansion   Boolean?

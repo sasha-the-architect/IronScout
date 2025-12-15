@@ -6,6 +6,11 @@
 -- PRODUCTS TABLE
 -- =====================================================
 
+-- 0. Vector search optimization (pgvector HNSW for semantic search)
+-- Requires: CREATE EXTENSION IF NOT EXISTS vector;
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_embedding_hnsw
+ON products USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+
 -- 1. Text search optimization (GIN indexes for ILIKE queries)
 -- Used heavily in product search with case-insensitive LIKE queries
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_name_gin
