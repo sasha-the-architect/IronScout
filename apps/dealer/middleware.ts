@@ -31,6 +31,7 @@ export async function middleware(request: NextRequest) {
   
   // Check for dealer session
   const dealerToken = request.cookies.get('dealer-session')?.value;
+  const isImpersonating = request.cookies.has('dealer-impersonation');
   let isDealerAuthenticated = false;
   let dealerSession: { dealerId: string; email: string; status: string } | null = null;
   
@@ -50,7 +51,8 @@ export async function middleware(request: NextRequest) {
   
   
   // All routes require a dealer session (real or impersonated)
-  if (!isDealerAuthenticated) {
+  // If an admin is impersonating (marker cookie), allow through even if token verification fails
+  if (!isDealerAuthenticated && !isImpersonating) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);

@@ -202,20 +202,26 @@ class FeedIngestSimulator {
 }
 
 /**
- * Stage 2: SKU Match Simulator
- * Simulates the sku-match worker's matching logic
+ * Stage 2: SKU Match Simulator (Batch Optimized)
+ *
+ * Mirrors the optimized sku-match.ts implementation:
+ * - Pre-builds lookup maps for O(1) matching
+ * - Uses "caliber|brand" composite keys
+ * - Batch processes all SKUs against pre-loaded maps
  */
 class SkuMatchSimulator {
   private canonicalSkus: Map<string, MockCanonicalSku> = new Map()
   private matchedSkus: Map<string, string> = new Map() // dealerSkuId -> canonicalSkuId
 
-  // Pre-populate with some canonical SKUs
+  // Optimized lookup maps (mirrors sku-match.ts)
+  private upcMap: Map<string, MockCanonicalSku> = new Map()
+  private attrMap: Map<string, MockCanonicalSku[]> = new Map() // "caliber|brand" -> canonicals
+
   constructor() {
     this.seedCanonicalSkus()
   }
 
   private seedCanonicalSkus(): void {
-    // Create canonical SKUs for common calibers
     const calibers = ['9mm Luger', '.45 ACP', '5.56x45mm NATO', '.223 Remington', '.308 Winchester']
     const brands = ['Federal', 'Hornady', 'Winchester']
     let id = 1
@@ -223,16 +229,37 @@ class SkuMatchSimulator {
     for (const caliber of calibers) {
       for (const brand of brands) {
         for (const grain of [115, 124, 147, 55, 62, 77, 147, 168]) {
-          this.canonicalSkus.set(`canon-${id}`, {
+          const canon: MockCanonicalSku = {
             id: `canon-${id}`,
             caliber,
             brand,
             grainWeight: grain,
             packSize: 50,
-          })
+          }
+          this.canonicalSkus.set(`canon-${id}`, canon)
           id++
         }
       }
+    }
+
+    // Build optimized lookup maps after seeding
+    this.buildLookupMaps()
+  }
+
+  /**
+   * Build O(1) lookup maps - mirrors buildUpcLookupMap and buildAttributeLookupMap
+   */
+  private buildLookupMaps(): void {
+    this.upcMap.clear()
+    this.attrMap.clear()
+
+    for (const canon of this.canonicalSkus.values()) {
+      // Build attribute map with "caliber|brand" key
+      const key = `${canon.caliber}|${canon.brand}`
+      if (!this.attrMap.has(key)) {
+        this.attrMap.set(key, [])
+      }
+      this.attrMap.get(key)!.push(canon)
     }
   }
 
@@ -249,17 +276,25 @@ class SkuMatchSimulator {
     let unmatchedCount = 0
     let autoCreatedCount = 0
 
-    for (const sku of dealerSkus) {
+    // STEP 1: Extract attributes for all SKUs (batch, no lookup yet)
+    const skusWithAttrs = dealerSkus.map(sku => ({
+      sku,
+      caliber: this.extractCaliber(sku.rawTitle),
+      brand: this.extractBrand(sku.rawTitle),
+    }))
+
+    // STEP 2: Match all SKUs using pre-built maps (O(1) lookups)
+    for (const { sku, caliber, brand } of skusWithAttrs) {
       // Simulate UPC lookup (50% match rate)
       if (sku.rawUpc && Math.random() > 0.5) {
-        // Find or create canonical SKU
-        const existingCanon = this.findCanonicalByAttributes(sku)
+        // O(1) attribute lookup using composite key
+        const existingCanon = this.findCanonicalByAttributesOptimized(caliber, brand)
         if (existingCanon) {
           this.matchedSkus.set(sku.id, existingCanon.id)
           matchedCount++
         } else {
           // Auto-create canonical SKU
-          const newCanon = this.createCanonicalSku(sku)
+          const newCanon = this.createCanonicalSku(sku, caliber, brand)
           this.matchedSkus.set(sku.id, newCanon.id)
           autoCreatedCount++
         }
@@ -276,29 +311,36 @@ class SkuMatchSimulator {
     }
   }
 
-  private findCanonicalByAttributes(sku: MockDealerSku): MockCanonicalSku | undefined {
-    // Simplified attribute matching
-    for (const canon of this.canonicalSkus.values()) {
-      if (sku.rawTitle.includes(canon.caliber) && sku.rawTitle.includes(canon.brand)) {
-        return canon
-      }
-    }
-    return undefined
+  /**
+   * O(1) attribute matching using pre-built map
+   */
+  private findCanonicalByAttributesOptimized(caliber: string, brand: string): MockCanonicalSku | undefined {
+    const key = `${caliber}|${brand}`
+    const candidates = this.attrMap.get(key)
+    return candidates?.[0] // Return first match (simplified)
   }
 
-  private createCanonicalSku(sku: MockDealerSku): MockCanonicalSku {
+  private createCanonicalSku(sku: MockDealerSku, caliber: string, brand: string): MockCanonicalSku {
     const id = `canon-auto-${this.canonicalSkus.size + 1}`
     const canon: MockCanonicalSku = {
       id,
-      caliber: this.extractCaliber(sku.rawTitle),
-      brand: this.extractBrand(sku.rawTitle),
+      caliber,
+      brand,
     }
     this.canonicalSkus.set(id, canon)
+
+    // Update lookup map with new canonical
+    const key = `${caliber}|${brand}`
+    if (!this.attrMap.has(key)) {
+      this.attrMap.set(key, [])
+    }
+    this.attrMap.get(key)!.push(canon)
+
     return canon
   }
 
   private extractCaliber(title: string): string {
-    const caliberPatterns = ['9mm', '.45 ACP', '5.56', '.223', '.308', '7.62']
+    const caliberPatterns = ['9mm Luger', '.45 ACP', '5.56x45mm NATO', '.223 Remington', '.308 Winchester', '9mm', '.45 ACP', '5.56', '.223', '.308', '7.62']
     for (const pattern of caliberPatterns) {
       if (title.toLowerCase().includes(pattern.toLowerCase())) {
         return pattern
@@ -327,6 +369,9 @@ class SkuMatchSimulator {
 
   reset(): void {
     this.matchedSkus.clear()
+    this.canonicalSkus.clear()
+    this.upcMap.clear()
+    this.attrMap.clear()
     this.seedCanonicalSkus()
   }
 }
