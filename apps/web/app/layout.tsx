@@ -44,8 +44,8 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0f172a' },
+    { media: '(prefers-color-scheme: light)', color: '#F8F9FA' },
+    { media: '(prefers-color-scheme: dark)', color: '#121418' },
   ],
   viewportFit: 'cover',
 }
@@ -87,7 +87,7 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png" />
         
         {/* Microsoft Tiles */}
-        <meta name="msapplication-TileColor" content="#3b82f6" />
+        <meta name="msapplication-TileColor" content="#121418" />
         <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
         
         {/* Third-party Scripts */}

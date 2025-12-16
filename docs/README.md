@@ -26,6 +26,7 @@ Technical design and system overview.
 | [overview.md](architecture/overview.md) | Full system architecture, tier system, roadmap |
 | [ai-search.md](architecture/ai-search.md) | AI search system - embeddings, intent parsing, ranking |
 | [database.md](architecture/database.md) | Database schema - models, relationships, indexes |
+| [normalization.md](architecture/normalization.md) | Ammunition normalization - UPC matching, caliber extraction |
 
 ---
 
@@ -53,6 +54,7 @@ Setup and configuration guides.
 | [environments.md](deployment/environments.md) | Environment setup - dev, staging, production |
 | [stripe.md](deployment/stripe.md) | Stripe integration - webhooks, checkout, testing |
 | [email.md](deployment/email.md) | Resend email - setup, templates, verification |
+| [checklist.md](deployment/checklist.md) | Pre-deployment checklist - external services, env vars |
 
 ---
 

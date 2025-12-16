@@ -13,10 +13,12 @@
     "lint": "pnpm run --recursive lint",
     "type-check": "pnpm run --recursive type-check",
     "doc:watch": "pnpm exec tsx agents/doc-watcher/doc-watcher.ts",
-    "doc:watch:head": "pnpm exec tsx agents/doc-watcher/watch-head.ts"
+    "doc:watch:head": "pnpm exec tsx agents/doc-watcher/watch-head.ts",
+    "generate:icons": "node scripts/generate-icons.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.19.25",
+    "sharp": "^0.33.5",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
