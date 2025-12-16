@@ -233,21 +233,32 @@ const suggestionsSchema = z.object({
 
 router.get('/suggestions', async (req: Request, res: Response) => {
   try {
+    // Set CORS and cache headers to help with Cloudflare
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+    res.setHeader('Cache-Control', 'public, max-age=60') // 60 second cache
+    res.setHeader('Content-Type', 'application/json')
+
     const { q } = suggestionsSchema.parse(req.query)
-    
+
+    // Early return for very short queries
+    if (q.length < 1) {
+      return res.json({ suggestions: [] })
+    }
+
     const suggestions = await getSearchSuggestions(q)
-    
+
     res.json({ suggestions })
   } catch (error) {
     console.error('Suggestions error:', error)
-    
+
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid request parameters',
-        details: error.errors 
+        details: error.errors
       })
     }
-    
+
     res.status(500).json({ error: 'Suggestions failed' })
   }
 })
