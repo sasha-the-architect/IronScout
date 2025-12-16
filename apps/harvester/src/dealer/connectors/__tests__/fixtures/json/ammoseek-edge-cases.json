@@ -1,0 +1,118 @@
+{
+  "products": [
+    {
+      "upc": "012345678901",
+      "title": "Sale Price Lower Than Regular",
+      "price": 25.99,
+      "sale_price": 19.99,
+      "link": "https://dealer.com/sale-item",
+      "in_stock": true,
+      "brand": "Federal",
+      "caliber": "9mm"
+    },
+    {
+      "upc": "023456789012",
+      "title": "Sale Price Same As Regular",
+      "price": 25.99,
+      "sale_price": 25.99,
+      "link": "https://dealer.com/same-price",
+      "in_stock": "yes",
+      "brand": "Hornady"
+    },
+    {
+      "upc": "034567890123",
+      "title": "Sale Price Higher (Should Use Sale)",
+      "price": 19.99,
+      "sale_price": 25.99,
+      "link": "https://dealer.com/higher-sale",
+      "in_stock": 1
+    },
+    {
+      "upc": "045678901234",
+      "title": "Zero Sale Price (Should Use Regular)",
+      "price": 25.99,
+      "sale_price": 0,
+      "link": "https://dealer.com/zero-sale",
+      "in_stock": "available"
+    },
+    {
+      "upc": "056789012345",
+      "title": "Various Stock Formats True",
+      "price": 18.99,
+      "link": "https://dealer.com/stock-true",
+      "in_stock": true
+    },
+    {
+      "upc": "067890123456",
+      "title": "Various Stock Formats 1",
+      "price": 18.99,
+      "link": "https://dealer.com/stock-1",
+      "in_stock": "1"
+    },
+    {
+      "upc": "078901234567",
+      "title": "Various Stock Formats Yes",
+      "price": 18.99,
+      "link": "https://dealer.com/stock-yes",
+      "in_stock": "yes"
+    },
+    {
+      "upc": "089012345678",
+      "title": "Various Stock Formats In Stock",
+      "price": 18.99,
+      "link": "https://dealer.com/stock-instock",
+      "instock": "in stock"
+    },
+    {
+      "upc": "090123456789",
+      "title": "Out Of Stock False",
+      "price": 18.99,
+      "link": "https://dealer.com/oos-false",
+      "in_stock": false
+    },
+    {
+      "upc": "101234567890",
+      "title": "Out Of Stock 0",
+      "price": 18.99,
+      "link": "https://dealer.com/oos-0",
+      "in_stock": "0"
+    },
+    {
+      "upc": "112345678901",
+      "title": "Out Of Stock No",
+      "price": 18.99,
+      "link": "https://dealer.com/oos-no",
+      "in_stock": "no"
+    },
+    {
+      "upc": "123456789012",
+      "title": "Grain As String",
+      "price": 18.99,
+      "link": "https://dealer.com/grain-string",
+      "in_stock": true,
+      "grain": "115"
+    },
+    {
+      "upc": "134567890123",
+      "title": "Grain With Text",
+      "price": 18.99,
+      "link": "https://dealer.com/grain-text",
+      "in_stock": true,
+      "grain": "115 grains"
+    },
+    {
+      "upc": "145678901234",
+      "title": "Price With Currency Symbol",
+      "price": "$18.99",
+      "link": "https://dealer.com/price-symbol",
+      "in_stock": true
+    },
+    {
+      "upc": "156789012345",
+      "title": "Price With Spaces",
+      "price": "  18.99  ",
+      "link": "https://dealer.com/price-spaces",
+      "in_stock": true
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+item_id,upc,title,price,url,stock_status,manufacturer,caliber,bullet_weight,bullet_type,case_material,rounds_per_box
+FED-9MM-115,012345678901,Federal American Eagle 9mm 115gr FMJ,18.99,https://dealer.com/fed-9mm,in_stock,Federal,9mm Luger,115,FMJ,Brass,50
+HORN-CD-9MM,023456789012,Hornady Critical Defense 9mm 115gr FTX,27.99,https://dealer.com/horn-9mm,available,Hornady,9mm Luger,115,FTX,Nickel,25
+WIN-WB-45,034567890123,Winchester White Box 45 ACP 230gr FMJ,32.99,https://dealer.com/win-45,limited,Winchester,.45 ACP,230,FMJ,Brass,50
+REM-UMC-223,045678901234,Remington UMC 223 55gr FMJ,12.49,https://dealer.com/rem-223,out_of_stock,Remington,.223 Remington,55,FMJ,Brass,20

@@ -176,7 +176,7 @@ export const INVALID_UPCS = [
   '12345678901234567890', // Way too long
   'ABCDEFGHIJKL', // Non-numeric
   'ABC12345DEF', // Mixed
-  '12.345.678.901', // With dots
+  // Note: '12.345.678.901' is actually VALID - dots get stripped leaving 11 digits
 ]
 
 export const VALID_UPCS = [

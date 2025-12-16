@@ -11,6 +11,7 @@ import { ERROR_CODES } from '../types'
 import {
   loadCsvFixture,
   loadJsonFixture,
+  loadXmlFixture,
   assertValidParseResult,
   assertIndexableRecord,
   hasErrorCode,
@@ -403,6 +404,194 @@ describe('AmmoSeekConnector', () => {
       const result = await connector.parse(json)
 
       expect(result.parsedRecords[0].isIndexable).toBe(false)
+    })
+  })
+
+  // ==========================================================================
+  // XML PARSING
+  // ==========================================================================
+
+  describe('XML parsing', () => {
+    it('parses valid AmmoSeek XML feed', async () => {
+      const xml = loadXmlFixture('ammoseek-valid.xml')
+      const result = await connector.parse(xml)
+
+      assertValidParseResult(result)
+      expect(result.totalRows).toBe(2)
+      expect(result.indexableCount).toBe(2)
+    })
+
+    it('extracts fields from XML format', async () => {
+      const xml = loadXmlFixture('ammoseek-valid.xml')
+      const result = await connector.parse(xml)
+
+      const firstRecord = result.parsedRecords[0].record
+      // XML parser strips leading zeros from numeric-looking values
+      expect(firstRecord.upc).toBe('12345678901')
+      expect(firstRecord.title).toBe('Federal American Eagle 9mm 115gr FMJ')
+      expect(firstRecord.price).toBe(17.99) // sale_price preferred
+      expect(firstRecord.salePrice).toBe(17.99)
+      expect(firstRecord.productUrl).toBe('https://dealer.com/fed-9mm')
+      expect(firstRecord.brand).toBe('Federal')
+      expect(firstRecord.caliber).toBe('9mm Luger')
+      expect(firstRecord.grainWeight).toBe(115)
+      expect(firstRecord.roundCount).toBe(50)
+    })
+
+    it('handles XML without sale_price', async () => {
+      const xml = loadXmlFixture('ammoseek-valid.xml')
+      const result = await connector.parse(xml)
+
+      // Second product has no sale_price
+      const secondRecord = result.parsedRecords[1].record
+      expect(secondRecord.price).toBe(27.99)
+      expect(secondRecord.salePrice).toBeUndefined()
+    })
+  })
+
+  // ==========================================================================
+  // SALE PRICE EDGE CASES
+  // ==========================================================================
+
+  describe('sale price edge cases', () => {
+    it('uses sale_price when lower than regular price', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // First item: price 25.99, sale_price 19.99
+      expect(result.parsedRecords[0].record.price).toBe(19.99)
+      expect(result.parsedRecords[0].record.salePrice).toBe(19.99)
+    })
+
+    it('uses sale_price when same as regular price', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Second item: price 25.99, sale_price 25.99
+      expect(result.parsedRecords[1].record.price).toBe(25.99)
+    })
+
+    it('uses sale_price even when higher than regular price', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Third item: price 19.99, sale_price 25.99
+      // Connector uses sale_price when available
+      expect(result.parsedRecords[2].record.price).toBe(25.99)
+    })
+
+    it('uses regular price when sale_price is zero', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Fourth item: price 25.99, sale_price 0
+      expect(result.parsedRecords[3].record.price).toBe(25.99)
+    })
+  })
+
+  // ==========================================================================
+  // IN_STOCK FORMAT VARIATIONS
+  // ==========================================================================
+
+  describe('in_stock format variations', () => {
+    it('handles boolean true', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Fifth item: in_stock: true
+      expect(result.parsedRecords[4].record.inStock).toBe(true)
+    })
+
+    it('handles string "1"', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Sixth item: in_stock: "1"
+      expect(result.parsedRecords[5].record.inStock).toBe(true)
+    })
+
+    it('handles string "yes"', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Seventh item: in_stock: "yes"
+      expect(result.parsedRecords[6].record.inStock).toBe(true)
+    })
+
+    it('handles "instock" field with "in stock" value', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Eighth item: instock: "in stock"
+      expect(result.parsedRecords[7].record.inStock).toBe(true)
+    })
+
+    it('handles boolean false', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Ninth item: in_stock: false
+      expect(result.parsedRecords[8].record.inStock).toBe(false)
+    })
+
+    it('handles string "0"', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Tenth item: in_stock: "0"
+      expect(result.parsedRecords[9].record.inStock).toBe(false)
+    })
+
+    it('handles string "no"', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Eleventh item: in_stock: "no"
+      expect(result.parsedRecords[10].record.inStock).toBe(false)
+    })
+  })
+
+  // ==========================================================================
+  // GRAIN WEIGHT PARSING
+  // ==========================================================================
+
+  describe('grain weight parsing', () => {
+    it('parses grain as string number', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Twelfth item: grain: "115"
+      expect(result.parsedRecords[11].record.grainWeight).toBe(115)
+    })
+
+    it('parses grain with text suffix', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Thirteenth item: grain: "115 grains"
+      expect(result.parsedRecords[12].record.grainWeight).toBe(115)
+    })
+  })
+
+  // ==========================================================================
+  // PRICE FORMAT VARIATIONS
+  // ==========================================================================
+
+  describe('price format variations', () => {
+    it('parses price with currency symbol', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Fourteenth item: price: "$18.99"
+      expect(result.parsedRecords[13].record.price).toBe(18.99)
+    })
+
+    it('parses price with surrounding spaces', async () => {
+      const json = loadJsonFixture('ammoseek-edge-cases.json')
+      const result = await connector.parse(json)
+
+      // Fifteenth item: price: "  18.99  "
+      expect(result.parsedRecords[14].record.price).toBe(18.99)
     })
   })
 

@@ -29,6 +29,7 @@
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "@types/node": "^20.19.25",
+    "@vitest/coverage-v8": "^1.6.1",
     "@vitest/ui": "^1.6.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

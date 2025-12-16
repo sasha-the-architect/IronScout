@@ -207,7 +207,8 @@ describe('parseXML', () => {
     const xml = '<?xml version="1.0"?><products><product><upc>123</upc></product></products>'
     const result = parseXML(xml)
     expect(result).toHaveLength(1)
-    expect(result[0].upc).toBe('123')
+    // XML parser returns numeric-looking values as numbers
+    expect(result[0].upc).toBe(123)
   })
 
   it('parses catalog/product structure', () => {

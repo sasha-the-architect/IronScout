@@ -1,0 +1,150 @@
+{
+  "offers": [
+    {
+      "item_id": "SKU-001",
+      "upc": "012345678901",
+      "title": "In Stock Status",
+      "price": 18.99,
+      "url": "https://dealer.com/item1",
+      "stock_status": "in_stock",
+      "manufacturer": "Federal"
+    },
+    {
+      "item_id": "SKU-002",
+      "upc": "023456789012",
+      "title": "InStock Status (no underscore)",
+      "price": 18.99,
+      "url": "https://dealer.com/item2",
+      "stock_status": "instock",
+      "manufacturer": "Federal"
+    },
+    {
+      "item_id": "SKU-003",
+      "upc": "034567890123",
+      "title": "Available Status",
+      "price": 18.99,
+      "url": "https://dealer.com/item3",
+      "stock_status": "available",
+      "manufacturer": "Federal"
+    },
+    {
+      "item_id": "SKU-004",
+      "upc": "045678901234",
+      "title": "Limited Status",
+      "price": 18.99,
+      "url": "https://dealer.com/item4",
+      "stock_status": "limited",
+      "manufacturer": "Federal"
+    },
+    {
+      "item_id": "SKU-005",
+      "upc": "056789012345",
+      "title": "Out Of Stock Status",
+      "price": 18.99,
+      "url": "https://dealer.com/item5",
+      "stock_status": "out_of_stock",
+      "manufacturer": "Federal"
+    },
+    {
+      "item_id": "SKU-006",
+      "upc": "067890123456",
+      "title": "Unavailable Status",
+      "price": 18.99,
+      "url": "https://dealer.com/item6",
+      "stock_status": "unavailable",
+      "manufacturer": "Federal"
+    },
+    {
+      "item_id": "SKU-007",
+      "upc": "078901234567",
+      "title": "UPPERCASE Status",
+      "price": 18.99,
+      "url": "https://dealer.com/item7",
+      "stock_status": "IN_STOCK",
+      "manufacturer": "Federal"
+    },
+    {
+      "item_id": "SKU-008",
+      "upc": "089012345678",
+      "title": "Uses GTIN Instead of UPC",
+      "price": 18.99,
+      "url": "https://dealer.com/item8",
+      "gtin": "089012345678",
+      "stock_status": "in_stock",
+      "manufacturer": "Federal"
+    },
+    {
+      "item_id": "SKU-009",
+      "title": "Uses EAN Instead of UPC",
+      "price": 18.99,
+      "url": "https://dealer.com/item9",
+      "ean": "0901234567890",
+      "stock_status": "in_stock",
+      "manufacturer": "Federal"
+    },
+    {
+      "item_id": "SKU-010",
+      "upc": "101234567890",
+      "title": "Uses Brand Instead of Manufacturer",
+      "price": 18.99,
+      "url": "https://dealer.com/item10",
+      "stock_status": "in_stock",
+      "brand": "Hornady"
+    },
+    {
+      "item_id": "SKU-011",
+      "upc": "112345678901",
+      "title": "Uses Link Instead of URL",
+      "price": 18.99,
+      "link": "https://dealer.com/item11",
+      "stock_status": "in_stock",
+      "manufacturer": "Winchester"
+    },
+    {
+      "item_id": "SKU-012",
+      "upc": "123456789012",
+      "title": "All V2 Ammo Fields",
+      "price": 18.99,
+      "url": "https://dealer.com/item12",
+      "stock_status": "in_stock",
+      "manufacturer": "Federal",
+      "caliber": "9mm Luger",
+      "bullet_weight": 115,
+      "bullet_type": "FMJ",
+      "case_material": "Brass",
+      "rounds_per_box": 50
+    },
+    {
+      "item_id": "SKU-013",
+      "upc": "134567890123",
+      "title": "Alternative Ammo Field Names",
+      "price": 18.99,
+      "url": "https://dealer.com/item13",
+      "stock_status": "in_stock",
+      "manufacturer": "Hornady",
+      "caliber": "9mm",
+      "grain": 115,
+      "projectile_type": "JHP",
+      "casing": "Nickel",
+      "round_count": 25
+    },
+    {
+      "itemId": "SKU-014",
+      "upc": "145678901234",
+      "title": "Uses itemId (camelCase)",
+      "price": 18.99,
+      "url": "https://dealer.com/item14",
+      "stock_status": "in_stock",
+      "manufacturer": "Remington"
+    },
+    {
+      "sku": "SKU-015",
+      "upc": "156789012345",
+      "title": "Uses SKU Instead of item_id",
+      "price": 18.99,
+      "url": "https://dealer.com/item15",
+      "stock_status": "in_stock",
+      "manufacturer": "CCI"
+    }
+  ]
+}

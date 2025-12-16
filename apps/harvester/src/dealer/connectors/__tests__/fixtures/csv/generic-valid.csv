@@ -1,4 +1,4 @@
-upc,title,price,brand,caliber,grain,in_stock,quantity,url,image_url,case_type,bullet_type,rounds
+upc,title,price,brand,caliber,grain,in_stock,stock_quantity,url,image_url,case_type,bullet_type,round_count
 012345678901,Federal American Eagle 9mm 115gr FMJ,18.99,Federal,9mm Luger,115,true,500,https://example.com/fed-9mm,https://example.com/img/fed-9mm.jpg,Brass,FMJ,50
 023456789012,Hornady Critical Defense 9mm 115gr FTX,27.99,Hornady,9mm Luger,115,true,250,https://example.com/horn-9mm,https://example.com/img/horn-9mm.jpg,Brass,FTX,25
 034567890123,Winchester White Box 45 ACP 230gr FMJ,32.99,Winchester,.45 ACP,230,true,100,https://example.com/win-45,https://example.com/img/win-45.jpg,Brass,FMJ,50
