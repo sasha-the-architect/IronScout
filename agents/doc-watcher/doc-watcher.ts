@@ -14,8 +14,14 @@
  *   pnpm exec tsx agents/doc-watcher/doc-watcher.ts
  *
  * Note: This script only reports; it does not auto-edit docs.
+ *
+ * Acknowledgment Strategy:
+ * - Uses a "content hash" based on commit message + changed files (excluding state file)
+ * - This allows the state file to be committed without invalidating the acknowledgment
+ * - Avoids the amend cycle: ack -> commit state -> hash changes -> ack invalid
  */
 import { execSync } from 'child_process'
+import { createHash } from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import https from 'https'
@@ -77,10 +83,27 @@ function log(level: 'INFO' | 'WARN' | 'ERROR', msg: string) {
   console.log(`[${ts}] [${level}] ${msg}`)
 }
 
+// Files to exclude when computing content hash (these don't affect doc drift)
+const STATE_FILES = ['.doc-watcher-state.json']
+
 function getLatestCommit(rev: string): { message: string; files: string[] } {
   const message = run(`git log -1 --pretty=%B ${rev}`)
   const files = run(`git log -1 --name-only --pretty=format: ${rev}`).split('\n').filter(Boolean)
   return { message, files }
+}
+
+/**
+ * Compute a content hash based on commit message and meaningful files.
+ * This hash is stable even if the state file is added/amended to the commit.
+ */
+function computeContentHash(message: string, files: string[]): string {
+  // Filter out state files that don't affect documentation drift
+  const meaningfulFiles = files.filter((f) => !STATE_FILES.includes(f))
+
+  // Create a deterministic string from message + sorted files
+  const content = [message.trim(), ...meaningfulFiles.sort()].join('\n')
+
+  return createHash('sha256').update(content).digest('hex').slice(0, 16)
 }
 
 function hitsAny(path: string, pats: RegExp[]): boolean {
@@ -223,19 +246,32 @@ function main() {
     const statePath = path.join(process.cwd(), '.doc-watcher-state.json')
     const state = readState(statePath)
 
+    // Get commit info for content hash calculation
+    const { message, files } = getLatestCommit(rev)
+    const contentHash = computeContentHash(message, files)
+
     if (ackOnly) {
-      writeState(statePath, { lastHead: head, acknowledged: true, rev })
+      // Store both the commit hash (for display) and content hash (for matching)
+      writeState(statePath, { lastHead: head, contentHash, acknowledged: true, rev })
       log('INFO', `Acknowledged ${rev} (${head}).`)
       return
     }
 
-    const { message, files } = getLatestCommit(rev)
     const { hits, docs } = analyze(files, message)
 
     if (!hits.length) {
       log('INFO', 'Docs check: no obvious documentation impact detected.')
-      // Mark current head as acknowledged to avoid stale reminders
-      writeState(statePath, { lastHead: head, acknowledged: true, rev })
+      // Mark current content as acknowledged to avoid stale reminders
+      writeState(statePath, { lastHead: head, contentHash, acknowledged: true, rev })
+      return
+    }
+
+    // Check if this content has already been acknowledged
+    // (content hash matches even if commit hash changed due to amend)
+    if (state.contentHash === contentHash && state.acknowledged) {
+      log('INFO', 'Docs check: content already acknowledged (commit may have been amended).')
+      // Update state with new commit hash but keep acknowledged
+      writeState(statePath, { lastHead: head, contentHash, acknowledged: true, rev })
       return
     }
 
@@ -259,11 +295,11 @@ function main() {
     console.log('')
     console.log('Next: review the commit diff for these areas; if clear, update the corresponding doc(s).')
 
-    // Mark this head as needing acknowledgement
-    writeState(statePath, { lastHead: head, acknowledged: false, rev })
+    // Mark this content as needing acknowledgement
+    writeState(statePath, { lastHead: head, contentHash, acknowledged: false, rev })
 
     const webhook = process.env.DOC_WATCHER_SLACK_WEBHOOK
-    const alreadySent = state.lastHead === head && state.acknowledged === false && state.rev === rev
+    const alreadySent = state.contentHash === contentHash && state.acknowledged === false
     if (webhook && !noSlack && !alreadySent) {
       sendSlack(webhook, head, hits, docs)
     }
@@ -283,17 +319,29 @@ main()
 
 // ---------------- helpers ----------------
 
-function readState(statePath: string): { lastHead?: string; acknowledged: boolean; rev?: string } {
+interface DocWatcherState {
+  lastHead?: string
+  contentHash?: string
+  acknowledged: boolean
+  rev?: string
+}
+
+function readState(statePath: string): DocWatcherState {
   try {
     const txt = fs.readFileSync(statePath, 'utf-8')
     const parsed = JSON.parse(txt)
-    return { lastHead: parsed.lastHead, acknowledged: !!parsed.acknowledged, rev: parsed.rev }
+    return {
+      lastHead: parsed.lastHead,
+      contentHash: parsed.contentHash,
+      acknowledged: !!parsed.acknowledged,
+      rev: parsed.rev,
+    }
   } catch {
     return { acknowledged: true }
   }
 }
 
-function writeState(statePath: string, state: { lastHead?: string; acknowledged: boolean; rev?: string }) {
+function writeState(statePath: string, state: DocWatcherState) {
   try {
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2))
   } catch (err) {
