@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Prevent push if documentation drift is detected and not acknowledged.
+command -v pnpm >/dev/null 2>&1 || { echo "pnpm not found; skipping doc:watch"; exit 0; }
+
+pnpm doc:watch --fail-on-drift --no-slack
+status=$?
+if [ $status -ne 0 ]; then
+  echo "Push blocked: doc watcher found unacknowledged documentation drift."
+  echo "Review and update docs, then acknowledge with: pnpm doc:watch --ack"
+fi
+exit $status

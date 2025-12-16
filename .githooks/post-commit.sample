@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Run doc watcher after each commit to catch potential documentation drift.
+command -v pnpm >/dev/null 2>&1 || { echo "pnpm not found; skipping doc:watch"; exit 0; }
+pnpm doc:watch

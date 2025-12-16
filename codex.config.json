@@ -1,0 +1,8 @@
+{
+  "agents": {
+    "doc-watcher": {
+      "command": "pnpm exec tsx agents/doc-watcher/index.ts",
+      "description": "Analyze latest commit for documentation drift and suggest docs to update"
+    }
+  }
+}

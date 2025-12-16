@@ -66,6 +66,12 @@ Product requirements, features, and business decisions.
 | [offerings.md](product/offerings.md) | Dealer tier features (STANDARD, PRO, FOUNDING) |
 | [consumer-tiers.md](product/consumer-tiers.md) | Consumer tier features (FREE, PREMIUM) |
 
+### Agents
+
+| Document | Description |
+|----------|-------------|
+| [agents.md](agents.md) | Available Codex-friendly agents and how to run them |
+
 **Not yet documented:**
 - `stripe-integration.md` - Stripe webhooks and billing flows (dealer-specific)
 
