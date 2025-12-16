@@ -1,0 +1,5 @@
+upc,title,price,link,in_stock,brand,caliber,grain,case_type,bullet_type,rounds,image_link,description,sale_price,sku
+012345678901,Federal American Eagle 9mm 115gr FMJ,18.99,https://dealer.com/fed-9mm,true,Federal,9mm Luger,115,Brass,FMJ,50,https://dealer.com/img/fed-9mm.jpg,Premium target ammunition,17.99,FED-9MM-115
+023456789012,Hornady Critical Defense 9mm 115gr FTX,27.99,https://dealer.com/horn-9mm,true,Hornady,9mm Luger,115,Nickel,FTX,25,https://dealer.com/img/horn-9mm.jpg,Self-defense ammunition,,HORN-CD-9MM
+034567890123,Winchester White Box 45 ACP 230gr FMJ,32.99,https://dealer.com/win-45,true,Winchester,.45 ACP,230,Brass,FMJ,50,https://dealer.com/img/win-45.jpg,Value pack range ammo,29.99,WIN-WB-45
+045678901234,Remington UMC 223 55gr FMJ,12.49,https://dealer.com/rem-223,false,Remington,.223 Remington,55,Brass,FMJ,20,https://dealer.com/img/rem-223.jpg,Rifle ammunition,,REM-UMC-223

@@ -490,7 +490,15 @@ export async function aiSearch(params: AISearchParams): Promise<AISearchResponse
   })
   
   if (!response.ok) {
-    throw new Error('AI search failed')
+    const errorText = await response.text().catch(() => '')
+    console.error('[aiSearch] Request failed', {
+      status: response.status,
+      statusText: response.statusText,
+      url: `${API_BASE_URL}/api/search/semantic`,
+      body,
+      errorText: errorText?.slice(0, 500),
+    })
+    throw new Error(`AI search failed (${response.status})`)
   }
   
   return response.json()

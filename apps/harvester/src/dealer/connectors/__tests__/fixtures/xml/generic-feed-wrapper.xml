@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed>
+  <products>
+    <product>
+      <gtin>012345678901</gtin>
+      <product_name>Federal 9mm</product_name>
+      <current_price>18.99</current_price>
+      <vendor>Federal</vendor>
+      <is_available>1</is_available>
+    </product>
+  </products>
+</feed>

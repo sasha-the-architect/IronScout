@@ -1,0 +1,73 @@
+{
+  "products": [
+    {
+      "upc": "012345678901",
+      "title": "  Trimmed Whitespace Title  ",
+      "price": "  $18.99  ",
+      "brand": "Federal",
+      "in_stock": "yes"
+    },
+    {
+      "upc": "UPC:023456789012",
+      "title": "UPC With Prefix",
+      "price": 27.99,
+      "brand": "Hornady",
+      "in_stock": 1
+    },
+    {
+      "upc": "GTIN:034567890123",
+      "title": "GTIN With Prefix",
+      "price": 32.99,
+      "brand": "Winchester",
+      "in_stock": "true"
+    },
+    {
+      "upc": "045-678-901-234",
+      "title": "UPC With Dashes",
+      "price": 12.49,
+      "brand": "Remington",
+      "in_stock": "IN STOCK"
+    },
+    {
+      "upc": null,
+      "title": "Null UPC",
+      "price": 19.99,
+      "brand": "CCI",
+      "in_stock": "available"
+    },
+    {
+      "title": "Missing UPC Field Entirely",
+      "price": 15.99,
+      "brand": "Speer",
+      "in_stock": "Y"
+    },
+    {
+      "upc": "",
+      "title": "Empty String UPC",
+      "price": 22.99,
+      "brand": "PMC",
+      "in_stock": "false"
+    },
+    {
+      "upc": "067890123456",
+      "title": "Zero Price",
+      "price": 0,
+      "brand": "Test",
+      "in_stock": true
+    },
+    {
+      "upc": "078901234567",
+      "title": "Negative Price",
+      "price": -5.99,
+      "brand": "Test",
+      "in_stock": true
+    },
+    {
+      "upc": "089012345678",
+      "title": "",
+      "price": 18.99,
+      "brand": "Test",
+      "in_stock": true
+    }
+  ]
+}

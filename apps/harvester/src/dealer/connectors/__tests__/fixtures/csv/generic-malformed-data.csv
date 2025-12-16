@@ -1,0 +1,9 @@
+upc,title,price,brand,caliber,grain,in_stock,quantity,rounds
+12345,Federal 9mm - Short UPC,18.99,Federal,9mm Luger,115,true,500,50
+1234567890123456789,Long Invalid UPC - Too Many Digits,27.99,Hornady,9mm Luger,115,true,250,25
+ABC123DEF456,Non-Numeric UPC,32.99,Winchester,.45 ACP,230,true,100,50
+045678901234,Valid UPC But Price Is Text,$12.49,Remington,.223 Remington,55,false,0,20
+056789012345,Grain Weight Is Text,19.99,CCI,9mm Luger,one hundred,1,350,50
+067890123456,Quantity Is Negative,15.99,Speer,9mm Luger,115,true,-50,50
+078901234567,Rounds Is Decimal,22.99,PMC,9mm Luger,115,true,100,49.5
+089012345678,Boolean Stock As Word,17.99,Sellier,9mm Luger,115,available,100,50

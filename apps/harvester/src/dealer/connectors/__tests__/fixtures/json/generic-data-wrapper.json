@@ -1,0 +1,13 @@
+{
+  "data": [
+    {
+      "barcode": "012345678901",
+      "productTitle": "Federal 9mm",
+      "currentPrice": 18.99,
+      "brandName": "Federal",
+      "ammo_type": "9mm Luger",
+      "grains": 115,
+      "is_available": true
+    }
+  ]
+}

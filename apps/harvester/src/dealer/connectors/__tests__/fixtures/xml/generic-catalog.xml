@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog>
+  <product>
+    <barcode>012345678901</barcode>
+    <name>Federal 9mm</name>
+    <retail_price>18.99</retail_price>
+    <manufacturer>Federal</manufacturer>
+    <cartridge>9mm Luger</cartridge>
+    <available>yes</available>
+  </product>
+</catalog>

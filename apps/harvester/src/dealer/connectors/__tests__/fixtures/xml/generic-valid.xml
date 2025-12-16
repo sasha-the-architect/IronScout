@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<products>
+  <product>
+    <upc>012345678901</upc>
+    <title>Federal American Eagle 9mm 115gr FMJ</title>
+    <price>18.99</price>
+    <brand>Federal</brand>
+    <caliber>9mm Luger</caliber>
+    <grain>115</grain>
+    <in_stock>true</in_stock>
+    <quantity>500</quantity>
+    <url>https://example.com/fed-9mm</url>
+    <image_url>https://example.com/img/fed-9mm.jpg</image_url>
+    <case_type>Brass</case_type>
+    <bullet_type>FMJ</bullet_type>
+    <rounds>50</rounds>
+  </product>
+  <product>
+    <upc>023456789012</upc>
+    <title>Hornady Critical Defense 9mm 115gr FTX</title>
+    <price>27.99</price>
+    <brand>Hornady</brand>
+    <caliber>9mm Luger</caliber>
+    <grain>115</grain>
+    <in_stock>true</in_stock>
+    <quantity>250</quantity>
+    <url>https://example.com/horn-9mm</url>
+    <image_url>https://example.com/img/horn-9mm.jpg</image_url>
+    <case_type>Brass</case_type>
+    <bullet_type>FTX</bullet_type>
+    <rounds>25</rounds>
+  </product>
+</products>

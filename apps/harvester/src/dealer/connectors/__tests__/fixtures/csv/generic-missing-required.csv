@@ -1,0 +1,6 @@
+upc,title,price,brand,caliber,in_stock
+012345678901,,18.99,Federal,9mm Luger,true
+023456789012,Hornady Critical Defense 9mm,,Hornady,9mm Luger,true
+034567890123,Winchester White Box 45 ACP,32.99,Winchester,.45 ACP,true
+045678901234,Remington UMC 223,0,Remington,.223 Remington,true
+056789012345,CCI Blazer Brass 9mm,-5.99,CCI,9mm Luger,true

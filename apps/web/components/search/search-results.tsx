@@ -317,12 +317,20 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
     )
   } catch (error) {
     console.error('Search error:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
     return (
       <>
         <SearchHeader query={query} isPremium={isPremium} />
-        <div className="text-center py-12 mt-6">
-          <p className="text-muted-foreground">Failed to load search results</p>
-          <p className="text-sm text-muted-foreground mt-2">Please try again later</p>
+        <div className="text-center py-12 mt-6 space-y-2">
+          <p className="text-muted-foreground font-semibold">Failed to load search results</p>
+          <p className="text-sm text-muted-foreground">Reason: {message}</p>
+          <p className="text-xs text-muted-foreground">
+            If running locally, ensure the API is up and env vars are set (`NEXT_PUBLIC_API_URL` on web; `OPENAI_API_KEY`, `DATABASE_URL` on API).
+          </p>
+          <div className="flex justify-center gap-3 pt-2 text-sm">
+            <a className="text-primary underline" href="/search">Try again</a>
+            <a className="text-primary underline" href="/help">Help</a>
+          </div>
         </div>
       </>
     )

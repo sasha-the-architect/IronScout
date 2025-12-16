@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "gtin": "012345678901",
+      "product_name": "Federal 9mm",
+      "retail_price": 18.99,
+      "vendor": "Federal",
+      "cartridge": "9mm Luger",
+      "weight": 115,
+      "available": "yes"
+    }
+  ]
+}

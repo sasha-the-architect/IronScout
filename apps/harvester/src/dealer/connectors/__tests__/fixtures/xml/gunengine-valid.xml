@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<offers>
+  <offer>
+    <item_id>FED-9MM-115</item_id>
+    <upc>012345678901</upc>
+    <title>Federal American Eagle 9mm 115gr FMJ</title>
+    <price>18.99</price>
+    <url>https://dealer.com/fed-9mm</url>
+    <stock_status>in_stock</stock_status>
+    <manufacturer>Federal</manufacturer>
+    <caliber>9mm Luger</caliber>
+    <bullet_weight>115</bullet_weight>
+    <bullet_type>FMJ</bullet_type>
+    <case_material>Brass</case_material>
+    <rounds_per_box>50</rounds_per_box>
+    <image_url>https://dealer.com/img/fed-9mm.jpg</image_url>
+    <description>Premium target ammunition</description>
+    <msrp>22.99</msrp>
+    <stock_quantity>500</stock_quantity>
+  </offer>
+  <offer>
+    <item_id>HORN-CD-9MM</item_id>
+    <upc>023456789012</upc>
+    <title>Hornady Critical Defense 9mm 115gr FTX</title>
+    <price>27.99</price>
+    <url>https://dealer.com/horn-9mm</url>
+    <stock_status>available</stock_status>
+    <manufacturer>Hornady</manufacturer>
+    <caliber>9mm Luger</caliber>
+    <bullet_weight>115</bullet_weight>
+    <bullet_type>FTX</bullet_type>
+    <case_material>Nickel</case_material>
+    <rounds_per_box>25</rounds_per_box>
+  </offer>
+</offers>

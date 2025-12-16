@@ -1,0 +1,36 @@
+{
+  "products": [
+    {
+      "upc": "012345678901",
+      "title": "Federal American Eagle 9mm 115gr FMJ",
+      "price": 18.99,
+      "link": "https://dealer.com/fed-9mm",
+      "in_stock": true,
+      "brand": "Federal",
+      "caliber": "9mm Luger",
+      "grain": 115,
+      "case_type": "Brass",
+      "bullet_type": "FMJ",
+      "rounds": 50,
+      "image_link": "https://dealer.com/img/fed-9mm.jpg",
+      "description": "Premium target ammunition",
+      "sale_price": 17.99,
+      "sku": "FED-9MM-115"
+    },
+    {
+      "upc": "023456789012",
+      "title": "Hornady Critical Defense 9mm 115gr FTX",
+      "price": 27.99,
+      "link": "https://dealer.com/horn-9mm",
+      "in_stock": true,
+      "brand": "Hornady",
+      "caliber": "9mm Luger",
+      "grain": 115,
+      "case_type": "Nickel",
+      "bullet_type": "FTX",
+      "rounds": 25,
+      "image_link": "https://dealer.com/img/horn-9mm.jpg",
+      "description": "Self-defense ammunition"
+    }
+  ]
+}

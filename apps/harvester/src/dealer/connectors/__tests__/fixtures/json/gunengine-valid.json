@@ -1,0 +1,53 @@
+{
+  "offers": [
+    {
+      "item_id": "FED-9MM-115",
+      "upc": "012345678901",
+      "title": "Federal American Eagle 9mm 115gr FMJ",
+      "price": 18.99,
+      "url": "https://dealer.com/fed-9mm",
+      "stock_status": "in_stock",
+      "manufacturer": "Federal",
+      "caliber": "9mm Luger",
+      "bullet_weight": 115,
+      "bullet_type": "FMJ",
+      "case_material": "Brass",
+      "rounds_per_box": 50,
+      "image_url": "https://dealer.com/img/fed-9mm.jpg",
+      "description": "Premium target ammunition",
+      "msrp": 22.99,
+      "stock_quantity": 500
+    },
+    {
+      "item_id": "HORN-CD-9MM",
+      "upc": "023456789012",
+      "title": "Hornady Critical Defense 9mm 115gr FTX",
+      "price": 27.99,
+      "url": "https://dealer.com/horn-9mm",
+      "stock_status": "limited",
+      "manufacturer": "Hornady",
+      "caliber": "9mm Luger",
+      "bullet_weight": 115,
+      "bullet_type": "FTX",
+      "case_material": "Nickel",
+      "rounds_per_box": 25,
+      "image_url": "https://dealer.com/img/horn-9mm.jpg",
+      "stock_quantity": 50
+    },
+    {
+      "item_id": "WIN-WB-45",
+      "upc": "034567890123",
+      "title": "Winchester White Box 45 ACP 230gr FMJ",
+      "price": 32.99,
+      "url": "https://dealer.com/win-45",
+      "stock_status": "out_of_stock",
+      "manufacturer": "Winchester",
+      "caliber": ".45 ACP",
+      "bullet_weight": 230,
+      "bullet_type": "FMJ",
+      "case_material": "Brass",
+      "rounds_per_box": 50,
+      "stock_quantity": 0
+    }
+  ]
+}

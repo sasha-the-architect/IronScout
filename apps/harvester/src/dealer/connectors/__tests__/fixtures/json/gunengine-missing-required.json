@@ -1,0 +1,29 @@
+{
+  "offers": [
+    {
+      "upc": "012345678901",
+      "title": "Missing Item ID",
+      "price": 18.99,
+      "url": "https://dealer.com/missing-id",
+      "stock_status": "in_stock",
+      "manufacturer": "Federal"
+    },
+    {
+      "item_id": "MISSING-URL",
+      "upc": "023456789012",
+      "title": "Missing URL",
+      "price": 27.99,
+      "stock_status": "in_stock",
+      "manufacturer": "Hornady"
+    },
+    {
+      "item_id": "COMPLETE",
+      "upc": "034567890123",
+      "title": "Complete Record",
+      "price": 32.99,
+      "url": "https://dealer.com/complete",
+      "stock_status": "in_stock",
+      "manufacturer": "Winchester"
+    }
+  ]
+}
