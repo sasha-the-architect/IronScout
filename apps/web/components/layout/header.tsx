@@ -80,7 +80,7 @@ export function Header() {
                         <button
                           onClick={() => {
                             setIsUserMenuOpen(false)
-                            signOut()
+                            signOut({ callbackUrl: '/' })
                           }}
                           className="flex items-center w-full px-4 py-2 text-sm hover:bg-accent text-left"
                         >
@@ -163,7 +163,7 @@ export function Header() {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      signOut()
+                      signOut({ callbackUrl: '/' })
                       setIsMenuOpen(false)
                     }}
                     className="justify-start"
