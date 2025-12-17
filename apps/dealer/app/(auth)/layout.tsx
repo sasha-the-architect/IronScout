@@ -1,5 +1,3 @@
-import Image from 'next/image';
-
 export default function AuthLayout({
   children,
 }: {
@@ -10,7 +8,8 @@ export default function AuthLayout({
       <div className="max-w-md w-full space-y-8">
         {/* Logo */}
         <div className="text-center flex flex-col items-center">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src="/logo-dark.svg"
             alt="IronScout"
             width={48}
