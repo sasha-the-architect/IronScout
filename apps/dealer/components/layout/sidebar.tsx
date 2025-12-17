@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Rss, 
-  Package, 
-  Lightbulb, 
+import {
+  LayoutDashboard,
+  Rss,
+  Package,
+  Lightbulb,
   BarChart3,
   Settings,
   FileDown,
@@ -46,9 +47,13 @@ export function Sidebar({ session }: SidebarProps) {
         {/* Logo */}
         <div className="flex h-16 shrink-0 items-center">
           <Link href={isAdmin ? '/admin/dealers' : '/dashboard'} className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gray-900 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">IS</span>
-            </div>
+            <Image
+              src="/logo-dark.svg"
+              alt="IronScout"
+              width={32}
+              height={32}
+              className="flex-shrink-0"
+            />
             <span className="font-semibold text-gray-900">Dealer Portal</span>
           </Link>
         </div>
