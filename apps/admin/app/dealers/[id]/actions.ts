@@ -4,6 +4,12 @@ import { prisma } from '@ironscout/db';
 import { revalidatePath } from 'next/cache';
 import { getAdminSession, logAdminAction } from '@/lib/auth';
 import { SignJWT } from 'jose';
+import Stripe from 'stripe';
+
+// Initialize Stripe
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-08-16' })
+  : null;
 
 /**
  * Get the dealer portal base URL with trailing slashes removed
@@ -866,6 +872,215 @@ export async function updatePaymentDetails(dealerId: string, data: UpdatePayment
   } catch (error) {
     console.error('Failed to update payment details:', error);
     return { success: false, error: 'Failed to update payment details' };
+  }
+}
+
+// =============================================================================
+// Stripe Lookup and Validation
+// =============================================================================
+
+export interface StripeCustomerResult {
+  id: string;
+  name: string | null;
+  email: string | null;
+  description: string | null;
+  metadata: Record<string, string>;
+}
+
+export interface StripeSubscriptionResult {
+  id: string;
+  status: string;
+  currentPeriodEnd: Date;
+  cancelAtPeriodEnd: boolean;
+  metadata: Record<string, string>;
+}
+
+/**
+ * Search for Stripe customers by query (name, email, or ID)
+ */
+export async function searchStripeCustomers(query: string) {
+  const session = await getAdminSession();
+
+  if (!session) {
+    return { success: false, error: 'Unauthorized', customers: [] };
+  }
+
+  if (!stripe) {
+    return { success: false, error: 'Stripe not configured', customers: [] };
+  }
+
+  try {
+    // If query looks like a customer ID, fetch it directly
+    if (query.startsWith('cus_')) {
+      try {
+        const customer = await stripe.customers.retrieve(query);
+        if (customer.deleted) {
+          return { success: true, customers: [] };
+        }
+        return {
+          success: true,
+          customers: [{
+            id: customer.id,
+            name: customer.name,
+            email: customer.email,
+            description: customer.description,
+            metadata: customer.metadata,
+          }],
+        };
+      } catch (err) {
+        // Not found, fall through to search
+      }
+    }
+
+    // Otherwise search by email or name
+    const customers = await stripe.customers.search({
+      query: `email~'${query}' OR name~'${query}'`,
+      limit: 10,
+    });
+
+    return {
+      success: true,
+      customers: customers.data.map(c => ({
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        description: c.description,
+        metadata: c.metadata,
+      })),
+    };
+  } catch (error) {
+    console.error('Failed to search Stripe customers:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to search customers',
+      customers: [],
+    };
+  }
+}
+
+/**
+ * Validate and get details for a Stripe customer ID
+ */
+export async function validateStripeCustomer(customerId: string) {
+  const session = await getAdminSession();
+
+  if (!session) {
+    return { success: false, error: 'Unauthorized', customer: null };
+  }
+
+  if (!stripe) {
+    return { success: false, error: 'Stripe not configured', customer: null };
+  }
+
+  if (!customerId.startsWith('cus_')) {
+    return { success: false, error: 'Invalid customer ID format', customer: null };
+  }
+
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+
+    if (customer.deleted) {
+      return { success: false, error: 'Customer has been deleted', customer: null };
+    }
+
+    return {
+      success: true,
+      customer: {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email,
+        description: customer.description,
+        metadata: customer.metadata,
+      },
+    };
+  } catch (error) {
+    console.error('Failed to validate Stripe customer:', error);
+    return {
+      success: false,
+      error: 'Customer not found in Stripe',
+      customer: null,
+    };
+  }
+}
+
+/**
+ * Validate and get details for a Stripe subscription ID
+ */
+export async function validateStripeSubscription(subscriptionId: string) {
+  const session = await getAdminSession();
+
+  if (!session) {
+    return { success: false, error: 'Unauthorized', subscription: null };
+  }
+
+  if (!stripe) {
+    return { success: false, error: 'Stripe not configured', subscription: null };
+  }
+
+  if (!subscriptionId.startsWith('sub_')) {
+    return { success: false, error: 'Invalid subscription ID format', subscription: null };
+  }
+
+  try {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+    return {
+      success: true,
+      subscription: {
+        id: subscription.id,
+        status: subscription.status,
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        metadata: subscription.metadata,
+      },
+    };
+  } catch (error) {
+    console.error('Failed to validate Stripe subscription:', error);
+    return {
+      success: false,
+      error: 'Subscription not found in Stripe',
+      subscription: null,
+    };
+  }
+}
+
+/**
+ * Get all subscriptions for a Stripe customer
+ */
+export async function getStripeCustomerSubscriptions(customerId: string) {
+  const session = await getAdminSession();
+
+  if (!session) {
+    return { success: false, error: 'Unauthorized', subscriptions: [] };
+  }
+
+  if (!stripe) {
+    return { success: false, error: 'Stripe not configured', subscriptions: [] };
+  }
+
+  try {
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      limit: 100,
+    });
+
+    return {
+      success: true,
+      subscriptions: subscriptions.data.map(s => ({
+        id: s.id,
+        status: s.status,
+        currentPeriodEnd: new Date(s.current_period_end * 1000),
+        cancelAtPeriodEnd: s.cancel_at_period_end,
+        metadata: s.metadata,
+      })),
+    };
+  } catch (error) {
+    console.error('Failed to get customer subscriptions:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get subscriptions',
+      subscriptions: [],
+    };
   }
 }
 

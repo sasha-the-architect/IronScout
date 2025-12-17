@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { ExternalLink, CreditCard, Key, RefreshCw, AlertCircle, Pencil, Save, X } from 'lucide-react';
-import { updatePaymentDetails } from './actions';
+import { useState, useEffect } from 'react';
+import { ExternalLink, CreditCard, Key, RefreshCw, AlertCircle, Pencil, Save, X, Search, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { updatePaymentDetails, searchStripeCustomers, validateStripeCustomer, validateStripeSubscription, getStripeCustomerSubscriptions, type StripeCustomerResult, type StripeSubscriptionResult } from './actions';
 
 interface PaymentSectionProps {
   dealerId: string;
+  dealerBusinessName: string;
+  dealerEmail: string;
   paymentMethod: string | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
@@ -14,6 +16,8 @@ interface PaymentSectionProps {
 
 export function PaymentSection({
   dealerId,
+  dealerBusinessName,
+  dealerEmail,
   paymentMethod,
   stripeCustomerId,
   stripeSubscriptionId,
@@ -32,6 +36,19 @@ export function PaymentSection({
     autoRenew,
   });
 
+  // Stripe search and validation state
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [customerSearchResults, setCustomerSearchResults] = useState<StripeCustomerResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showCustomerResults, setShowCustomerResults] = useState(false);
+  const [validatedCustomer, setValidatedCustomer] = useState<StripeCustomerResult | null>(null);
+  const [validatedSubscription, setValidatedSubscription] = useState<StripeSubscriptionResult | null>(null);
+  const [isValidatingCustomer, setIsValidatingCustomer] = useState(false);
+  const [isValidatingSubscription, setIsValidatingSubscription] = useState(false);
+  const [customerValidationError, setCustomerValidationError] = useState<string | null>(null);
+  const [subscriptionValidationError, setSubscriptionValidationError] = useState<string | null>(null);
+  const [availableSubscriptions, setAvailableSubscriptions] = useState<StripeSubscriptionResult[]>([]);
+
   const stripeBaseUrl = process.env.NODE_ENV === 'production'
     ? 'https://dashboard.stripe.com'
     : 'https://dashboard.stripe.com/test';
@@ -47,6 +64,113 @@ export function PaymentSection({
   // Determine payment status
   const hasStripeSetup = paymentMethod === 'STRIPE' && stripeCustomerId;
 
+  // Search for Stripe customers
+  const handleCustomerSearch = async () => {
+    if (!customerSearchQuery.trim()) {
+      setCustomerSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const result = await searchStripeCustomers(customerSearchQuery);
+      if (result.success) {
+        setCustomerSearchResults(result.customers);
+        setShowCustomerResults(true);
+      } else {
+        setError(result.error || 'Failed to search customers');
+      }
+    } catch (err) {
+      setError('Failed to search customers');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Validate customer ID when it changes
+  useEffect(() => {
+    const validateCustomer = async () => {
+      if (!formData.stripeCustomerId || !formData.stripeCustomerId.startsWith('cus_')) {
+        setValidatedCustomer(null);
+        setCustomerValidationError(null);
+        setAvailableSubscriptions([]);
+        return;
+      }
+
+      setIsValidatingCustomer(true);
+      setCustomerValidationError(null);
+      try {
+        const result = await validateStripeCustomer(formData.stripeCustomerId);
+        if (result.success && result.customer) {
+          setValidatedCustomer(result.customer);
+          setCustomerValidationError(null);
+
+          // Load subscriptions for this customer
+          const subsResult = await getStripeCustomerSubscriptions(formData.stripeCustomerId);
+          if (subsResult.success) {
+            setAvailableSubscriptions(subsResult.subscriptions);
+
+            // Auto-select the first active subscription if none is selected
+            if (!formData.stripeSubscriptionId && subsResult.subscriptions.length > 0) {
+              const activeSub = subsResult.subscriptions.find(s => s.status === 'active') || subsResult.subscriptions[0];
+              setFormData(prev => ({ ...prev, stripeSubscriptionId: activeSub.id }));
+            }
+          }
+        } else {
+          setValidatedCustomer(null);
+          setCustomerValidationError(result.error || 'Customer not found');
+          setAvailableSubscriptions([]);
+        }
+      } catch (err) {
+        setValidatedCustomer(null);
+        setCustomerValidationError('Failed to validate customer');
+        setAvailableSubscriptions([]);
+      } finally {
+        setIsValidatingCustomer(false);
+      }
+    };
+
+    validateCustomer();
+  }, [formData.stripeCustomerId]);
+
+  // Validate subscription ID when it changes
+  useEffect(() => {
+    const validateSubscription = async () => {
+      if (!formData.stripeSubscriptionId || !formData.stripeSubscriptionId.startsWith('sub_')) {
+        setValidatedSubscription(null);
+        setSubscriptionValidationError(null);
+        return;
+      }
+
+      setIsValidatingSubscription(true);
+      setSubscriptionValidationError(null);
+      try {
+        const result = await validateStripeSubscription(formData.stripeSubscriptionId);
+        if (result.success && result.subscription) {
+          setValidatedSubscription(result.subscription);
+          setSubscriptionValidationError(null);
+        } else {
+          setValidatedSubscription(null);
+          setSubscriptionValidationError(result.error || 'Subscription not found');
+        }
+      } catch (err) {
+        setValidatedSubscription(null);
+        setSubscriptionValidationError('Failed to validate subscription');
+      } finally {
+        setIsValidatingSubscription(false);
+      }
+    };
+
+    validateSubscription();
+  }, [formData.stripeSubscriptionId]);
+
+  const handleSelectCustomer = (customer: StripeCustomerResult) => {
+    setFormData(prev => ({ ...prev, stripeCustomerId: customer.id }));
+    setShowCustomerResults(false);
+    setCustomerSearchQuery('');
+    setCustomerSearchResults([]);
+  };
+
   const handleEdit = () => {
     setIsEditing(true);
     setError(null);
@@ -58,15 +182,37 @@ export function PaymentSection({
       stripeSubscriptionId: stripeSubscriptionId || '',
       autoRenew,
     });
+    // Pre-populate search with dealer info
+    setCustomerSearchQuery(dealerBusinessName || dealerEmail || '');
   };
 
   const handleCancel = () => {
     setIsEditing(false);
     setError(null);
     setSuccessMessage(null);
+    setCustomerSearchQuery('');
+    setCustomerSearchResults([]);
+    setShowCustomerResults(false);
+    setValidatedCustomer(null);
+    setValidatedSubscription(null);
+    setCustomerValidationError(null);
+    setSubscriptionValidationError(null);
+    setAvailableSubscriptions([]);
   };
 
   const handleSave = async () => {
+    // Validate that customer and subscription exist in Stripe
+    if (formData.paymentMethod === 'STRIPE') {
+      if (!validatedCustomer) {
+        setError('Please select a valid Stripe customer');
+        return;
+      }
+      if (formData.stripeSubscriptionId && !validatedSubscription) {
+        setError('Please select a valid Stripe subscription');
+        return;
+      }
+    }
+
     setIsSaving(true);
     setError(null);
     setSuccessMessage(null);
@@ -82,6 +228,12 @@ export function PaymentSection({
       if (result.success) {
         setSuccessMessage(result.message || 'Payment details updated successfully');
         setIsEditing(false);
+        // Clear validation state
+        setValidatedCustomer(null);
+        setValidatedSubscription(null);
+        setCustomerValidationError(null);
+        setSubscriptionValidationError(null);
+        setAvailableSubscriptions([]);
         // The page will revalidate automatically
       } else {
         setError(result.error || 'Failed to update payment details');
@@ -127,7 +279,7 @@ export function PaymentSection({
       )}
 
       {isEditing ? (
-        // Edit mode - show form inputs
+        // Edit mode - show form inputs with Stripe lookup
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Payment Method */}
@@ -165,37 +317,172 @@ export function PaymentSection({
                 </label>
               </div>
             </div>
-
-            {/* Stripe Customer ID */}
-            <div>
-              <label htmlFor="stripeCustomerId" className="block text-sm font-medium text-gray-700 mb-1">
-                Stripe Customer ID
-              </label>
-              <input
-                type="text"
-                id="stripeCustomerId"
-                value={formData.stripeCustomerId}
-                onChange={(e) => setFormData({ ...formData, stripeCustomerId: e.target.value })}
-                placeholder="cus_..."
-                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Stripe Subscription ID */}
-            <div>
-              <label htmlFor="stripeSubscriptionId" className="block text-sm font-medium text-gray-700 mb-1">
-                Stripe Subscription ID
-              </label>
-              <input
-                type="text"
-                id="stripeSubscriptionId"
-                value={formData.stripeSubscriptionId}
-                onChange={(e) => setFormData({ ...formData, stripeSubscriptionId: e.target.value })}
-                placeholder="sub_..."
-                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
           </div>
+
+          {/* Stripe Customer Search */}
+          {formData.paymentMethod === 'STRIPE' && (
+            <div className="space-y-4 border-t border-gray-200 pt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Search Stripe Customer
+                </label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={customerSearchQuery}
+                      onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleCustomerSearch()}
+                      placeholder="Search by business name, email, or customer ID..."
+                      className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={handleCustomerSearch}
+                    disabled={isSearching || !customerSearchQuery.trim()}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSearching ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                    Search
+                  </button>
+                </div>
+
+                {/* Search Results */}
+                {showCustomerResults && customerSearchResults.length > 0 && (
+                  <div className="mt-2 border border-gray-200 rounded-md bg-white shadow-sm max-h-60 overflow-y-auto">
+                    {customerSearchResults.map((customer) => (
+                      <button
+                        key={customer.id}
+                        onClick={() => handleSelectCustomer(customer)}
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {customer.name || 'Unnamed Customer'}
+                            </p>
+                            <p className="text-xs text-gray-500">{customer.email}</p>
+                            <p className="text-xs text-gray-400 font-mono">{customer.id}</p>
+                          </div>
+                          <CheckCircle className="h-4 w-4 text-blue-600" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {showCustomerResults && customerSearchResults.length === 0 && (
+                  <p className="mt-2 text-sm text-gray-500">No customers found</p>
+                )}
+              </div>
+
+              {/* Stripe Customer ID */}
+              <div>
+                <label htmlFor="stripeCustomerId" className="block text-sm font-medium text-gray-700 mb-1">
+                  Stripe Customer ID
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    id="stripeCustomerId"
+                    value={formData.stripeCustomerId}
+                    onChange={(e) => setFormData({ ...formData, stripeCustomerId: e.target.value })}
+                    placeholder="cus_... or search above"
+                    className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 pr-10"
+                  />
+                  {isValidatingCustomer && (
+                    <div className="absolute right-3 top-2.5">
+                      <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+                    </div>
+                  )}
+                  {!isValidatingCustomer && validatedCustomer && (
+                    <div className="absolute right-3 top-2.5">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    </div>
+                  )}
+                  {!isValidatingCustomer && customerValidationError && formData.stripeCustomerId && (
+                    <div className="absolute right-3 top-2.5">
+                      <XCircle className="h-4 w-4 text-red-600" />
+                    </div>
+                  )}
+                </div>
+                {validatedCustomer && (
+                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                    <p className="font-medium text-green-800">✓ Verified in Stripe</p>
+                    <p className="text-green-700">{validatedCustomer.name || validatedCustomer.email}</p>
+                  </div>
+                )}
+                {customerValidationError && formData.stripeCustomerId && (
+                  <p className="mt-1 text-xs text-red-600">{customerValidationError}</p>
+                )}
+              </div>
+
+              {/* Stripe Subscription ID */}
+              <div>
+                <label htmlFor="stripeSubscriptionId" className="block text-sm font-medium text-gray-700 mb-1">
+                  Stripe Subscription ID
+                </label>
+
+                {/* Show subscription dropdown if we have available subscriptions */}
+                {availableSubscriptions.length > 0 && (
+                  <select
+                    value={formData.stripeSubscriptionId}
+                    onChange={(e) => setFormData({ ...formData, stripeSubscriptionId: e.target.value })}
+                    className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 mb-2"
+                  >
+                    <option value="">Select a subscription</option>
+                    {availableSubscriptions.map((sub) => (
+                      <option key={sub.id} value={sub.id}>
+                        {sub.id} ({sub.status})
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    id="stripeSubscriptionId"
+                    value={formData.stripeSubscriptionId}
+                    onChange={(e) => setFormData({ ...formData, stripeSubscriptionId: e.target.value })}
+                    placeholder="sub_... or select above"
+                    className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 pr-10"
+                  />
+                  {isValidatingSubscription && (
+                    <div className="absolute right-3 top-2.5">
+                      <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+                    </div>
+                  )}
+                  {!isValidatingSubscription && validatedSubscription && (
+                    <div className="absolute right-3 top-2.5">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    </div>
+                  )}
+                  {!isValidatingSubscription && subscriptionValidationError && formData.stripeSubscriptionId && (
+                    <div className="absolute right-3 top-2.5">
+                      <XCircle className="h-4 w-4 text-red-600" />
+                    </div>
+                  )}
+                </div>
+                {validatedSubscription && (
+                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                    <p className="font-medium text-green-800">✓ Verified in Stripe</p>
+                    <p className="text-green-700">
+                      Status: {validatedSubscription.status} •
+                      Renews: {validatedSubscription.currentPeriodEnd.toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+                {subscriptionValidationError && formData.stripeSubscriptionId && (
+                  <p className="mt-1 text-xs text-red-600">{subscriptionValidationError}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="flex items-center gap-3 pt-4 border-t border-gray-200">

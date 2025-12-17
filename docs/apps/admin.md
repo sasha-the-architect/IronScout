@@ -224,19 +224,63 @@ Admins can log in as a dealer to provide support assistance:
 
 ### Payment Details Section
 
-The dealer detail page (`/dealers/[id]`) includes a Payment Details section showing:
+The dealer detail page (`/dealers/[id]`) includes an editable Payment Details section for managing dealer payment information with **Stripe lookup and validation**.
 
+**Display Mode** shows:
 - **Payment Method**: STRIPE (automated billing) or PURCHASE_ORDER (manual invoicing)
 - **Auto Renew**: Whether automatic renewal is enabled
-- **Stripe Customer ID**: Link to Stripe Dashboard customer page
-- **Stripe Subscription ID**: Link to Stripe Dashboard subscription page
+- **Stripe Customer ID**: Link to Stripe Dashboard customer page (clickable, opens in new tab)
+- **Stripe Subscription ID**: Link to Stripe Dashboard subscription page (clickable, opens in new tab)
 
-The section provides:
+**Edit Mode** with Stripe Integration:
+
+1. **Customer Search** (when Payment Method = Stripe):
+   - Search by business name, email, or customer ID
+   - Live search against Stripe API
+   - Autocomplete dropdown showing matching customers
+   - Click to select customer (auto-populates ID)
+
+2. **Real-time Validation**:
+   - **Green checkmark** (✓) when customer/subscription verified in Stripe
+   - **Red X** (✗) when ID not found or invalid
+   - **Spinning loader** during validation
+   - Shows customer name and email when verified
+   - Shows subscription status and renewal date when verified
+
+3. **Auto-populate Subscriptions**:
+   - When customer is selected, automatically fetches their subscriptions
+   - Dropdown appears with all available subscriptions
+   - Auto-selects first active subscription
+   - Manual text input also available for direct entry
+
+4. **Validation Requirements**:
+   - Cannot save if customer ID doesn't exist in Stripe
+   - Cannot save if subscription ID doesn't exist in Stripe
+   - Format validation: customer IDs must start with `cus_`, subscriptions with `sub_`
+
+**Features:**
+- Click "Edit" button to enter edit mode
+- Pre-populates search with dealer business name
+- Live Stripe API validation (not just format checking)
+- Prevents data entry errors by verifying IDs exist
+- Success/error messages displayed after updates
+- All changes logged to `AdminAuditLog` table with old/new values
+- Page auto-revalidates after successful update
 - Direct links to Stripe Dashboard for quick access
 - Info banners explaining Purchase Order billing
 - Warnings for dealers without payment methods
 
-**Key file:** `apps/admin/app/dealers/[id]/payment-section.tsx`
+**Server Actions:**
+- `searchStripeCustomers(query)` - Search customers by name, email, or ID
+- `validateStripeCustomer(customerId)` - Verify customer exists and get details
+- `validateStripeSubscription(subscriptionId)` - Verify subscription exists and get details
+- `getStripeCustomerSubscriptions(customerId)` - List all subscriptions for a customer
+- `updatePaymentDetails(dealerId, data)` - Update payment details with validation
+
+**Key files:**
+- `apps/admin/app/dealers/[id]/payment-section.tsx` - UI component with Stripe lookup
+- `apps/admin/app/dealers/[id]/actions.ts` - Stripe server actions and payment updates
+- `apps/admin/package.json` - Includes `stripe` package
 
 ### Dealers List Payment Column
 

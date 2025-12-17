@@ -268,6 +268,8 @@ export default async function DealerDetailPage({
       {/* Payment Details */}
       <PaymentSection
         dealerId={dealer.id}
+        dealerBusinessName={dealer.businessName}
+        dealerEmail={ownerUser?.email || ''}
         paymentMethod={dealer.paymentMethod}
         stripeCustomerId={dealer.stripeCustomerId}
         stripeSubscriptionId={dealer.stripeSubscriptionId}
