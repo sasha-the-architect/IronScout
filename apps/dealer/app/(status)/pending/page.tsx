@@ -1,6 +1,7 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Clock } from 'lucide-react';
 
 export default async function PendingPage() {
@@ -20,9 +21,12 @@ export default async function PendingPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="h-12 w-12 rounded-lg bg-gray-900 flex items-center justify-center">
-            <span className="text-white font-bold text-lg">IS</span>
-          </div>
+          <Image
+            src="/logo-dark.svg"
+            alt="IronScout"
+            width={48}
+            height={48}
+          />
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Account Pending Approval

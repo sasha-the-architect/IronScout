@@ -54,7 +54,7 @@ export async function notifyDealerApproved(dealer: DealerStatusInfo): Promise<No
     html: wrapEmailTemplate(`
       <div style="background: #ecfdf5; border: 1px solid #6ee7b7; border-radius: 8px; padding: 30px; margin-bottom: 30px;">
         <h2 style="color: #065f46; font-size: 20px; margin: 0 0 15px 0;">🎉 Congratulations, ${dealer.businessName}!</h2>
-        <p style="margin: 0 0 20px 0; color: #047857;">Your IronScout Founding Dealer account has been approved. You now have access to 12 months of Pro features absolutely free!</p>
+        <p style="margin: 0 0 20px 0; color: #047857;">Your IronScout Dealer account has been approved.</p>
       </div>
       
       <div style="background: #f9fafb; border-radius: 8px; padding: 30px; margin-bottom: 30px;">
@@ -76,7 +76,7 @@ export async function notifyDealerApproved(dealer: DealerStatusInfo): Promise<No
     `),
     text: `Congratulations, ${dealer.businessName}!
 
-Your IronScout Founding Dealer account has been approved. You now have access to 12 months of Pro features absolutely free!
+Your IronScout Dealer account has been approved.
 
 What's included:
 - Automated product feed ingestion

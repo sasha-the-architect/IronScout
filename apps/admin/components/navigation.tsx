@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { 
-  Users, 
+import {
+  Users,
   BarChart3,
   Settings,
-  Shield,
   LogOut,
 } from 'lucide-react';
 import type { AdminSession } from '@/lib/auth';
@@ -29,7 +29,13 @@ export function Navigation({ admin }: NavigationProps) {
       {/* Logo */}
       <div className="p-4 border-b border-gray-800">
         <Link href="/" className="flex items-center gap-2">
-          <Shield className="h-8 w-8 text-red-500" />
+          <Image
+            src="/logo-dark.svg"
+            alt="IronScout"
+            width={32}
+            height={32}
+            className="flex-shrink-0"
+          />
           <div>
             <h1 className="text-lg font-bold">IronScout</h1>
             <p className="text-xs text-gray-400">Admin Portal</p>
