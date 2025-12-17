@@ -1,12 +1,11 @@
 /**
  * Admin Portal Authentication
- * 
- * Reads the NextAuth JWT token from the shared cookie (set by main web app)
- * and verifies the user is in the ADMIN_EMAILS list.
+ *
+ * Uses NextAuth for OAuth-based authentication.
+ * Verifies the user is in the ADMIN_EMAILS list.
  */
 
-import { decode } from '@auth/core/jwt';
-import { cookies, headers } from 'next/headers';
+import { auth } from '@/lib/auth-config';
 import { prisma } from '@ironscout/db';
 import { logger } from './logger';
 
@@ -16,11 +15,6 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .map(e => e.trim().toLowerCase())
   .filter(Boolean);
 
-// Cookie name varies by environment
-const SESSION_COOKIE_NAME = process.env.NODE_ENV === 'production'
-  ? '__Secure-authjs.session-token'
-  : 'authjs.session-token';
-
 export interface AdminSession {
   userId: string;
   email: string;
@@ -29,118 +23,49 @@ export interface AdminSession {
 }
 
 /**
- * Get the current admin session from the NextAuth JWT cookie
+ * Get the current admin session from NextAuth
  */
 export async function getAdminSession(): Promise<AdminSession | null> {
   try {
-    const cookieStore = await cookies();
-    const headerStore = await headers();
-    
-    // Debug: Log raw cookie header
-    const rawCookieHeader = headerStore.get('cookie');
-    logger.debug('Raw cookie header', { 
-      hasCookieHeader: !!rawCookieHeader,
-      cookieHeaderLength: rawCookieHeader?.length || 0,
-      cookieHeaderPreview: rawCookieHeader?.substring(0, 100) || 'none',
-    });
-    
-    // Debug: Log all available cookies (names only for security)
-    const allCookies = cookieStore.getAll();
-    logger.debug('Available cookies', { 
-      cookieNames: allCookies.map(c => c.name),
-      expectedCookie: SESSION_COOKIE_NAME,
-      nodeEnv: process.env.NODE_ENV,
-    });
-    
-    // Try getting token from cookie store first
-    let token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-    
-    // Fallback: parse raw cookie header if cookieStore is empty
-    if (!token && rawCookieHeader) {
-      logger.debug('Trying to parse token from raw cookie header');
-      const cookieMatch = rawCookieHeader.match(new RegExp(`${SESSION_COOKIE_NAME}=([^;]+)`));
-      if (cookieMatch) {
-        token = cookieMatch[1];
-        logger.debug('Found token in raw cookie header', { tokenLength: token.length });
-      }
-    }
+    const session = await auth();
 
-    if (!token) {
-      logger.warn('No session cookie found', { 
-        cookieName: SESSION_COOKIE_NAME,
-        availableCookies: allCookies.map(c => c.name),
-        hint: 'User may need to log in at main site first',
-      });
+    if (!session || !session.user) {
+      logger.debug('No session found');
       return null;
     }
-    
-    logger.debug('Session cookie found', { tokenLength: token.length });
 
-    // Verify the JWT
-    const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET;
-    if (!secret) {
-      logger.error('NEXTAUTH_SECRET not configured', {
-        hasNextAuthSecret: !!process.env.NEXTAUTH_SECRET,
-        hasAuthSecret: !!process.env.AUTH_SECRET,
-      });
+    const email = session.user.email?.toLowerCase();
+    const userId = session.user.id;
+
+    if (!email || !userId) {
+      logger.warn('Session missing email or id', { hasEmail: !!email, hasId: !!userId });
       return null;
     }
-    
-    logger.debug('Secret configured', { secretLength: secret.length });
-    
-    try {
-      // Use NextAuth's decode function (handles JWE encryption)
-      const payload = await decode({
-        token,
-        secret,
-        salt: SESSION_COOKIE_NAME,
-      });
-      
-      if (!payload) {
-        logger.warn('JWT decode returned null');
-        return null;
-      }
 
-      const email = (payload.email as string)?.toLowerCase();
-      const userId = payload.sub as string;
+    // Check if user is in admin list
+    logger.debug('Checking admin access', {
+      email,
+      adminEmailsCount: ADMIN_EMAILS.length,
+      adminEmails: ADMIN_EMAILS, // Safe to log since it's server-side
+    });
 
-      if (!email || !userId) {
-        logger.warn('JWT missing email or sub', { hasEmail: !!email, hasSub: !!userId });
-        return null;
-      }
-
-      // Check if user is in admin list
-      logger.debug('Checking admin access', { 
-        email, 
-        adminEmailsCount: ADMIN_EMAILS.length,
-        adminEmails: ADMIN_EMAILS, // Safe to log since it's server-side
-      });
-      
-      if (!ADMIN_EMAILS.includes(email)) {
-        logger.warn('User not in admin list', { 
-          email, 
-          adminEmails: ADMIN_EMAILS,
-          hint: 'Add email to ADMIN_EMAILS env var',
-        });
-        return null;
-      }
-
-      logger.debug('Admin session verified', { email, userId });
-
-      return {
-        userId,
+    if (!ADMIN_EMAILS.includes(email)) {
+      logger.warn('User not in admin list', {
         email,
-        name: payload.name as string | undefined,
-        image: payload.picture as string | undefined,
-      };
-    } catch (decodeError) {
-      logger.warn('JWT decode failed', {
-        errorType: decodeError instanceof Error ? decodeError.name : 'unknown',
-        errorMessage: decodeError instanceof Error ? decodeError.message : 'unknown',
-        hint: 'Check that NEXTAUTH_SECRET matches between web and admin apps',
-      }, decodeError);
+        adminEmails: ADMIN_EMAILS,
+        hint: 'Add email to ADMIN_EMAILS env var',
+      });
       return null;
     }
+
+    logger.debug('Admin session verified', { email, userId });
+
+    return {
+      userId,
+      email,
+      name: session.user.name || undefined,
+      image: session.user.image || undefined,
+    };
   } catch (error) {
     logger.error('Error getting admin session', {}, error);
     return null;
