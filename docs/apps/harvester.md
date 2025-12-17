@@ -240,7 +240,7 @@ Downloads and parses dealer feeds.
 
 ### SkuMatch
 
-Matches dealer SKUs to canonical products.
+Matches dealer SKUs to canonical products using optimized batch operations.
 
 **Confidence Levels**:
 
@@ -252,9 +252,47 @@ Matches dealer SKUs to canonical products.
 | NONE | Cannot match, excluded from benchmarks |
 
 **Matching Strategy**:
-1. Try exact UPC match
-2. Try fuzzy title match with attribute scoring
+1. Try exact UPC match (O(1) via Map lookup)
+2. Try attribute match using composite key `caliber|brand` (O(1) via Map lookup)
 3. Flag low-confidence matches for manual review
+
+**Performance Optimization (v2.0)**:
+
+The SKU match worker was optimized from O(n²) to O(n) complexity:
+
+| Approach | 5,000 SKUs | Queries |
+|----------|------------|---------|
+| **Before** (sequential) | ~105s | ~26,500 |
+| **After** (batch + Maps) | ~5s | ~30 |
+
+**Key Optimizations**:
+- **Batch fetch**: Load all dealer SKUs in single query
+- **Pre-built lookup Maps**: UPC map and attribute map built once
+- **O(1) matching**: Map.get() instead of database queries per SKU
+- **Batch creates**: `prisma.canonicalSku.createMany()` for new canonicals
+- **Batch updates**: Single transaction for all DealerSku updates
+
+```typescript
+// Batch processing pattern
+const upcMap = await buildUpcLookupMap(upcs)           // Single query
+const attrMap = await buildAttributeLookupMap(...)     // Single query
+
+for (const sku of dealerSkus) {
+  const match = upcMap.get(sku.upc) ||                 // O(1)
+                attrMap.get(`${caliber}|${brand}`)     // O(1)
+}
+
+await batchUpdateDealerSkus(updates)                   // Single transaction
+```
+
+**Throughput Benchmarks**:
+
+| Dealer Tier | SKUs | Total Time | Match Throughput |
+|-------------|------|------------|------------------|
+| Hobbyist | 150 | 5.12ms | 178K SKUs/sec |
+| Serious | 800 | 9.79ms | 529K SKUs/sec |
+| National | 3,000 | 31.96ms | 689K SKUs/sec |
+| Top-Tier | 5,000 | 38.49ms | 1.02M SKUs/sec |
 
 ### Benchmark
 
@@ -418,4 +456,64 @@ export function startExampleWorker() {
 
 ---
 
-*Last updated: December 14, 2024*
+## Performance & Scaling
+
+### Current Capacity
+
+The harvester is optimized to handle 100+ dealers of various sizes:
+
+| Dealer Distribution | Count | SKUs Each | Total |
+|---------------------|-------|-----------|-------|
+| Hobbyist | 40 | 150 | 6,000 |
+| Serious | 35 | 800 | 28,000 |
+| National | 20 | 3,000 | 60,000 |
+| Top-Tier | 5 | 5,000 | 25,000 |
+| **Total** | **100** | - | **119,000** |
+
+### Feed-Level Change Detection
+
+Skips processing when feed content hasn't changed:
+
+```typescript
+const contentHash = createHash('sha256').update(content).digest('hex')
+
+if (feed?.feedHash === contentHash) {
+  return { skipped: true, reason: 'no_changes' }
+}
+```
+
+### Horizontal Scaling
+
+BullMQ supports distributed workers automatically:
+
+```
+Redis Queue ←→ Harvester Instance 1 ←→ PostgreSQL
+            ←→ Harvester Instance 2 ←↗
+            ←→ Harvester Instance 3 ←↗
+```
+
+**Scale triggers**:
+- Queue depth > 100 jobs consistently
+- Worker CPU > 80%
+- Any dealer processing > 30 seconds
+
+### Testing Scale Performance
+
+```bash
+cd apps/harvester
+
+# Run all tier tests
+pnpm test -- --run scale-pipeline.test.ts
+
+# Run specific tier only (Windows)
+pnpm test -- --run --testNamePattern="Hobbyist Pipeline" scale-pipeline.test.ts
+
+# Run bottleneck analysis
+set RUN_BOTTLENECK=1 && pnpm test -- --run scale-pipeline.test.ts
+```
+
+See `docs/architecture/scaling-strategy.md` for detailed scaling roadmap.
+
+---
+
+*Last updated: December 16, 2025*

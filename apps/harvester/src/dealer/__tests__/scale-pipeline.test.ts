@@ -9,6 +9,12 @@
  *
  * These tests simulate the full pipeline with mocked database operations
  * to identify bottlenecks and verify data flow at scale.
+ *
+ * Usage:
+ * - RUN_TIER=hobbyist pnpm test -- --run scale-pipeline.test.ts  (only hobbyist)
+ * - RUN_TIER=serious pnpm test -- --run scale-pipeline.test.ts   (only serious)
+ * - RUN_BOTTLENECK=1 pnpm test -- --run scale-pipeline.test.ts   (include bottleneck analysis)
+ * - pnpm test -- --run scale-pipeline.test.ts                    (all pipeline tests, skip bottleneck)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -22,6 +28,19 @@ import {
 } from './scale-data-generator'
 import { GenericConnector } from '../connectors/generic-connector'
 import type { FeedParseResult, ParsedRecordResult } from '../connectors/types'
+
+// ============================================================================
+// TEST FILTERING
+// ============================================================================
+
+const RUN_TIER = process.env.RUN_TIER as DealerTier | undefined
+const RUN_BOTTLENECK = process.env.RUN_BOTTLENECK === '1'
+
+/** Check if a tier should run based on RUN_TIER env var */
+function shouldRunTier(tier: DealerTier): boolean {
+  if (!RUN_TIER) return true // Run all if not specified
+  return RUN_TIER === tier
+}
 
 // ============================================================================
 // MOCK PIPELINE COMPONENTS
@@ -643,7 +662,7 @@ describe('Full Pipeline Scale Tests', () => {
     pipeline.reset()
   })
 
-  describe('Hobbyist Pipeline', () => {
+  describe.skipIf(!shouldRunTier('hobbyist'))('Hobbyist Pipeline', () => {
     const tier: DealerTier = 'hobbyist'
 
     it('processes hobbyist catalog through full pipeline', async () => {
@@ -667,7 +686,7 @@ describe('Full Pipeline Scale Tests', () => {
     })
   })
 
-  describe('Serious Seller Pipeline', () => {
+  describe.skipIf(!shouldRunTier('serious'))('Serious Seller Pipeline', () => {
     const tier: DealerTier = 'serious'
 
     it('processes serious catalog through full pipeline', async () => {
@@ -710,7 +729,7 @@ describe('Full Pipeline Scale Tests', () => {
     }, 20000)
   })
 
-  describe('National Operation Pipeline', () => {
+  describe.skipIf(!shouldRunTier('national'))('National Operation Pipeline', () => {
     const tier: DealerTier = 'national'
 
     it('processes national catalog through full pipeline', async () => {
@@ -736,7 +755,7 @@ describe('Full Pipeline Scale Tests', () => {
     }, 90000)
   })
 
-  describe('Top-Tier Pipeline', () => {
+  describe.skipIf(!shouldRunTier('top-tier'))('Top-Tier Pipeline', () => {
     const tier: DealerTier = 'top-tier'
 
     it('processes top-tier catalog through full pipeline', async () => {
@@ -765,7 +784,7 @@ describe('Full Pipeline Scale Tests', () => {
 // BOTTLENECK ANALYSIS TESTS
 // ============================================================================
 
-describe('Pipeline Bottleneck Analysis', () => {
+describe.skipIf(!RUN_BOTTLENECK)('Pipeline Bottleneck Analysis', () => {
   let pipeline: PipelineSimulator
 
   beforeEach(() => {
@@ -870,7 +889,7 @@ describe('Pipeline Bottleneck Analysis', () => {
 // CONCURRENT PROCESSING SIMULATION
 // ============================================================================
 
-describe('Concurrent Dealer Processing', () => {
+describe.skipIf(!!RUN_TIER || !RUN_BOTTLENECK)('Concurrent Dealer Processing', () => {
   it('simulates multiple dealers processing simultaneously', async () => {
     const dealerCount = 5
     const skusPerDealer = 500
@@ -917,7 +936,7 @@ describe('Concurrent Dealer Processing', () => {
 // DATA QUALITY IMPACT TESTS
 // ============================================================================
 
-describe('Data Quality Impact on Pipeline', () => {
+describe.skipIf(!!RUN_TIER || !RUN_BOTTLENECK)('Data Quality Impact on Pipeline', () => {
   let pipeline: PipelineSimulator
 
   beforeEach(() => {

@@ -32,6 +32,7 @@ Technical design and system overview.
 | [ai-search.md](architecture/ai-search.md) | AI search system - embeddings, intent parsing, ranking |
 | [database.md](architecture/database.md) | Database schema - models, relationships, indexes |
 | [normalization.md](architecture/normalization.md) | Ammunition normalization - UPC matching, caliber extraction |
+| [scaling-strategy.md](architecture/scaling-strategy.md) | Dealer pipeline scaling - batch ops, vectors, horizontal scaling |
 
 ---
 

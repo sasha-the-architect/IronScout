@@ -208,7 +208,7 @@ CREATE INDEX idx_products_purpose ON products(purpose);
 
 ### Dealer Portal Pipeline (4 workers)
 1. **DealerFeedIngest** → Parse dealer CSV/XML/JSON
-2. **DealerSkuMatch** → Match to canonical products
+2. **DealerSkuMatch** → Match to canonical products (batch-optimized, O(n) complexity)
 3. **DealerBenchmark** → Calculate market benchmarks
 4. **DealerInsight** → Generate actionable insights
 
@@ -324,6 +324,7 @@ Complex features use phased rollout:
 - pgvector HNSW index for fast similarity
 - Price cache with 1hr TTL
 - Batch embedding generation
+- **Dealer pipeline**: Batch operations with O(1) Map lookups (see `scaling-strategy.md`)
 
 ### Data Quality
 - Confidence scores track data reliability
@@ -356,4 +357,4 @@ Complex features use phased rollout:
 
 ---
 
-*Last updated: December 7, 2025*
+*Last updated: December 16, 2025*
