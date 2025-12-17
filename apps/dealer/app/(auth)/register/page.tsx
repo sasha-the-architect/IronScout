@@ -162,7 +162,7 @@ export default function RegisterPage() {
       </h2>
       
       <p className="mb-6 text-center text-sm text-gray-600">
-        Join the IronScout Founding Dealer Program and get 12 months of Pro features free.
+        Join the IronScout Dealer Program and get 12 months of Pro features free.
       </p>
 
       {error && (

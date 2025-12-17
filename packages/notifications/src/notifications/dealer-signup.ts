@@ -151,7 +151,7 @@ export async function sendDealerVerificationEmail(
     html: wrapEmailTemplate(`
       <div style="background: #f9fafb; border-radius: 8px; padding: 30px; margin-bottom: 30px;">
         <h2 style="color: #111; font-size: 20px; margin: 0 0 15px 0;">Welcome, ${businessName}!</h2>
-        <p style="margin: 0 0 20px 0;">Thank you for registering for the IronScout Founding Dealer Program. Please verify your email address to continue.</p>
+        <p style="margin: 0 0 20px 0;">Thank you for registering for the IronScout Dealer Program. Please verify your email address to continue.</p>
         
         ${emailButton('Verify Email Address', verifyUrl)}
         
@@ -168,7 +168,7 @@ export async function sendDealerVerificationEmail(
     `),
     text: `Welcome to IronScout, ${businessName}!
 
-Thank you for registering for the IronScout Founding Dealer Program.
+Thank you for registering for the IronScout Dealer Program.
 
 Please verify your email address by clicking the link below:
 ${verifyUrl}

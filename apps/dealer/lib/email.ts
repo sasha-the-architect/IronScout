@@ -74,7 +74,7 @@ export async function sendVerificationEmail(
   
   <div style="background: #f9fafb; border-radius: 8px; padding: 30px; margin-bottom: 30px;">
     <h2 style="color: #111; font-size: 20px; margin: 0 0 15px 0;">Welcome, ${businessName}!</h2>
-    <p style="margin: 0 0 20px 0;">Thank you for registering for the IronScout Founding Dealer Program. Please verify your email address to continue.</p>
+    <p style="margin: 0 0 20px 0;">Thank you for registering for the IronScout Dealer Program. Please verify your email address to continue.</p>
     
     <div style="text-align: center; margin: 30px 0;">
       <a href="${verifyUrl}" style="display: inline-block; background: #111; color: #fff; text-decoration: none; padding: 14px 30px; border-radius: 6px; font-weight: 600; font-size: 16px;">Verify Email Address</a>
@@ -106,7 +106,7 @@ export async function sendVerificationEmail(
       text: `
 Welcome to IronScout, ${businessName}!
 
-Thank you for registering for the IronScout Founding Dealer Program.
+Thank you for registering for the IronScout Dealer Program.
 
 Please verify your email address by clicking the link below:
 ${verifyUrl}
