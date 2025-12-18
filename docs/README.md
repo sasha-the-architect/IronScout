@@ -57,8 +57,11 @@ Visual development guidelines and brand standards.
 
 | Document | Description |
 |----------|-------------|
-| [design-principles.md](design/design-principles.md) | Design checklist - consistency, accessibility, responsive design |
+| [design-principles.md](design/design-principles.md) | S-Tier SaaS design checklist - comprehensive UI/UX guidelines |
 | [style-guide.md](design/style-guide.md) | Brand style guide - colors, typography, spacing, components |
+| [design-review-agent.md](design/design-review-agent.md) | Design review agent - automated comprehensive design validation |
+| [design-review-slash-command.md](design/design-review-slash-command.md) | Design review slash command - trigger agent from command line |
+| [design-review-claude-md-snippet.md](design/design-review-claude-md-snippet.md) | CLAUDE.md snippet - visual development workflow |
 
 ---
 
