@@ -8,6 +8,7 @@ This folder contains all project documentation organized by category.
 docs/
 ├── architecture/     # System design and technical architecture
 ├── apps/             # Per-application documentation
+├── design/           # Visual development guidelines and brand standards
 ├── deployment/       # Setup, configuration, and deployment guides
 ├── product/          # Product requirements, features, and decisions
 ├── guides/           # How-to guides and tutorials
@@ -47,6 +48,17 @@ Documentation for each deployable application.
 | [harvester.md](apps/harvester.md) | BullMQ workers - 10-worker pipeline, queues |
 | [admin.md](apps/admin.md) | Admin portal - dealer management, impersonation |
 | [dealer.md](apps/dealer.md) | Dealer portal - feeds, SKUs, insights, contacts |
+
+---
+
+## Design
+
+Visual development guidelines and brand standards.
+
+| Document | Description |
+|----------|-------------|
+| [design-principles.md](design/design-principles.md) | Design checklist - consistency, accessibility, responsive design |
+| [style-guide.md](design/style-guide.md) | Brand style guide - colors, typography, spacing, components |
 
 ---
 
