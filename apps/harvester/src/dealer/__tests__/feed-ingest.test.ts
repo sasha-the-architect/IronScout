@@ -101,8 +101,12 @@ function setupDefaultMocks() {
   vi.mocked(checkDealerSubscription).mockResolvedValue({
     isActive: true,
     status: 'ACTIVE',
-    reason: 'Active subscription',
+    expiresAt: new Date('2026-01-01'),
+    isInGracePeriod: false,
+    daysUntilExpiry: 365,
+    daysOverdue: null,
     shouldNotify: false,
+    reason: 'Active subscription',
   })
 
   // Default: dealer exists with contact
@@ -121,15 +125,58 @@ function setupDefaultMocks() {
   // Default: all DB operations succeed
   vi.mocked(prisma.dealerFeedRun.update).mockResolvedValue({} as never)
   vi.mocked(prisma.dealerFeed.update).mockResolvedValue({} as never)
-  vi.mocked(prisma.dealerSku.upsert).mockImplementation(async (args) => ({
-    id: `sku-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    ...args.create,
-  }) as never)
+  vi.mocked(prisma.dealerSku.upsert).mockResolvedValue({
+    id: `sku-mock`,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    isActive: true,
+    dealerId: 'dealer-123',
+    feedId: 'feed-456',
+    feedRunId: 'run-789',
+    productType: 'ammo',
+    rawTitle: 'Test Product',
+    normalizedTitle: 'test product',
+    brand: 'TestBrand',
+    caliber: '9mm',
+    grainWeight: 115,
+    bulletType: 'FMJ',
+    roundCount: 50,
+    caseType: 'Brass',
+    price: 18.99,
+    currency: 'USD',
+    inStock: true,
+    quantity: 100,
+    upc: '012345678901',
+    mpn: null,
+    asin: null,
+    matchScore: null,
+    matchMethod: null,
+    matchedAt: null,
+    productUrl: 'https://example.com/test',
+    imageUrl: 'https://example.com/test.jpg',
+    rawRow: {},
+    skuHash: 'hash123',
+    canonicalSkuId: null,
+    description: null,
+    muzzleVelocityFps: null,
+    pressureRating: null,
+    isSubsonic: null,
+  } as never)
   vi.mocked(prisma.dealerSku.updateMany).mockResolvedValue({ count: 0 } as never)
-  vi.mocked(prisma.quarantinedRecord.upsert).mockImplementation(async (args) => ({
-    id: `quarantine-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    ...args.create,
-  }) as never)
+  vi.mocked(prisma.quarantinedRecord.upsert).mockResolvedValue({
+    id: `quarantine-mock`,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    status: 'PENDING',
+    dealerId: 'dealer-123',
+    feedId: 'feed-456',
+    productType: 'ammo',
+    runId: 'run-789',
+    matchKey: 'matchkey123',
+    rawData: {},
+    parsedFields: {},
+    blockingErrors: [],
+  } as never)
 
   // Default: queue operations succeed
   vi.mocked(dealerSkuMatchQueue.add).mockResolvedValue({} as never)
@@ -264,8 +311,12 @@ describe('Feed Ingest Worker', () => {
       vi.mocked(checkDealerSubscription).mockResolvedValue({
         isActive: true,
         status: 'ACTIVE',
-        reason: 'Active subscription',
+        expiresAt: new Date('2026-01-01'),
+        isInGracePeriod: false,
+        daysUntilExpiry: 365,
+        daysOverdue: null,
         shouldNotify: false,
+        reason: 'Active subscription',
       })
 
       const result = await checkDealerSubscription('dealer-123')
@@ -276,8 +327,12 @@ describe('Feed Ingest Worker', () => {
       vi.mocked(checkDealerSubscription).mockResolvedValue({
         isActive: false,
         status: 'EXPIRED',
-        reason: 'Subscription expired on 2025-01-01',
+        expiresAt: new Date('2025-01-01'),
+        isInGracePeriod: false,
+        daysUntilExpiry: null,
+        daysOverdue: 30,
         shouldNotify: true,
+        reason: 'Subscription expired on 2025-01-01',
       })
 
       const result = await checkDealerSubscription('dealer-123')
@@ -289,8 +344,12 @@ describe('Feed Ingest Worker', () => {
       vi.mocked(checkDealerSubscription).mockResolvedValue({
         isActive: false,
         status: 'EXPIRED',
-        reason: 'Subscription expired',
+        expiresAt: new Date('2025-01-01'),
+        isInGracePeriod: false,
+        daysUntilExpiry: null,
+        daysOverdue: 30,
         shouldNotify: true,
+        reason: 'Subscription expired',
       })
 
       const result = await checkDealerSubscription('dealer-123')
@@ -301,8 +360,12 @@ describe('Feed Ingest Worker', () => {
       vi.mocked(checkDealerSubscription).mockResolvedValue({
         isActive: true,
         status: 'ACTIVE',
-        reason: 'FOUNDING tier - lifetime access',
+        expiresAt: new Date('2026-12-31'),
+        isInGracePeriod: false,
+        daysUntilExpiry: 365,
+        daysOverdue: null,
         shouldNotify: false,
+        reason: 'FOUNDING tier - lifetime access',
       })
 
       const result = await checkDealerSubscription('dealer-123')
@@ -313,9 +376,12 @@ describe('Feed Ingest Worker', () => {
       vi.mocked(checkDealerSubscription).mockResolvedValue({
         isActive: true,
         status: 'EXPIRED',
-        reason: 'In grace period (5 days remaining)',
+        expiresAt: new Date('2025-01-01'),
+        isInGracePeriod: true,
+        daysUntilExpiry: null,
+        daysOverdue: 2,
         shouldNotify: true,
-        graceDaysRemaining: 5,
+        reason: 'In grace period (5 days remaining)',
       })
 
       const result = await checkDealerSubscription('dealer-123')
@@ -655,7 +721,11 @@ describe('Feed Ingest Worker', () => {
       const dealerSkuIds: string[] = []
 
       if (dealerSkuIds.length > 0) {
-        await dealerSkuMatchQueue.add('match-batch', { dealerSkuIds })
+        await dealerSkuMatchQueue.add('match-batch', {
+          dealerId: 'dealer-123',
+          feedRunId: 'run-789',
+          dealerSkuIds,
+        })
       }
 
       expect(dealerSkuMatchQueue.add).not.toHaveBeenCalled()

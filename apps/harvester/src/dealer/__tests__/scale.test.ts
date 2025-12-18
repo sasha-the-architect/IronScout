@@ -37,6 +37,7 @@ import {
   formatMetrics,
   type DealerTier,
   type GeneratedFeed,
+  type PerformanceMetrics,
 } from './scale-data-generator'
 import { assertValidParseResult, countErrorCode } from '../connectors/__tests__/test-utils'
 import { ERROR_CODES } from '../connectors/types'
@@ -87,7 +88,7 @@ function describeTier(tier: DealerTier): string {
 async function runParseTest(
   connector: GenericConnector | AmmoSeekConnector,
   feed: GeneratedFeed
-): Promise<{ result: Awaited<ReturnType<typeof connector.parse>>; metrics: { parseTimeMs: number; memoryUsedMb: number } }> {
+): Promise<{ result: Awaited<ReturnType<typeof connector.parse>>; metrics: PerformanceMetrics }> {
   let result: Awaited<ReturnType<typeof connector.parse>>
 
   const metrics = await measurePerformance(async () => {

@@ -447,13 +447,13 @@ export function generateDealerFeed(options: GeneratorOptions): GeneratedFeed {
     }
 
     // Determine expected classification
-    const hasValidUpc = upc && !hasInvalidUpc
+    const hasValidUpc = !!(upc && !hasInvalidUpc)
     const hasValidPrice = !hasMissingPrice && !hasInvalidPrice && basePrice > 0
     const hasValidTitle = !hasMissingTitle
 
-    const _expectedValid = hasValidUpc && hasValidPrice && hasValidTitle
-    const _expectedQuarantine = !hasValidUpc && hasValidPrice && hasValidTitle
-    const _expectedReject = !hasValidPrice || !hasValidTitle
+    const _expectedValid: boolean = hasValidUpc && hasValidPrice && hasValidTitle
+    const _expectedQuarantine: boolean = !hasValidUpc && hasValidPrice && hasValidTitle
+    const _expectedReject: boolean = !hasValidPrice || !hasValidTitle
 
     if (_expectedValid) expectedIndexable++
     else if (_expectedQuarantine) expectedQuarantine++

@@ -5,6 +5,7 @@
  * and asserting on parse results.
  */
 
+import { expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import type { FeedParseResult, ParsedRecordResult, ParsedFeedRecord } from '../types'
