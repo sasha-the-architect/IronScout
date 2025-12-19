@@ -1,18 +1,18 @@
 /**
  * Script to backfill embeddings for all products
- * 
+ *
  * Usage:
  *   npx tsx backfill-embeddings.ts
- *   
+ *
  * Environment variables:
  *   OPENAI_API_KEY - Required for generating embeddings
  *   DATABASE_URL - PostgreSQL connection string
  */
 
-import { backfillProductEmbeddings } from './src/services/ai-search/embedding-service'
-import dotenv from 'dotenv'
+// Load environment variables first, before any other imports
+import 'dotenv/config'
 
-dotenv.config()
+import { backfillProductEmbeddings } from './src/services/ai-search/embedding-service'
 
 async function main() {
   console.log('🚀 Starting embedding backfill...')

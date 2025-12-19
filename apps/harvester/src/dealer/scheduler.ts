@@ -249,6 +249,59 @@ export async function scheduleBenchmarkRecalc(fullRecalc: boolean = false): Prom
 }
 
 // ============================================================================
+// RETRY UTILITIES
+// ============================================================================
+
+/**
+ * Execute a function with exponential backoff retry
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxAttempts?: number
+    initialDelayMs?: number
+    maxDelayMs?: number
+    label?: string
+  } = {}
+): Promise<T> {
+  const {
+    maxAttempts = 5,
+    initialDelayMs = 5000,
+    maxDelayMs = 60000,
+    label = 'operation',
+  } = options
+
+  let lastError: Error | undefined
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (error) {
+      lastError = error as Error
+
+      const isConnectionError =
+        lastError.message?.includes('ECONNREFUSED') ||
+        lastError.message?.includes('connection') ||
+        (lastError as { code?: string }).code === 'ECONNREFUSED'
+
+      if (!isConnectionError || attempt === maxAttempts) {
+        throw lastError
+      }
+
+      const delayMs = Math.min(initialDelayMs * Math.pow(2, attempt - 1), maxDelayMs)
+      console.log(
+        `[Dealer Scheduler] ${label} failed (attempt ${attempt}/${maxAttempts}), ` +
+          `retrying in ${delayMs / 1000}s: ${lastError.message?.substring(0, 100)}`
+      )
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+  }
+
+  throw lastError
+}
+
+// ============================================================================
 // SCHEDULED RUNNER
 // ============================================================================
 
@@ -260,35 +313,49 @@ let benchmarkSchedulerInterval: NodeJS.Timeout | null = null
  */
 export function startDealerScheduler(): void {
   console.log('[Dealer Scheduler] Starting...')
-  
+
   // Schedule feed ingestion every 5 minutes (jobs will check individual feed schedules)
   feedSchedulerInterval = setInterval(async () => {
     try {
-      await scheduleDealerFeeds()
+      await withRetry(() => scheduleDealerFeeds(), {
+        label: 'Feed scheduling',
+        maxAttempts: 3,
+      })
     } catch (error) {
       console.error('[Dealer Scheduler] Feed scheduling error:', error)
     }
   }, 5 * 60 * 1000) // 5 minutes
-  
+
   // Schedule benchmark recalculation every 2 hours
   benchmarkSchedulerInterval = setInterval(async () => {
     try {
-      await scheduleBenchmarkRecalc(false)
+      await withRetry(() => scheduleBenchmarkRecalc(false), {
+        label: 'Benchmark scheduling',
+        maxAttempts: 3,
+      })
     } catch (error) {
       console.error('[Dealer Scheduler] Benchmark scheduling error:', error)
     }
   }, 2 * 60 * 60 * 1000) // 2 hours
-  
-  // Run initial scheduling
+
+  // Run initial scheduling with retry (connection may not be ready immediately)
   setTimeout(async () => {
     try {
-      await scheduleDealerFeeds()
-      await scheduleBenchmarkRecalc(false)
+      await withRetry(() => scheduleDealerFeeds(), {
+        label: 'Initial feed scheduling',
+        maxAttempts: 5,
+        initialDelayMs: 5000,
+      })
+      await withRetry(() => scheduleBenchmarkRecalc(false), {
+        label: 'Initial benchmark scheduling',
+        maxAttempts: 5,
+        initialDelayMs: 5000,
+      })
     } catch (error) {
-      console.error('[Dealer Scheduler] Initial scheduling error:', error)
+      console.error('[Dealer Scheduler] Initial scheduling failed after retries:', error)
     }
   }, 10000) // 10 seconds after startup
-  
+
   console.log('[Dealer Scheduler] Started')
 }
 

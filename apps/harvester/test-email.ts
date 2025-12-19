@@ -1,7 +1,7 @@
-import { Resend } from 'resend'
-import dotenv from 'dotenv'
+// Load environment variables first, before any other imports
+import 'dotenv/config'
 
-dotenv.config()
+import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM_EMAIL = process.env.FROM_EMAIL || 'alerts@ironscout.ai'

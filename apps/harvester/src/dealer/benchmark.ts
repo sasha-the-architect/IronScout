@@ -374,6 +374,13 @@ export const dealerBenchmarkWorker = new Worker(
   {
     connection: redisConnection,
     concurrency: 3,
+    settings: {
+      // Retry settings for transient failures (DB connection, network issues)
+      backoffStrategy: (attemptsMade: number) => {
+        // Exponential backoff: 5s, 15s, 45s
+        return Math.min(5000 * Math.pow(3, attemptsMade - 1), 60000)
+      },
+    },
   }
 )
 

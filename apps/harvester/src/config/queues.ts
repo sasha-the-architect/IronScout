@@ -153,7 +153,18 @@ export const dealerSkuMatchQueue = new Queue<DealerSkuMatchJobData>(
 
 export const dealerBenchmarkQueue = new Queue<DealerBenchmarkJobData>(
   QUEUE_NAMES.DEALER_BENCHMARK,
-  { connection: redisConnection }
+  {
+    connection: redisConnection,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000, // 5s, 15s, 45s
+      },
+      removeOnComplete: 100, // Keep last 100 completed jobs
+      removeOnFail: 500, // Keep last 500 failed jobs for debugging
+    },
+  }
 )
 
 export const dealerInsightQueue = new Queue<DealerInsightJobData>(

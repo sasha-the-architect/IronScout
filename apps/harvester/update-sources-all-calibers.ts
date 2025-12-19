@@ -1,3 +1,6 @@
+// Load environment variables first, before any other imports
+import 'dotenv/config'
+
 import { prisma } from '@ironscout/db'
 
 async function updateSources() {
