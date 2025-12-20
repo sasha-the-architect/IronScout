@@ -413,10 +413,11 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
       },
     })
 
-    // Queue SKU matching in batches
+    // Queue SKU matching in batches with idempotent jobIds
     if (dealerSkuIds.length > 0) {
       const BATCH_SIZE = 100
       for (let i = 0; i < dealerSkuIds.length; i += BATCH_SIZE) {
+        const batchNum = Math.floor(i / BATCH_SIZE)
         const batch = dealerSkuIds.slice(i, i + BATCH_SIZE)
         await dealerSkuMatchQueue.add(
           'match-batch',
@@ -428,6 +429,7 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
           {
             attempts: 3,
             backoff: { type: 'exponential', delay: 5000 },
+            jobId: `sku-match:${feedRunId}:${batchNum}`, // Idempotent: one match job per feedRun batch
           }
         )
       }

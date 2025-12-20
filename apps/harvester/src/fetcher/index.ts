@@ -261,6 +261,8 @@ export const fetcherWorker = new Worker<FetchJobData>(
           sourceId,
           rawItems: parsedItems,
           contentHash,
+        }, {
+          jobId: `normalize:${executionId}`, // Idempotent: one normalize per execution
         })
 
         await prisma.executionLog.create({
@@ -279,6 +281,8 @@ export const fetcherWorker = new Worker<FetchJobData>(
           content,
           sourceType: type,
           contentHash,
+        }, {
+          jobId: `extract:${executionId}`, // Idempotent: one extract per execution
         })
 
         await prisma.executionLog.create({

@@ -41,12 +41,14 @@ export const schedulerWorker = new Worker<CrawlJobData>(
         throw new Error(`Source ${sourceId} is disabled`)
       }
 
-      // Create fetch job
+      // Create fetch job with idempotent jobId (one fetch per execution)
       await fetchQueue.add('fetch', {
         sourceId: source.id,
         executionId,
         url: source.url,
         type: source.type,
+      }, {
+        jobId: `fetch:${executionId}`, // Idempotent: one fetch per execution
       })
 
       await prisma.executionLog.create({

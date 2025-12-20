@@ -63,12 +63,14 @@ export const normalizerWorker = new Worker<NormalizeJobData>(
         },
       })
 
-      // Queue write job
+      // Queue write job with idempotent jobId
       await writeQueue.add('write', {
         executionId,
         sourceId,
         normalizedItems,
         contentHash, // Pass hash to be stored after successful write
+      }, {
+        jobId: `write:${executionId}`, // Idempotent: one write per execution
       })
 
       await prisma.executionLog.create({

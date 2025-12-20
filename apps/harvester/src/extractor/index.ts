@@ -55,12 +55,14 @@ export const extractorWorker = new Worker<ExtractJobData>(
         data: { itemsFound: rawItems.length },
       })
 
-      // Queue normalization job
+      // Queue normalization job with idempotent jobId
       await normalizeQueue.add('normalize', {
         executionId,
         sourceId,
         rawItems,
         contentHash, // Pass hash to be stored after successful write
+      }, {
+        jobId: `normalize:${executionId}`, // Idempotent: one normalize per execution
       })
 
       await prisma.executionLog.create({

@@ -345,7 +345,14 @@ async function processBenchmark(job: Job<DealerBenchmarkJobData>) {
     }
   }
   
-  // Queue insight generation for affected dealers
+  // Queue insight generation for affected dealers with idempotent jobIds
+  // Use 2-hour time bucket to dedupe insights within same benchmark window
+  const insightWindow = new Date()
+  insightWindow.setMinutes(0, 0, 0)
+  const hours = Math.floor(insightWindow.getHours() / 2) * 2
+  insightWindow.setHours(hours)
+  const insightBucket = insightWindow.toISOString()
+
   for (const dealerId of dealersToNotify) {
     await dealerInsightQueue.add(
       'generate-insights',
@@ -353,8 +360,8 @@ async function processBenchmark(job: Job<DealerBenchmarkJobData>) {
       {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
-        // Dedupe by dealerId
-        jobId: `insight-${dealerId}-${Date.now()}`,
+        // Idempotent: one insight job per dealer per 2-hour window
+        jobId: `insight:${dealerId}:${insightBucket}`,
       }
     )
   }
