@@ -10,7 +10,6 @@ import {
   Lightbulb,
   BarChart3,
   Settings,
-  FileDown,
   Users,
   LogOut,
   Activity
@@ -28,7 +27,6 @@ const dealerNavigation = [
   { name: 'SKUs', href: '/skus', icon: Package },
   { name: 'Market Context', href: '/insights', icon: Lightbulb },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { name: 'Export', href: '/export', icon: FileDown },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
