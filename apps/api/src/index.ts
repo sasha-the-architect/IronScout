@@ -18,6 +18,8 @@ import { harvesterRouter } from './routes/harvester'
 import reportsRouter from './routes/reports'
 import { searchRouter } from './routes/search'
 import { authRouter } from './routes/auth'
+import { dashboardRouter } from './routes/dashboard'
+import { watchlistRouter } from './routes/watchlist'
 
 const app: Express = express()
 const PORT = process.env.PORT || 8000
@@ -64,6 +66,8 @@ app.use('/api/harvester', harvesterRouter)
 app.use('/api/reports', reportsRouter)
 app.use('/api/search', searchRouter)
 app.use('/api/auth', authRouter)
+app.use('/api/dashboard', dashboardRouter)
+app.use('/api/watchlist', watchlistRouter)
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(err.stack)

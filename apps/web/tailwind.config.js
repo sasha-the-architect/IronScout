@@ -50,6 +50,15 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Dashboard status colors - Trading Terminal Style
+        status: {
+          buy: "hsl(var(--status-buy))",
+          wait: "hsl(var(--status-wait))",
+          stable: "hsl(var(--status-stable))",
+          hot: "hsl(var(--status-hot))",
+          new: "hsl(var(--status-new))",
+          bulk: "hsl(var(--status-bulk))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

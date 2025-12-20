@@ -1,0 +1,514 @@
+import { Router, Request, Response } from 'express'
+import { z } from 'zod'
+import { prisma } from '@ironscout/db'
+import {
+  TIER_CONFIG,
+  getTierConfig,
+  getMaxMarketPulseCalibers,
+  getMaxDealsForYou,
+  hasFeature,
+  hasPriceHistoryAccess,
+  getPriceHistoryDays,
+  UserTier
+} from '../config/tiers'
+
+const router: any = Router()
+
+// ============================================================================
+// MARKET PULSE ENDPOINT
+// Returns Buy/Wait indicators for user's top calibers
+// Free: 2 calibers max, current price + 7-day arrow
+// Premium: All calibers, Buy/Wait score (1-100), charts
+// ============================================================================
+
+router.get('/pulse/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params
+
+    // Get user and their tier
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, tier: true }
+    })
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const userTier = user.tier as UserTier
+    const maxCalibers = getMaxMarketPulseCalibers(userTier)
+    const showBuyWaitScore = hasFeature(userTier, 'buyWaitScore')
+
+    // Get user's calibers from alerts and watchlist
+    const [alerts, watchlistItems] = await Promise.all([
+      prisma.alert.findMany({
+        where: { userId, isActive: true },
+        include: { product: { select: { caliber: true } } }
+      }),
+      prisma.watchlistItem.findMany({
+        where: { userId },
+        include: { product: { select: { caliber: true } } }
+      })
+    ])
+
+    // Extract unique calibers
+    const calibersSet = new Set<string>()
+    alerts.forEach(a => a.product.caliber && calibersSet.add(a.product.caliber))
+    watchlistItems.forEach(w => w.product.caliber && calibersSet.add(w.product.caliber))
+
+    // Default calibers if user has none tracked
+    if (calibersSet.size === 0) {
+      calibersSet.add('9mm')
+      calibersSet.add('.223 Rem')
+    }
+
+    let calibers = Array.from(calibersSet)
+
+    // Apply tier limit
+    if (maxCalibers !== -1 && calibers.length > maxCalibers) {
+      calibers = calibers.slice(0, maxCalibers)
+    }
+
+    // Calculate market pulse for each caliber
+    const pulseData = await Promise.all(
+      calibers.map(async caliber => {
+        // Get current average price for this caliber
+        const currentPrices = await prisma.price.findMany({
+          where: {
+            product: { caliber },
+            inStock: true
+          },
+          select: { price: true },
+          orderBy: { createdAt: 'desc' },
+          take: 50
+        })
+
+        if (currentPrices.length === 0) {
+          return {
+            caliber,
+            currentAvg: null,
+            trend: 'STABLE' as const,
+            trendPercent: 0,
+            buyWaitScore: showBuyWaitScore ? null : undefined,
+            verdict: 'STABLE' as const
+          }
+        }
+
+        const currentAvg =
+          currentPrices.reduce((sum, p) => sum + parseFloat(p.price.toString()), 0) /
+          currentPrices.length
+
+        // Get 7-day historical average for trend
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+        const historicalPrices = await prisma.price.findMany({
+          where: {
+            product: { caliber },
+            createdAt: { lt: sevenDaysAgo }
+          },
+          select: { price: true },
+          take: 50
+        })
+
+        let trend: 'UP' | 'DOWN' | 'STABLE' = 'STABLE'
+        let trendPercent = 0
+        let buyWaitScore: number | null = null
+
+        if (historicalPrices.length > 0) {
+          const historicalAvg =
+            historicalPrices.reduce((sum, p) => sum + parseFloat(p.price.toString()), 0) /
+            historicalPrices.length
+
+          trendPercent = ((currentAvg - historicalAvg) / historicalAvg) * 100
+
+          if (trendPercent < -3) {
+            trend = 'DOWN'
+          } else if (trendPercent > 3) {
+            trend = 'UP'
+          }
+
+          // Calculate Buy/Wait score (Premium only)
+          if (showBuyWaitScore) {
+            // Score: 100 = best time to buy, 0 = wait
+            // Based on how current price compares to historical
+            const ratio = currentAvg / historicalAvg
+            buyWaitScore = Math.max(0, Math.min(100, Math.round((1.5 - ratio) * 100)))
+          }
+        }
+
+        // Determine verdict
+        let verdict: 'BUY' | 'WAIT' | 'STABLE' = 'STABLE'
+        if (buyWaitScore !== null) {
+          if (buyWaitScore >= 70) verdict = 'BUY'
+          else if (buyWaitScore <= 30) verdict = 'WAIT'
+        } else {
+          // Free tier: use simple trend
+          if (trend === 'DOWN') verdict = 'BUY'
+          else if (trend === 'UP') verdict = 'WAIT'
+        }
+
+        return {
+          caliber,
+          currentAvg: Math.round(currentAvg * 100) / 100,
+          trend,
+          trendPercent: Math.round(trendPercent * 10) / 10,
+          ...(showBuyWaitScore && { buyWaitScore }),
+          verdict
+        }
+      })
+    )
+
+    res.json({
+      pulse: pulseData,
+      _meta: {
+        tier: userTier,
+        calibersShown: calibers.length,
+        calibersLimit: maxCalibers,
+        hasBuyWaitScore: showBuyWaitScore
+      }
+    })
+  } catch (error) {
+    console.error('Market pulse error:', error)
+    res.status(500).json({ error: 'Failed to fetch market pulse' })
+  }
+})
+
+// ============================================================================
+// DEALS FOR YOU ENDPOINT
+// Returns personalized deal feed based on alerts/watchlist
+// Free: 5 deals max, basic ranking
+// Premium: 20 deals, flash deals, stock indicators, better ranking
+// ============================================================================
+
+router.get('/deals/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params
+
+    // Get user and their tier
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, tier: true }
+    })
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const userTier = user.tier as UserTier
+    const maxDeals = getMaxDealsForYou(userTier)
+    const showBestValue = hasFeature(userTier, 'bestValueScore')
+    const showStockIndicators = hasFeature(userTier, 'stockIndicators')
+    const showExplanations = hasFeature(userTier, 'aiExplanations')
+
+    // Get user's calibers from alerts and watchlist for personalization
+    const [alerts, watchlistItems] = await Promise.all([
+      prisma.alert.findMany({
+        where: { userId, isActive: true },
+        include: { product: { select: { caliber: true, id: true } } }
+      }),
+      prisma.watchlistItem.findMany({
+        where: { userId },
+        include: { product: { select: { caliber: true, id: true } } }
+      })
+    ])
+
+    // Extract calibers and product IDs for personalization
+    const calibersSet = new Set<string>()
+    const watchedProductIds = new Set<string>()
+
+    alerts.forEach(a => {
+      if (a.product.caliber) calibersSet.add(a.product.caliber)
+      watchedProductIds.add(a.product.id)
+    })
+    watchlistItems.forEach(w => {
+      if (w.product.caliber) calibersSet.add(w.product.caliber)
+      watchedProductIds.add(w.product.id)
+    })
+
+    const calibers = Array.from(calibersSet)
+
+    // Build where clause - prioritize user's calibers if they have any
+    const whereClause: any = {
+      inStock: true
+    }
+
+    if (calibers.length > 0) {
+      whereClause.product = { caliber: { in: calibers } }
+    }
+
+    // Get deals with best prices
+    const prices = await prisma.price.findMany({
+      where: whereClause,
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            caliber: true,
+            brand: true,
+            imageUrl: true,
+            roundCount: true,
+            grainWeight: true
+          }
+        },
+        retailer: {
+          select: {
+            id: true,
+            name: true,
+            tier: true,
+            logoUrl: true
+          }
+        }
+      },
+      orderBy: [{ retailer: { tier: 'desc' } }, { price: 'asc' }],
+      take: maxDeals * 2 // Fetch extra for deduplication
+    })
+
+    // Deduplicate by product (keep best price per product)
+    const seenProducts = new Set<string>()
+    const deals = prices
+      .filter(p => {
+        if (seenProducts.has(p.productId)) return false
+        seenProducts.add(p.productId)
+        return true
+      })
+      .slice(0, maxDeals)
+      .map(price => {
+        const pricePerRound =
+          price.product.roundCount && price.product.roundCount > 0
+            ? parseFloat(price.price.toString()) / price.product.roundCount
+            : null
+
+        const deal: any = {
+          id: price.id,
+          product: price.product,
+          retailer: price.retailer,
+          price: parseFloat(price.price.toString()),
+          pricePerRound: pricePerRound ? Math.round(pricePerRound * 1000) / 1000 : null,
+          url: price.url,
+          inStock: price.inStock,
+          isWatched: watchedProductIds.has(price.productId)
+        }
+
+        // Premium features
+        if (showBestValue) {
+          // Simplified Best Value score (in production, use ai-search service)
+          deal.bestValueScore = Math.floor(Math.random() * 30) + 70 // Placeholder
+        }
+
+        if (showExplanations && deal.isWatched) {
+          deal.explanation = 'Matches your watchlist preferences'
+        }
+
+        return deal
+      })
+
+    res.json({
+      deals,
+      _meta: {
+        tier: userTier,
+        dealsShown: deals.length,
+        dealsLimit: maxDeals,
+        personalized: calibers.length > 0,
+        calibersUsed: calibers
+      }
+    })
+  } catch (error) {
+    console.error('Deals for you error:', error)
+    res.status(500).json({ error: 'Failed to fetch deals' })
+  }
+})
+
+// ============================================================================
+// SAVINGS ENDPOINT
+// Returns savings tracking data
+// Free: Potential savings only
+// Premium: Verified savings with attribution
+// ============================================================================
+
+router.get('/savings/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params
+
+    // Get user and their tier
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, tier: true }
+    })
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const userTier = user.tier as UserTier
+    const showVerifiedSavings = hasFeature(userTier, 'verifiedSavings')
+
+    // Get user's alerts with target prices
+    const alerts = await prisma.alert.findMany({
+      where: { userId },
+      include: {
+        product: {
+          include: {
+            prices: {
+              where: { inStock: true },
+              orderBy: { price: 'asc' },
+              take: 1
+            }
+          }
+        }
+      }
+    })
+
+    // Calculate potential savings
+    let potentialSavings = 0
+    const savingsBreakdown: any[] = []
+
+    for (const alert of alerts) {
+      if (alert.targetPrice && alert.product.prices.length > 0) {
+        const currentPrice = parseFloat(alert.product.prices[0].price.toString())
+        const targetPrice = parseFloat(alert.targetPrice.toString())
+
+        if (currentPrice < targetPrice) {
+          const savings = targetPrice - currentPrice
+          potentialSavings += savings
+          savingsBreakdown.push({
+            productId: alert.productId,
+            productName: alert.product.name,
+            targetPrice,
+            currentPrice,
+            savings: Math.round(savings * 100) / 100
+          })
+        }
+      }
+    }
+
+    const response: any = {
+      potentialSavings: Math.round(potentialSavings * 100) / 100,
+      breakdown: savingsBreakdown,
+      alertsWithSavings: savingsBreakdown.length,
+      totalAlerts: alerts.length
+    }
+
+    // Premium: Add verified savings (placeholder - needs purchase tracking)
+    if (showVerifiedSavings) {
+      response.verifiedSavings = {
+        thisMonth: 0,
+        allTime: 0,
+        purchaseCount: 0,
+        message: 'Purchase tracking coming soon'
+      }
+    }
+
+    res.json({
+      savings: response,
+      _meta: {
+        tier: userTier,
+        hasVerifiedSavings: showVerifiedSavings
+      }
+    })
+  } catch (error) {
+    console.error('Savings error:', error)
+    res.status(500).json({ error: 'Failed to fetch savings' })
+  }
+})
+
+// ============================================================================
+// PRICE HISTORY ENDPOINT
+// Returns price history for a caliber
+// Free: Blocked (returns upgrade CTA)
+// Premium: 30/90/365 day charts
+// ============================================================================
+
+const priceHistorySchema = z.object({
+  days: z.coerce.number().int().min(7).max(365).default(30)
+})
+
+router.get('/price-history/:userId/:caliber', async (req: Request, res: Response) => {
+  try {
+    const { userId, caliber } = req.params
+    const { days } = priceHistorySchema.parse(req.query)
+
+    // Get user and their tier
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, tier: true }
+    })
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const userTier = user.tier as UserTier
+
+    // Check if user has access to price history
+    if (!hasPriceHistoryAccess(userTier)) {
+      return res.status(403).json({
+        error: 'Price history is a Premium feature',
+        message: 'Upgrade to Premium to view price history charts',
+        upgradeUrl: '/pricing',
+        tier: userTier
+      })
+    }
+
+    // Enforce tier-based history limit
+    const maxDays = getPriceHistoryDays(userTier)
+    const effectiveDays = Math.min(days, maxDays)
+
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - effectiveDays)
+
+    // Get price history aggregated by day
+    const prices = await prisma.price.findMany({
+      where: {
+        product: { caliber: decodeURIComponent(caliber) },
+        createdAt: { gte: startDate }
+      },
+      select: {
+        price: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: 'asc' }
+    })
+
+    // Aggregate by day
+    const dailyData: Record<string, { prices: number[]; date: string }> = {}
+
+    for (const price of prices) {
+      const dateKey = price.createdAt.toISOString().split('T')[0]
+      if (!dailyData[dateKey]) {
+        dailyData[dateKey] = { prices: [], date: dateKey }
+      }
+      dailyData[dateKey].prices.push(parseFloat(price.toString()))
+    }
+
+    // Calculate daily averages
+    const history = Object.values(dailyData).map(day => ({
+      date: day.date,
+      avgPrice: Math.round((day.prices.reduce((a, b) => a + b, 0) / day.prices.length) * 100) / 100,
+      minPrice: Math.round(Math.min(...day.prices) * 100) / 100,
+      maxPrice: Math.round(Math.max(...day.prices) * 100) / 100,
+      dataPoints: day.prices.length
+    }))
+
+    res.json({
+      caliber: decodeURIComponent(caliber),
+      days: effectiveDays,
+      history,
+      _meta: {
+        tier: userTier,
+        requestedDays: days,
+        effectiveDays,
+        maxDaysAllowed: maxDays
+      }
+    })
+  } catch (error) {
+    console.error('Price history error:', error)
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid parameters', details: error.errors })
+    }
+    res.status(500).json({ error: 'Failed to fetch price history' })
+  }
+})
+
+export { router as dashboardRouter }

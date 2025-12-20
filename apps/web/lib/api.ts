@@ -633,3 +633,184 @@ export const BADGE_CONFIG: Record<PerformanceBadge, { label: string; color: stri
   'frangible': { label: 'Frangible', color: 'bg-lime-100 text-lime-800 dark:bg-lime-900/50 dark:text-lime-300' },
   'lead-free': { label: 'Lead Free', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300' },
 }
+
+// ============================================
+// Dashboard API - Trading Terminal
+// ============================================
+
+import type {
+  MarketPulseResponse,
+  DealsResponse,
+  SavingsResponse,
+  WatchlistResponse,
+  PriceHistoryResponse,
+} from '@/types/dashboard'
+
+/**
+ * Get Market Pulse data for user's calibers
+ * Free: 2 calibers max, trend only
+ * Premium: Unlimited calibers, Buy/Wait score
+ */
+export async function getMarketPulse(userId: string): Promise<MarketPulseResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/dashboard/pulse/${userId}`)
+  if (!response.ok) {
+    throw new Error('Failed to fetch market pulse')
+  }
+  return response.json()
+}
+
+/**
+ * Get personalized deals feed
+ * Free: 5 deals max
+ * Premium: 20 deals + explanations
+ */
+export async function getDealsForYou(userId: string): Promise<DealsResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/dashboard/deals/${userId}`)
+  if (!response.ok) {
+    throw new Error('Failed to fetch deals')
+  }
+  return response.json()
+}
+
+/**
+ * Get savings tracking data
+ * Free: Potential savings only
+ * Premium: Verified savings with attribution
+ */
+export async function getSavings(userId: string): Promise<SavingsResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/dashboard/savings/${userId}`)
+  if (!response.ok) {
+    throw new Error('Failed to fetch savings')
+  }
+  return response.json()
+}
+
+/**
+ * Get price history for a caliber (Premium only)
+ */
+export async function getCaliberPriceHistory(
+  userId: string,
+  caliber: string,
+  days: number = 30
+): Promise<PriceHistoryResponse> {
+  const params = new URLSearchParams({ days: days.toString() })
+  const response = await fetch(
+    `${API_BASE_URL}/api/dashboard/price-history/${userId}/${encodeURIComponent(caliber)}?${params}`
+  )
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to fetch price history')
+  }
+  return response.json()
+}
+
+// ============================================
+// Watchlist API
+// ============================================
+
+/**
+ * Get user's watchlist
+ * Free: 5 items max, no collections
+ * Premium: Unlimited items, collections
+ */
+export async function getWatchlist(userId: string): Promise<WatchlistResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/watchlist/${userId}`)
+  if (!response.ok) {
+    throw new Error('Failed to fetch watchlist')
+  }
+  return response.json()
+}
+
+/**
+ * Add item to watchlist
+ */
+export async function addToWatchlist(
+  userId: string,
+  productId: string,
+  targetPrice?: number,
+  collectionId?: string
+): Promise<{ item: any; _meta: any }> {
+  const response = await fetch(`${API_BASE_URL}/api/watchlist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, productId, targetPrice, collectionId }),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to add to watchlist')
+  }
+  return response.json()
+}
+
+/**
+ * Update watchlist item
+ */
+export async function updateWatchlistItem(
+  id: string,
+  updates: { targetPrice?: number | null; collectionId?: string | null }
+): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/api/watchlist/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to update watchlist item')
+  }
+  return response.json()
+}
+
+/**
+ * Remove item from watchlist
+ */
+export async function removeFromWatchlist(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/watchlist/${id}`, {
+    method: 'DELETE',
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to remove from watchlist')
+  }
+}
+
+/**
+ * Get user's watchlist collections (Premium only)
+ */
+export async function getWatchlistCollections(userId: string): Promise<{ collections: any[] }> {
+  const response = await fetch(`${API_BASE_URL}/api/watchlist/${userId}/collections`)
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to fetch collections')
+  }
+  return response.json()
+}
+
+/**
+ * Create watchlist collection (Premium only)
+ */
+export async function createWatchlistCollection(userId: string, name: string): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/api/watchlist/collections`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, name }),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to create collection')
+  }
+  return response.json()
+}
+
+/**
+ * Delete watchlist collection (Premium only)
+ */
+export async function deleteWatchlistCollection(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/watchlist/collections/${id}`, {
+    method: 'DELETE',
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to delete collection')
+  }
+}

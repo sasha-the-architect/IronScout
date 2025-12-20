@@ -8,9 +8,109 @@ This document tracks what we offer to dealers at each subscription tier, impleme
 
 | Tier | Price | Target Customer |
 |------|-------|-----------------|
+| **STARTER** | $0/month + $0.08/click | New/small dealers wanting low-risk entry |
 | **STANDARD** | $99/month | Small to mid-size dealers wanting market visibility |
 | **PRO** | $299/month | Dealers needing deep market insight for pricing decisions |
 | **FOUNDING** | Free (1 year) | Early adopters - PRO features, converts to PRO after year 1 |
+
+---
+
+## STARTER Tier - Pay-Per-Click
+
+### Target Customer
+New or small dealers who want to test the waters without a monthly commitment. Ideal for dealers with unpredictable traffic or those evaluating IronScout before upgrading.
+
+### Pricing Model
+
+| Fee Type | Amount | Notes |
+|----------|--------|-------|
+| Monthly subscription | $0 | No fixed monthly cost |
+| Per-click fee | $0.08 | Per unique click to dealer site |
+| Setup fee | $0 | No setup fee (competitive advantage vs AmmoBuy) |
+| Minimum monthly spend | $0 | No minimums |
+
+**Billing**: Clicks tracked daily, invoiced monthly via Stripe. Prepaid credit option available.
+
+### Features
+
+| Feature | Description | Implementation Status | Notes |
+|---------|-------------|----------------------|-------|
+| **Product listing inclusion** | Dealer SKUs appear on IronScout.ai consumer search | _[STATUS?]_ | Core value prop |
+| **Dealer feed ingestion** | Automated import of dealer product feeds (CSV/XML/JSON) | Implemented | Same as paid tiers |
+| **SKU matching** | Match dealer SKUs to canonical products | Implemented | Same as paid tiers |
+| **Basic click analytics** | View clicks by day/week/month | _[STATUS?]_ | Simple dashboard |
+| **Self-service portal** | Manage feed, view clicks, update billing | _[STATUS?]_ | Subset of full portal |
+| **Email support** | Support via email | Operational | Standard response time |
+
+### NOT Included (Upgrade to STANDARD)
+
+| Feature | Why Not Included |
+|---------|------------------|
+| Market price benchmarks | Premium insight feature |
+| Pricing insights | Premium insight feature |
+| Email alerts | Premium engagement feature |
+| Monthly performance reports | Premium analytics feature |
+| Historical data | Premium data retention |
+
+### Click Tracking & Billing
+
+**What counts as a click?**
+- Unique click = one user clicking to dealer site per product per 24-hour period
+- Same user clicking same product multiple times in 24h = 1 click
+- Same user clicking different products = multiple clicks
+- Bot traffic filtered out (user-agent, rate limiting, IP patterns)
+
+**Click tracking implementation:**
+```
+User clicks "Buy" → ClickEvent logged → Redirect to dealer URL
+                         ↓
+              Daily aggregation job
+                         ↓
+              Monthly invoice generation
+```
+
+**Fraud prevention:**
+- Rate limiting per IP
+- Bot detection (user-agent filtering)
+- Suspicious pattern detection
+- Manual review for anomalies
+- Dealer can dispute charges within 30 days
+
+### Upgrade Path
+
+| Scenario | Recommendation |
+|----------|----------------|
+| Dealer reaches ~1,000 clicks/month | Suggest STANDARD ($99 = better value) |
+| Dealer wants market insights | Upgrade to STANDARD |
+| Dealer wants historical data/API | Upgrade to PRO |
+
+**Upgrade incentives:**
+- First month of STANDARD at 50% off when upgrading from STARTER
+- Click credits from current month applied to first subscription payment
+
+### Open Questions - STARTER
+
+1. **Click billing mechanics**:
+   - Prepaid credits vs post-paid invoicing?
+   - Minimum invoice threshold (e.g., $5 minimum)?
+   - What happens if payment fails?
+
+2. **Portal access**:
+   - Full portal access or limited dashboard?
+   - Can they see benchmarks but not detailed insights?
+
+3. **Feed refresh frequency**:
+   - Same as STANDARD (daily) or less frequent (weekly)?
+   - Lower frequency = lower operational cost for us
+
+4. **Conversion to paid**:
+   - Auto-suggest upgrade at click thresholds?
+   - Trial of STANDARD features to encourage upgrade?
+
+5. **Competitive positioning**:
+   - AmmoBuy charges $89.99 setup + $0.08/click
+   - We charge $0 setup + $0.08/click = better deal
+   - Should we undercut on per-click too ($0.06)?
 
 ---
 
@@ -245,36 +345,44 @@ Dealer Upload/URL → DealerFeedIngest → Parse & Validate → DealerSkuMatch �
 
 ## Feature Comparison Matrix
 
-| Feature | STANDARD | PRO | FOUNDING |
-|---------|----------|-----|----------|
-| **Product Listing** | | | |
-| SKUs on IronScout.ai | Yes | Yes | Yes |
-| **Feed Management** | | | |
-| Feed ingestion | Yes | Yes | Yes |
-| SKU matching | Yes | Yes | Yes |
-| Feed refresh frequency | Daily? | Hourly? | Hourly? |
-| **Benchmarks** | | | |
-| Caliber-level benchmarks | Yes | Yes | Yes |
-| Brand-level benchmarks | No | Yes | Yes |
-| Bullet type benchmarks | No | Yes | Yes |
-| **Insights** | | | |
-| Basic price insights | Yes | Yes | Yes |
-| SKU-level comparisons | No | Yes | Yes |
-| Actionable recommendations | No | Yes | Yes |
-| **Historical Data** | | | |
-| Price history access | 30 days? | 365 days? | 365 days? |
-| Trend charts | No | Yes | Yes |
-| **Alerts** | | | |
-| Subscription alerts | Yes | Yes | Yes |
-| Market price alerts | Basic | Advanced | Advanced |
-| **Reporting** | | | |
-| Monthly reports | Basic | Detailed | Detailed |
-| Export capabilities | No | Yes | Yes |
-| **API** | | | |
-| API access | No | Yes | Yes |
-| **Support** | | | |
-| Email support | Yes | Yes | Yes |
-| Phone support | No | Yes | Yes |
+| Feature | STARTER | STANDARD | PRO | FOUNDING |
+|---------|---------|----------|-----|----------|
+| **Pricing** | | | | |
+| Monthly fee | $0 | $99 | $299 | $0 (1 yr) |
+| Per-click fee | $0.08 | $0 | $0 | $0 |
+| Setup fee | $0 | $0 | $0 | $0 |
+| **Product Listing** | | | | |
+| SKUs on IronScout.ai | Yes | Yes | Yes | Yes |
+| **Feed Management** | | | | |
+| Feed ingestion | Yes | Yes | Yes | Yes |
+| SKU matching | Yes | Yes | Yes | Yes |
+| Feed refresh frequency | Weekly? | Daily | 4 hours | 4 hours |
+| **Analytics** | | | | |
+| Click tracking | Yes | Yes | Yes | Yes |
+| Basic click analytics | Yes | Yes | Yes | Yes |
+| Conversion tracking | No | Yes | Yes | Yes |
+| **Benchmarks** | | | | |
+| Caliber-level benchmarks | No | Yes | Yes | Yes |
+| Brand-level benchmarks | No | No | Yes | Yes |
+| Bullet type benchmarks | No | No | Yes | Yes |
+| **Insights** | | | | |
+| Basic price insights | No | Yes | Yes | Yes |
+| SKU-level comparisons | No | No | Yes | Yes |
+| Actionable recommendations | No | No | Yes | Yes |
+| **Historical Data** | | | | |
+| Price history access | None | 30 days | 365 days | 365 days |
+| Trend charts | No | No | Yes | Yes |
+| **Alerts** | | | | |
+| Subscription alerts | N/A | Yes | Yes | Yes |
+| Market price alerts | No | Basic | Advanced | Advanced |
+| **Reporting** | | | | |
+| Monthly reports | No | Basic | Detailed | Detailed |
+| Export capabilities | No | No | Yes | Yes |
+| **API** | | | | |
+| API access | No | No | Yes | Yes |
+| **Support** | | | | |
+| Email support | Yes | Yes | Yes | Yes |
+| Phone support | No | No | Yes | Yes |
 
 ---
 
@@ -286,6 +394,7 @@ Dealer Upload/URL → DealerFeedIngest → Parse & Validate → DealerSkuMatch �
 
 | Tier | Proposed Interval |
 |------|-------------------|
+| STARTER | Once weekly |
 | STANDARD | Once daily |
 | PRO | Every 4 hours |
 
@@ -299,6 +408,7 @@ Dealer Upload/URL → DealerFeedIngest → Parse & Validate → DealerSkuMatch �
 
 | Tier | Proposed History |
 |------|------------------|
+| STARTER | None (current only) |
 | STANDARD | 30 days |
 | PRO | 365 days |
 
@@ -338,11 +448,19 @@ Dealer Upload/URL → DealerFeedIngest → Parse & Validate → DealerSkuMatch �
 |------|----------|-----------|
 | 2024-12-14 | STANDARD $99/mo, PRO $299/mo | Two tiers based on market insight depth |
 | 2024-12-14 | FOUNDING = 1 year free PRO | Incentivize early adoption, converts to paid |
+| 2024-12-19 | STARTER tier $0 + $0.08/click | Compete with AmmoBuy, low barrier entry for small dealers |
 | | | |
 
 ---
 
 ## Implementation Priorities
+
+### Phase 0 - STARTER Tier (Low Barrier Entry)
+1. Click tracking and billing infrastructure
+2. Stripe usage-based billing integration
+3. STARTER-specific portal dashboard (clicks only)
+4. Fraud prevention (rate limiting, bot detection)
+5. Monthly click invoice generation
 
 ### Phase 1 - Core Value (MVP)
 1. Feed ingestion and SKU matching
@@ -365,4 +483,159 @@ Dealer Upload/URL → DealerFeedIngest → Parse & Validate → DealerSkuMatch �
 
 ---
 
-*Last updated: December 14, 2024*
+## Schema Changes Required
+
+### STARTER Tier Support
+
+The `DealerTier` enum needs to be updated to support STARTER:
+
+```prisma
+enum DealerTier {
+  STARTER     // Pay-per-click, no monthly fee
+  STANDARD    // $99/mo - basic features
+  PRO         // $299/mo - full features
+  FOUNDING    // PRO features free for 1 year
+}
+```
+
+### Click Billing Fields
+
+Add fields to `Dealer` model for usage-based billing:
+
+```prisma
+model Dealer {
+  // ... existing fields ...
+
+  // STARTER tier billing
+  clickBalance        Int       @default(0)    // Prepaid click credits (if using prepaid model)
+  monthlyClickCount   Int       @default(0)    // Clicks this billing period
+  lastClickReset      DateTime?               // When click count was last reset
+  stripeMeteredSubId  String?                 // Stripe metered subscription ID (for usage billing)
+}
+```
+
+### Click Aggregation Table (Optional)
+
+For billing accuracy and dispute resolution:
+
+```prisma
+model DealerClickSummary {
+  id          String   @id @default(cuid())
+  dealerId    String
+  dealer      Dealer   @relation(fields: [dealerId], references: [id])
+  periodStart DateTime
+  periodEnd   DateTime
+  totalClicks Int
+  uniqueClicks Int     // Deduplicated clicks
+  invoiceId   String?  // Stripe invoice ID
+  invoicedAt  DateTime?
+
+  @@unique([dealerId, periodStart])
+}
+```
+
+---
+
+## Competitive Analysis
+
+### AmmoBuy (ammobuy.com)
+
+**Source**: https://www.ammobuy.com/listing (December 2025)
+
+**Pricing Model**: Setup fee + per-click
+
+| Fee Type | Amount | Notes |
+|----------|--------|-------|
+| One-time setup fee | $89.99 | Covers feed integration |
+| Per-click fee | $0.08 | Per unique click to dealer site |
+
+**Feed Requirements**:
+- XML feed preferred
+- Required fields: product description, URL, manufacturer, caliber, casing, grain, projectile type, price, quantity, availability
+- Optional fields: velocity (fps), shotgun specs (shot size, shell length), thumbnail image
+- Can work with non-standard feeds
+
+**Fee Reduction Options**:
+- Join affiliate networks (e.g., AvantLink) offering sales commissions
+- Purchase advertising slots on platform
+
+**Analysis**:
+- Pure pay-per-click model with no monthly subscription
+- Low barrier to entry ($89.99 one-time)
+- Cost scales with traffic/success
+- No market insights, benchmarking, or analytics included
+- Dealer gets listing only, not business intelligence
+
+**IronScout Differentiation**:
+| Capability | AmmoBuy | IronScout |
+|------------|---------|-----------|
+| Product listing | Yes | Yes |
+| Feed ingestion | XML only | CSV, XML, JSON |
+| Pricing model | Setup + per-click | Monthly subscription |
+| Market benchmarks | No | Yes (STANDARD+) |
+| Pricing insights | No | Yes (STANDARD+) |
+| SKU-level comparisons | No | Yes (PRO) |
+| Historical data | No | Yes (PRO) |
+| API access | No | Yes (PRO) |
+| Business intelligence | No | Yes |
+
+**Pricing Comparison** (estimated monthly cost):
+
+| Monthly Clicks | AmmoBuy Cost | IronScout STANDARD | IronScout PRO |
+|----------------|--------------|--------------------| --------------|
+| 500 | $40 + setup* | $99 | $299 |
+| 1,000 | $80 + setup* | $99 | $299 |
+| 2,500 | $200 + setup* | $99 | $299 |
+| 5,000 | $400 + setup* | $99 | $299 |
+| 10,000 | $800 + setup* | $99 | $299 |
+
+*$89.99 setup fee applies to month 1 only
+
+**Breakeven Analysis**:
+- IronScout STANDARD ($99/mo) breaks even vs AmmoBuy at ~1,240 clicks/month
+- IronScout PRO ($299/mo) breaks even vs AmmoBuy at ~3,740 clicks/month
+- High-traffic dealers save significantly with IronScout flat-rate pricing
+- Low-traffic dealers may prefer AmmoBuy's pay-per-click model
+
+**Strategic Implications**:
+1. Our flat-rate model is more attractive for established dealers with consistent traffic
+2. Consider a lower-tier or pay-per-click option for small/new dealers
+3. Our value prop must emphasize business intelligence (benchmarks, insights, API) that AmmoBuy lacks
+4. The $89.99 setup fee validates that dealers expect some onboarding cost
+
+---
+
+### AmmoSeek (ammoseek.com)
+
+**Status**: Research needed
+
+**Known Info**:
+- Major competitor in consumer ammo search
+- Dealer listing options available
+- Pricing model: _[TO BE RESEARCHED]_
+
+---
+
+### WikiArms (wikiarms.com)
+
+**Status**: Research needed
+
+**Known Info**:
+- Consumer ammo price comparison
+- Dealer listing options: _[TO BE RESEARCHED]_
+- Pricing model: _[TO BE RESEARCHED]_
+
+---
+
+### Gun.Deals (gun.deals)
+
+**Status**: Research needed
+
+**Known Info**:
+- Broader firearms deals aggregator
+- Includes ammunition
+- Dealer listing options: _[TO BE RESEARCHED]_
+
+---
+
+*Last updated: December 2025*

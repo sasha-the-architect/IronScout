@@ -1,7 +1,7 @@
 Devin Prompt v4: Responsive UI, MVP Architecture with Ads & Future-Ready DaaS
 
 Project Goal:
-Create the foundational architecture and code stubs for a new, AI-native web application, codenamed "ZeroedIn". The Minimum Viable Product (MVP) will feature a modern, fully responsive user interface and a multi-faceted monetization strategy. The architecture must also include non-functional stubs for a future Data as a Service (DaaS) platform.
+Create the foundational architecture and code stubs for a new, AI-native web application, codenamed "IronScout". The Minimum Viable Product (MVP) will feature a modern, fully responsive user interface and a multi-faceted monetization strategy. The architecture must also include non-functional stubs for a future Data as a Service (DaaS) platform.
 
 Core Concept:
 The platform will be a proactive, personalized purchasing assistant. The MVP monetization strategy will be based on user subscriptions, prioritized dealer subscriptions, affiliate link revenue, and display advertising. The platform must provide a seamless user experience on all modern devices, from phones to desktops.

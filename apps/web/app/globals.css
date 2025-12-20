@@ -90,6 +90,14 @@
 
     /* Ring - Tactical Cyan */
     --ring: 183 100% 40%;
+
+    /* Dashboard Status Colors - Trading Terminal Style */
+    --status-buy: 142 76% 36%;       /* Green #22c55e - BUY NOW */
+    --status-wait: 38 92% 50%;       /* Amber #f59e0b - WAIT */
+    --status-stable: 209 16% 60%;    /* Neutral gray - STABLE */
+    --status-hot: 0 84% 60%;         /* Red/Orange - HOT DEAL */
+    --status-new: 183 100% 40%;      /* Cyan - NEW LOW */
+    --status-bulk: 262 83% 58%;      /* Purple - BULK VALUE */
   }
 }
 
