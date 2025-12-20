@@ -52,7 +52,7 @@ const PLANS = [
     priceId: 'STRIPE_PRICE_ID_DEALER_PRO_MONTHLY',
     features: [
       'Everything in Standard',
-      'Competitive pricing intelligence',
+      'Market pricing context',
       'API access',
       'Priority support',
       'Custom analytics',

@@ -80,9 +80,9 @@ export default async function InsightsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Pricing Insights</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Market Context</h1>
         <p className="mt-1 text-sm text-gray-500">
-          AI-powered recommendations to optimize your pricing strategy
+          See how your pricing compares to the broader market
         </p>
       </div>
 
@@ -146,8 +146,8 @@ export default async function InsightsPage() {
           <div className="ml-3">
             <h3 className="text-sm font-medium text-blue-800">Your data, your decisions</h3>
             <p className="mt-1 text-sm text-blue-700">
-              These are recommendations only. IronScout never changes your prices or shares your exact pricing with competitors.
-              All insights are based on anonymous market data.
+              This is market context only. IronScout never changes your prices or shares your exact pricing with competitors.
+              All data is based on anonymous market aggregates.
             </p>
           </div>
         </div>

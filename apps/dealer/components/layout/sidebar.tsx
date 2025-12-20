@@ -26,7 +26,7 @@ const dealerNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Feed Setup', href: '/feed', icon: Rss },
   { name: 'SKUs', href: '/skus', icon: Package },
-  { name: 'Insights', href: '/insights', icon: Lightbulb },
+  { name: 'Market Context', href: '/insights', icon: Lightbulb },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Export', href: '/export', icon: FileDown },
   { name: 'Settings', href: '/settings', icon: Settings },
