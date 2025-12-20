@@ -118,8 +118,8 @@ export function checkSubscriptionStatus(
         (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       );
 
-      // Warn if expiring soon (within 7 days)
-      if (daysUntilExpiry <= 7) {
+      // Warn if expiring soon (within 30 days per subscription-management.md)
+      if (daysUntilExpiry <= 30) {
         return {
           accessLevel: 'full',
           isExpired: false,

@@ -1,14 +1,15 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@ironscout/db';
-import { 
-  Package, 
-  TrendingUp, 
-  AlertTriangle, 
+import {
+  Package,
+  TrendingUp,
+  AlertTriangle,
   CheckCircle,
   Rss,
   Clock
 } from 'lucide-react';
+import { PlanSummary } from '@/components/plan-summary';
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -226,6 +227,9 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Plan Summary */}
+      <PlanSummary tier={session.tier} />
     </div>
   );
 }
