@@ -301,6 +301,7 @@ export const writerWorker = new Worker<WriteJobData>(
   'write',
   async (job: Job<WriteJobData>) => {
     const { executionId, sourceId, normalizedItems, contentHash } = job.data
+    const stageStart = Date.now()
     const totalItems = normalizedItems.length
     const batchCount = Math.ceil(totalItems / BATCH_SIZE)
 
@@ -381,19 +382,25 @@ export const writerWorker = new Worker<WriteJobData>(
       }
 
       // Summary log (single entry for entire write operation)
+      const writeDurationMs = Date.now() - stageStart
+
       await prisma.executionLog.create({
         data: {
           executionId,
           level: 'INFO',
           event: 'WRITE_OK',
-          message: `Write complete: ${totalUpserted} prices updated, ${allPriceChanges.length} price changes, ${allErrors.length} errors`,
+          message: `Write complete: ${totalUpserted} prices updated, ${allPriceChanges.length} price changes`,
           metadata: {
-            totalItems,
-            upsertedCount: totalUpserted,
-            priceChangesCount: allPriceChanges.length,
-            errorCount: allErrors.length,
+            // Timing
+            durationMs: writeDurationMs,
+            // Counters
+            itemsInput: totalItems,
+            itemsUpserted: totalUpserted,
+            priceChanges: allPriceChanges.length,
+            errors: allErrors.length,
             batchCount,
-            duration,
+            // Context
+            sourceId,
             contentHashUpdated: !!contentHash,
           },
         },

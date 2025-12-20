@@ -58,6 +58,7 @@ export const fetcherWorker = new Worker<FetchJobData>(
   'fetch',
   async (job: Job<FetchJobData>) => {
     const { sourceId, executionId, url, type } = job.data
+    const stageStart = Date.now()
 
     console.log(`[Fetcher] Fetching ${url}`)
 
@@ -79,6 +80,13 @@ export const fetcherWorker = new Worker<FetchJobData>(
           level: 'INFO',
           event: 'FETCH_START',
           message: `Fetching ${url}${paginationConfig?.type !== 'none' ? ' (with pagination)' : ''}`,
+          metadata: {
+            sourceId,
+            url,
+            type,
+            hasPagination: paginationConfig?.type !== 'none',
+            maxPages: paginationConfig?.maxPages || HARD_MAX_PAGES,
+          },
         },
       })
 
@@ -205,16 +213,24 @@ export const fetcherWorker = new Worker<FetchJobData>(
         content = safeJsonStringify(allContent)
       }
 
+      const fetchDurationMs = Date.now() - stageStart
+
       await prisma.executionLog.create({
         data: {
           executionId,
           level: 'INFO',
           event: 'FETCH_OK',
-          message: `Successfully fetched ${pagesFetched} page(s) (${content.length} bytes total)`,
+          message: `Fetched ${pagesFetched} page(s), ${allContent.length} items (${content.length} bytes)`,
           metadata: {
-            contentLength: content.length,
+            // Timing
+            durationMs: fetchDurationMs,
+            // Counters
             pagesFetched,
-            itemsCollected: allContent.length
+            itemsCollected: allContent.length,
+            contentBytes: content.length,
+            // Context
+            sourceId,
+            type,
           },
         },
       })

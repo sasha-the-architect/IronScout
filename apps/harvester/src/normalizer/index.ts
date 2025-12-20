@@ -9,6 +9,7 @@ export const normalizerWorker = new Worker<NormalizeJobData>(
   'normalize',
   async (job: Job<NormalizeJobData>) => {
     const { executionId, sourceId, rawItems, contentHash } = job.data
+    const stageStart = Date.now()
 
     console.log(`[Normalizer] Normalizing ${rawItems.length} items`)
 
@@ -19,6 +20,10 @@ export const normalizerWorker = new Worker<NormalizeJobData>(
           level: 'INFO',
           event: 'NORMALIZE_START',
           message: `Starting normalization of ${rawItems.length} items`,
+          metadata: {
+            sourceId,
+            itemCount: rawItems.length,
+          },
         },
       })
 
@@ -53,13 +58,25 @@ export const normalizerWorker = new Worker<NormalizeJobData>(
         }
       }
 
+      const normalizeDurationMs = Date.now() - stageStart
+      const skippedCount = rawItems.length - normalizedItems.length
+
       await prisma.executionLog.create({
         data: {
           executionId,
           level: 'INFO',
           event: 'NORMALIZE_OK',
           message: `Normalized ${normalizedItems.length}/${rawItems.length} items`,
-          metadata: { normalizedCount: normalizedItems.length },
+          metadata: {
+            // Timing
+            durationMs: normalizeDurationMs,
+            // Counters
+            itemsInput: rawItems.length,
+            itemsNormalized: normalizedItems.length,
+            itemsSkipped: skippedCount,
+            // Context
+            sourceId,
+          },
         },
       })
 

@@ -9,6 +9,8 @@ export const extractorWorker = new Worker<ExtractJobData>(
   'extract',
   async (job: Job<ExtractJobData>) => {
     const { executionId, sourceId, content, sourceType, contentHash } = job.data
+    const stageStart = Date.now()
+    const contentBytes = typeof content === 'string' ? content.length : JSON.stringify(content).length
 
     console.log(`[Extractor] Extracting data for execution ${executionId}`)
 
@@ -19,6 +21,11 @@ export const extractorWorker = new Worker<ExtractJobData>(
           level: 'INFO',
           event: 'EXTRACT_START',
           message: `Starting extraction for ${sourceType} content`,
+          metadata: {
+            sourceId,
+            sourceType,
+            contentBytes,
+          },
         },
       })
 
@@ -39,13 +46,24 @@ export const extractorWorker = new Worker<ExtractJobData>(
           throw new Error(`Unsupported source type: ${sourceType}`)
       }
 
+      const extractDurationMs = Date.now() - stageStart
+
       await prisma.executionLog.create({
         data: {
           executionId,
           level: 'INFO',
           event: 'EXTRACT_OK',
-          message: `Extracted ${rawItems.length} items`,
-          metadata: { itemCount: rawItems.length },
+          message: `Extracted ${rawItems.length} items from ${sourceType}`,
+          metadata: {
+            // Timing
+            durationMs: extractDurationMs,
+            // Counters
+            itemsExtracted: rawItems.length,
+            contentBytes,
+            // Context
+            sourceId,
+            sourceType,
+          },
         },
       })
 
