@@ -6,6 +6,29 @@ import { extractQueue, normalizeQueue, FetchJobData } from '../config/queues'
 import { computeContentHash } from '../utils/hash'
 import { ImpactParser, AvantLinkParser, ShareASaleParser } from '../parsers'
 
+// ============================================================================
+// FETCHER LIMITS - Prevent memory exhaustion from bad sources
+// ============================================================================
+
+/** Maximum response size per page (10MB) */
+const MAX_CONTENT_LENGTH_PER_PAGE = 10 * 1024 * 1024
+
+/** Maximum total content size across all pages (50MB) */
+const MAX_TOTAL_CONTENT_SIZE = 50 * 1024 * 1024
+
+/** Hard maximum pages regardless of source config */
+const HARD_MAX_PAGES = 100
+
+/** Maximum items to collect before stopping pagination */
+const MAX_ITEMS_COLLECTED = 50000
+
+/** Request timeout in milliseconds */
+const REQUEST_TIMEOUT = 30000
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
 // Fetcher worker - retrieves content from URLs
 interface PaginationConfig {
   type: 'none' | 'query_param' | 'path'
@@ -13,6 +36,22 @@ interface PaginationConfig {
   param?: string // e.g., "page" or "offset"
   startValue?: number
   increment?: number
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+/**
+ * Safely stringify JSON with size limit
+ * Throws if result would exceed maxSize
+ */
+function safeJsonStringify(data: unknown, maxSize: number = MAX_TOTAL_CONTENT_SIZE): string {
+  const result = JSON.stringify(data)
+  if (result.length > maxSize) {
+    throw new Error(`JSON stringify result exceeds max size (${result.length} > ${maxSize} bytes)`)
+  }
+  return result
 }
 
 export const fetcherWorker = new Worker<FetchJobData>(
@@ -46,9 +85,22 @@ export const fetcherWorker = new Worker<FetchJobData>(
       // Collect all content from all pages
       const allContent: any[] = []
       let currentPage = paginationConfig?.startValue || 1
-      const maxPages = paginationConfig?.maxPages || 100
+      // Enforce hard max pages limit
+      const configuredMaxPages = paginationConfig?.maxPages || HARD_MAX_PAGES
+      const maxPages = Math.min(configuredMaxPages, HARD_MAX_PAGES)
       const increment = paginationConfig?.increment || 1
       let pagesFetched = 0
+      let totalContentSize = 0
+
+      // Axios config with size limits
+      const axiosConfig = {
+        headers: {
+          'User-Agent': 'IronScout.ai Price Crawler/1.0',
+        },
+        timeout: REQUEST_TIMEOUT,
+        maxContentLength: MAX_CONTENT_LENGTH_PER_PAGE,
+        maxBodyLength: MAX_CONTENT_LENGTH_PER_PAGE,
+      }
 
       // Loop through pages
       for (let pageNum = 0; pageNum < maxPages; pageNum++) {
@@ -68,28 +120,27 @@ export const fetcherWorker = new Worker<FetchJobData>(
 
         let pageContent: string
 
-        if (type === 'JS_RENDERED') {
-          // For JS-rendered pages, we'd use Puppeteer
-          // For now, we'll use a simple fetch
-          // TODO: Implement Puppeteer for JS-rendered pages
-          const response = await axios.get(pageUrl, {
-            headers: {
-              'User-Agent': 'IronScout.ai Price Crawler/1.0',
+        // Standard HTTP fetch with limits
+        const response = await axios.get(pageUrl, axiosConfig)
+        // Convert to string if axios parsed JSON, with size limit
+        pageContent = typeof response.data === 'string'
+          ? response.data
+          : safeJsonStringify(response.data, MAX_CONTENT_LENGTH_PER_PAGE)
+
+        // Track total content size
+        totalContentSize += pageContent.length
+        if (totalContentSize > MAX_TOTAL_CONTENT_SIZE) {
+          console.warn(`[Fetcher] Total content size limit exceeded (${totalContentSize} > ${MAX_TOTAL_CONTENT_SIZE}), stopping`)
+          await prisma.executionLog.create({
+            data: {
+              executionId,
+              level: 'WARN',
+              event: 'FETCH_SIZE_LIMIT',
+              message: `Total content size limit exceeded after ${pagesFetched} pages`,
+              metadata: { totalContentSize, limit: MAX_TOTAL_CONTENT_SIZE },
             },
-            timeout: 30000,
           })
-          // Convert to string if axios parsed JSON
-          pageContent = typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
-        } else {
-          // Standard HTTP fetch
-          const response = await axios.get(pageUrl, {
-            headers: {
-              'User-Agent': 'IronScout.ai Price Crawler/1.0',
-            },
-            timeout: 30000,
-          })
-          // Convert to string if axios parsed JSON
-          pageContent = typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
+          break
         }
 
         pagesFetched++
@@ -106,6 +157,21 @@ export const fetcherWorker = new Worker<FetchJobData>(
             }
 
             allContent.push(...items)
+
+            // Check items limit
+            if (allContent.length >= MAX_ITEMS_COLLECTED) {
+              console.warn(`[Fetcher] Max items limit reached (${allContent.length} >= ${MAX_ITEMS_COLLECTED}), stopping`)
+              await prisma.executionLog.create({
+                data: {
+                  executionId,
+                  level: 'WARN',
+                  event: 'FETCH_ITEMS_LIMIT',
+                  message: `Max items limit reached after ${pagesFetched} pages`,
+                  metadata: { itemCount: allContent.length, limit: MAX_ITEMS_COLLECTED },
+                },
+              })
+              break
+            }
           } catch (e) {
             // If parsing fails, treat as single page
             allContent.push(pageContent)
@@ -126,14 +192,17 @@ export const fetcherWorker = new Worker<FetchJobData>(
 
       console.log(`[Fetcher] Fetched ${pagesFetched} page(s), total items: ${allContent.length}`)
 
-      // Serialize content based on type
+      // Serialize content based on type with size limits
       let content: string
       if (type === 'JSON' && allContent.length > 0 && typeof allContent[0] !== 'string') {
-        content = JSON.stringify(allContent)
+        content = safeJsonStringify(allContent)
       } else if (type === 'HTML') {
         content = allContent.join('\n')
+        if (content.length > MAX_TOTAL_CONTENT_SIZE) {
+          throw new Error(`HTML content exceeds max size (${content.length} > ${MAX_TOTAL_CONTENT_SIZE} bytes)`)
+        }
       } else {
-        content = JSON.stringify(allContent)
+        content = safeJsonStringify(allContent)
       }
 
       await prisma.executionLog.create({
