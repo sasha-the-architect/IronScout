@@ -32,11 +32,12 @@ export function AlertsManager() {
   }, [alerts, filterStatus])
 
   const fetchAlerts = async () => {
-    if (!session?.user?.id) return
+    const token = (session as any)?.accessToken
+    if (!token) return
 
     try {
       setLoading(true)
-      const data = await getUserAlerts(session.user.id, false)
+      const data = await getUserAlerts(token, false)
       setAlerts(data)
       setError(null)
     } catch (err) {
@@ -65,10 +66,12 @@ export function AlertsManager() {
   }
 
   const handleDelete = async (alertId: string) => {
+    const token = (session as any)?.accessToken
+    if (!token) return
     if (!confirm('Are you sure you want to delete this alert?')) return
 
     try {
-      await deleteAlert(alertId)
+      await deleteAlert(alertId, token)
       setAlerts(alerts.filter(a => a.id !== alertId))
       toast.success('Alert deleted')
     } catch (err) {
@@ -78,8 +81,11 @@ export function AlertsManager() {
   }
 
   const handleToggleActive = async (alert: AlertType) => {
+    const token = (session as any)?.accessToken
+    if (!token) return
+
     try {
-      await updateAlert(alert.id, { isActive: !alert.isActive })
+      await updateAlert(alert.id, { isActive: !alert.isActive }, token)
       setAlerts(alerts.map(a =>
         a.id === alert.id ? { ...a, isActive: !a.isActive } : a
       ))
@@ -101,6 +107,9 @@ export function AlertsManager() {
   }
 
   const saveEdit = async (alertId: string) => {
+    const token = (session as any)?.accessToken
+    if (!token) return
+
     try {
       const newPrice = parseFloat(editPrice)
       if (isNaN(newPrice) || newPrice <= 0) {
@@ -108,7 +117,7 @@ export function AlertsManager() {
         return
       }
 
-      await updateAlert(alertId, { targetPrice: newPrice })
+      await updateAlert(alertId, { targetPrice: newPrice }, token)
       setAlerts(alerts.map(a =>
         a.id === alertId ? { ...a, targetPrice: newPrice } : a
       ))

@@ -2,33 +2,10 @@ import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { aiSearch, getSearchSuggestions, parseSearchIntent, backfillProductEmbeddings, updateProductEmbedding, ParseOptions } from '../services/ai-search'
 import { prisma } from '@ironscout/db'
-import { requireAdmin, rateLimit } from '../middleware/auth'
-import { TIER_CONFIG, getMaxSearchResults, hasPriceHistoryAccess } from '../config/tiers'
+import { requireAdmin, rateLimit, getUserTier } from '../middleware/auth'
+import { getMaxSearchResults, hasPriceHistoryAccess } from '../config/tiers'
 
 const router: any = Router()
-
-/**
- * Get user tier from request
- * Checks X-User-Id header and looks up user tier
- * Falls back to FREE tier for anonymous users
- */
-async function getUserTier(req: Request): Promise<keyof typeof TIER_CONFIG> {
-  const userId = req.headers['x-user-id'] as string
-  
-  if (!userId) {
-    return 'FREE'
-  }
-
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { tier: true }
-    })
-    return (user?.tier as keyof typeof TIER_CONFIG) || 'FREE'
-  } catch {
-    return 'FREE'
-  }
-}
 
 // Valid bullet types for Premium filter validation
 const BULLET_TYPES = [

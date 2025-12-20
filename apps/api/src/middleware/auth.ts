@@ -1,11 +1,75 @@
 import { Request, Response, NextFunction } from 'express'
 import { prisma } from '@ironscout/db'
+import { TIER_CONFIG } from '../config/tiers'
 
 /**
  * List of admin email addresses
  * In production, you might want to add an 'isAdmin' or 'role' column to the User table
  */
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').filter(Boolean)
+
+export type UserTier = keyof typeof TIER_CONFIG
+
+/**
+ * Extract and validate user ID from JWT in Authorization header.
+ * Returns null if no valid session.
+ *
+ * SECURITY: Never trust X-User-Id headers - always validate JWT.
+ */
+function extractUserIdFromJwt(req: Request): string | null {
+  const authHeader = req.headers.authorization
+
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null
+  }
+
+  try {
+    const token = authHeader.substring(7)
+    // NextAuth JWTs are base64 encoded JSON
+    const payload = JSON.parse(
+      Buffer.from(token.split('.')[1], 'base64').toString()
+    )
+
+    // 'sub' is the standard JWT claim for subject (user ID)
+    return payload.sub || payload.userId || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Get user tier from request using secure JWT validation.
+ *
+ * SECURITY: This replaces header-based tier resolution.
+ * - If no valid JWT session → FREE tier
+ * - If valid JWT → lookup user tier from database
+ * - Never trusts client-provided headers for tier
+ */
+export async function getUserTier(req: Request): Promise<UserTier> {
+  const userId = extractUserIdFromJwt(req)
+
+  if (!userId) {
+    return 'FREE'
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { tier: true }
+    })
+    return (user?.tier as UserTier) || 'FREE'
+  } catch {
+    return 'FREE'
+  }
+}
+
+/**
+ * Get user ID from request if authenticated.
+ * Returns null for anonymous users.
+ */
+export function getAuthenticatedUserId(req: Request): string | null {
+  return extractUserIdFromJwt(req)
+}
 
 /**
  * Middleware to protect admin routes

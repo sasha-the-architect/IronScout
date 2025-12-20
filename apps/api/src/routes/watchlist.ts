@@ -2,12 +2,12 @@ import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
 import {
-  TIER_CONFIG,
   getMaxWatchlistItems,
   hasReachedWatchlistLimit,
   hasFeature,
   UserTier
 } from '../config/tiers'
+import { getUserTier, getAuthenticatedUserId } from '../middleware/auth'
 
 const router: any = Router()
 
@@ -18,7 +18,6 @@ const router: any = Router()
 // ============================================================================
 
 const createWatchlistItemSchema = z.object({
-  userId: z.string(),
   productId: z.string(),
   targetPrice: z.number().optional(),
   collectionId: z.string().optional()
@@ -30,29 +29,22 @@ const updateWatchlistItemSchema = z.object({
 })
 
 const createCollectionSchema = z.object({
-  userId: z.string(),
   name: z.string().min(1).max(50)
 })
 
 // ============================================================================
-// GET /api/watchlist/:userId - Get all watchlist items for a user
+// GET /api/watchlist - Get all watchlist items for authenticated user
 // ============================================================================
 
-router.get('/:userId', async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params
-
-    // Get user and tier
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, tier: true }
-    })
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const userTier = user.tier as UserTier
+    const userTier = await getUserTier(req)
     const maxItems = getMaxWatchlistItems(userTier)
     const hasCollections = hasFeature(userTier, 'collections')
 
@@ -165,19 +157,14 @@ router.get('/:userId', async (req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const data = createWatchlistItemSchema.parse(req.body)
-
-    // Get user and tier
-    const user = await prisma.user.findUnique({
-      where: { id: data.userId },
-      select: { id: true, tier: true }
-    })
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const userTier = user.tier as UserTier
+    const data = createWatchlistItemSchema.parse(req.body)
+    const userTier = await getUserTier(req)
     const hasCollections = hasFeature(userTier, 'collections')
 
     // Check if product exists
@@ -193,7 +180,7 @@ router.post('/', async (req: Request, res: Response) => {
     const existing = await prisma.watchlistItem.findUnique({
       where: {
         userId_productId: {
-          userId: data.userId,
+          userId,
           productId: data.productId
         }
       }
@@ -205,7 +192,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Check tier limit
     const currentCount = await prisma.watchlistItem.count({
-      where: { userId: data.userId }
+      where: { userId }
     })
 
     if (hasReachedWatchlistLimit(userTier, currentCount)) {
@@ -229,7 +216,7 @@ router.post('/', async (req: Request, res: Response) => {
       }
 
       const collection = await prisma.watchlistCollection.findFirst({
-        where: { id: data.collectionId, userId: data.userId }
+        where: { id: data.collectionId, userId }
       })
 
       if (!collection) {
@@ -247,7 +234,7 @@ router.post('/', async (req: Request, res: Response) => {
     // Create watchlist item
     const item = await prisma.watchlistItem.create({
       data: {
-        userId: data.userId,
+        userId,
         productId: data.productId,
         targetPrice: data.targetPrice,
         collectionId: hasCollections ? data.collectionId : undefined,
@@ -290,20 +277,31 @@ router.post('/', async (req: Request, res: Response) => {
 
 router.put('/:id', async (req: Request, res: Response) => {
   try {
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
     const { id } = req.params
     const data = updateWatchlistItemSchema.parse(req.body)
 
     // Get existing item
     const existing = await prisma.watchlistItem.findUnique({
       where: { id },
-      include: { user: { select: { tier: true } } }
+      select: { id: true, userId: true }
     })
 
     if (!existing) {
       return res.status(404).json({ error: 'Watchlist item not found' })
     }
 
-    const userTier = existing.user.tier as UserTier
+    // Verify user owns this item
+    if (existing.userId !== userId) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
+    const userTier = await getUserTier(req)
     const hasCollections = hasFeature(userTier, 'collections')
 
     // If updating collection, verify access
@@ -316,7 +314,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 
       if (data.collectionId !== null) {
         const collection = await prisma.watchlistCollection.findFirst({
-          where: { id: data.collectionId, userId: existing.userId }
+          where: { id: data.collectionId, userId }
         })
 
         if (!collection) {
@@ -362,12 +360,26 @@ router.put('/:id', async (req: Request, res: Response) => {
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
     const { id } = req.params
 
-    const existing = await prisma.watchlistItem.findUnique({ where: { id } })
+    const existing = await prisma.watchlistItem.findUnique({
+      where: { id },
+      select: { id: true, userId: true }
+    })
 
     if (!existing) {
       return res.status(404).json({ error: 'Watchlist item not found' })
+    }
+
+    // Verify user owns this item
+    if (existing.userId !== userId) {
+      return res.status(403).json({ error: 'Forbidden' })
     }
 
     await prisma.watchlistItem.delete({ where: { id } })
@@ -383,21 +395,16 @@ router.delete('/:id', async (req: Request, res: Response) => {
 // COLLECTIONS ENDPOINTS (Premium only)
 // ============================================================================
 
-// GET /api/watchlist/:userId/collections
-router.get('/:userId/collections', async (req: Request, res: Response) => {
+// GET /api/watchlist/collections
+router.get('/collections', async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, tier: true }
-    })
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const userTier = user.tier as UserTier
+    const userTier = await getUserTier(req)
 
     if (!hasFeature(userTier, 'collections')) {
       return res.status(403).json({
@@ -436,18 +443,14 @@ router.get('/:userId/collections', async (req: Request, res: Response) => {
 // POST /api/watchlist/collections
 router.post('/collections', async (req: Request, res: Response) => {
   try {
-    const data = createCollectionSchema.parse(req.body)
-
-    const user = await prisma.user.findUnique({
-      where: { id: data.userId },
-      select: { id: true, tier: true }
-    })
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const userTier = user.tier as UserTier
+    const data = createCollectionSchema.parse(req.body)
+    const userTier = await getUserTier(req)
 
     if (!hasFeature(userTier, 'collections')) {
       return res.status(403).json({
@@ -457,7 +460,7 @@ router.post('/collections', async (req: Request, res: Response) => {
 
     const collection = await prisma.watchlistCollection.create({
       data: {
-        userId: data.userId,
+        userId,
         name: data.name
       }
     })
@@ -475,15 +478,26 @@ router.post('/collections', async (req: Request, res: Response) => {
 // DELETE /api/watchlist/collections/:id
 router.delete('/collections/:id', async (req: Request, res: Response) => {
   try {
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
     const { id } = req.params
 
     const existing = await prisma.watchlistCollection.findUnique({
       where: { id },
-      include: { user: { select: { tier: true } } }
+      select: { id: true, userId: true }
     })
 
     if (!existing) {
       return res.status(404).json({ error: 'Collection not found' })
+    }
+
+    // Verify user owns this collection
+    if (existing.userId !== userId) {
+      return res.status(403).json({ error: 'Forbidden' })
     }
 
     // Items will have collectionId set to null via onDelete: SetNull

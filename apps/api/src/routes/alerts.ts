@@ -2,11 +2,11 @@ import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
 import { TIER_CONFIG, hasReachedAlertLimit } from '../config/tiers'
+import { getUserTier, getAuthenticatedUserId } from '../middleware/auth'
 
 const router: any = Router()
 
 const createAlertSchema = z.object({
-  userId: z.string(),
   productId: z.string(),
   targetPrice: z.number().optional(),
   alertType: z.enum(['PRICE_DROP', 'BACK_IN_STOCK', 'NEW_PRODUCT']).default('PRICE_DROP')
@@ -20,21 +20,19 @@ const updateAlertSchema = z.object({
 // Create new alert
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const alertData = createAlertSchema.parse(req.body)
-
-    // Verify user exists and get their tier
-    const user = await prisma.user.findUnique({ 
-      where: { id: alertData.userId },
-      select: { id: true, tier: true }
-    })
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
     }
 
+    const alertData = createAlertSchema.parse(req.body)
+    const userTier = await getUserTier(req)
+    const tierConfig = TIER_CONFIG[userTier] || TIER_CONFIG.FREE
+
     // Verify product exists
-    const product = await prisma.product.findUnique({ 
-      where: { id: alertData.productId } 
+    const product = await prisma.product.findUnique({
+      where: { id: alertData.productId }
     })
 
     if (!product) {
@@ -44,7 +42,7 @@ router.post('/', async (req: Request, res: Response) => {
     // Check for duplicate alert
     const existingAlert = await prisma.alert.findFirst({
       where: {
-        userId: alertData.userId,
+        userId,
         productId: alertData.productId,
         isActive: true
       }
@@ -57,16 +55,13 @@ router.post('/', async (req: Request, res: Response) => {
     // Check tier-based alert limit
     const activeAlertCount = await prisma.alert.count({
       where: {
-        userId: alertData.userId,
+        userId,
         isActive: true
       }
     })
 
-    const userTier = user.tier as keyof typeof TIER_CONFIG
-    const tierConfig = TIER_CONFIG[userTier] || TIER_CONFIG.FREE
-
     if (hasReachedAlertLimit(userTier, activeAlertCount)) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Alert limit reached',
         message: `Free accounts are limited to ${tierConfig.maxActiveAlerts} active alerts. Upgrade to Premium for unlimited alerts.`,
         currentCount: activeAlertCount,
@@ -78,7 +73,7 @@ router.post('/', async (req: Request, res: Response) => {
     // Create alert
     const alert = await prisma.alert.create({
       data: {
-        userId: alertData.userId,
+        userId,
         productId: alertData.productId,
         targetPrice: alertData.targetPrice,
         alertType: alertData.alertType,
@@ -115,19 +110,17 @@ router.post('/', async (req: Request, res: Response) => {
   }
 })
 
-// Get alerts for a user
-router.get('/:userId', async (req: Request, res: Response) => {
+// Get alerts for authenticated user
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
     const { activeOnly } = req.query
-
-    // Get user tier
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { tier: true }
-    })
-
-    const userTier = (user?.tier || 'FREE') as keyof typeof TIER_CONFIG
+    const userTier = await getUserTier(req)
     const tierConfig = TIER_CONFIG[userTier] || TIER_CONFIG.FREE
 
     const alerts = await prisma.alert.findMany({
@@ -208,13 +201,27 @@ router.get('/:userId', async (req: Request, res: Response) => {
 // Update alert
 router.put('/:id', async (req: Request, res: Response) => {
   try {
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
     const { id } = req.params
     const updateData = updateAlertSchema.parse(req.body)
 
     // Check if alert exists
-    const existingAlert = await prisma.alert.findUnique({ where: { id } })
+    const existingAlert = await prisma.alert.findUnique({
+      where: { id },
+      select: { id: true, userId: true }
+    })
     if (!existingAlert) {
       return res.status(404).json({ error: 'Alert not found' })
+    }
+
+    // Verify user owns this alert
+    if (existingAlert.userId !== userId) {
+      return res.status(403).json({ error: 'Forbidden' })
     }
 
     const updatedAlert = await prisma.alert.update({
@@ -250,12 +257,26 @@ router.put('/:id', async (req: Request, res: Response) => {
 // Delete alert
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
     const { id } = req.params
 
     // Check if alert exists
-    const existingAlert = await prisma.alert.findUnique({ where: { id } })
+    const existingAlert = await prisma.alert.findUnique({
+      where: { id },
+      select: { id: true, userId: true }
+    })
     if (!existingAlert) {
       return res.status(404).json({ error: 'Alert not found' })
+    }
+
+    // Verify user owns this alert
+    if (existingAlert.userId !== userId) {
+      return res.status(403).json({ error: 'Forbidden' })
     }
 
     await prisma.alert.delete({ where: { id } })

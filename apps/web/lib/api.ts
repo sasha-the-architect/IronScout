@@ -1,5 +1,19 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+/**
+ * Build headers with authentication token
+ * All authenticated API calls should use this to pass the JWT
+ */
+function buildAuthHeaders(token?: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  return headers
+}
+
 export interface Product {
   id: string
   name: string
@@ -203,10 +217,10 @@ export interface Alert {
 }
 
 export interface CreateAlertParams {
-  userId: string
   productId: string
   targetPrice?: number
   alertType?: 'PRICE_DROP' | 'BACK_IN_STOCK' | 'NEW_PRODUCT'
+  token: string // JWT token for authentication
 }
 
 export interface UpdateAlertParams {
@@ -215,12 +229,11 @@ export interface UpdateAlertParams {
 }
 
 export async function createAlert(params: CreateAlertParams): Promise<Alert> {
+  const { token, ...alertData } = params
   const response = await fetch(`${API_BASE_URL}/api/alerts`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(params)
+    headers: buildAuthHeaders(token),
+    body: JSON.stringify(alertData)
   })
   if (!response.ok) {
     const error = await response.json()
@@ -229,11 +242,13 @@ export async function createAlert(params: CreateAlertParams): Promise<Alert> {
   return response.json()
 }
 
-export async function getUserAlerts(userId: string, activeOnly: boolean = false): Promise<Alert[]> {
+export async function getUserAlerts(token: string, activeOnly: boolean = false): Promise<Alert[]> {
   const params = new URLSearchParams()
   if (activeOnly) params.append('activeOnly', 'true')
 
-  const response = await fetch(`${API_BASE_URL}/api/alerts/${userId}?${params}`)
+  const response = await fetch(`${API_BASE_URL}/api/alerts?${params}`, {
+    headers: buildAuthHeaders(token),
+  })
   if (!response.ok) {
     throw new Error('Failed to fetch alerts')
   }
@@ -241,12 +256,10 @@ export async function getUserAlerts(userId: string, activeOnly: boolean = false)
   return Array.isArray(data) ? data : (data.alerts || [])
 }
 
-export async function updateAlert(alertId: string, params: UpdateAlertParams): Promise<Alert> {
+export async function updateAlert(alertId: string, params: UpdateAlertParams, token: string): Promise<Alert> {
   const response = await fetch(`${API_BASE_URL}/api/alerts/${alertId}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: buildAuthHeaders(token),
     body: JSON.stringify(params)
   })
   if (!response.ok) {
@@ -256,9 +269,10 @@ export async function updateAlert(alertId: string, params: UpdateAlertParams): P
   return response.json()
 }
 
-export async function deleteAlert(alertId: string): Promise<void> {
+export async function deleteAlert(alertId: string, token: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/alerts/${alertId}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    headers: buildAuthHeaders(token),
   })
   if (!response.ok) {
     const error = await response.json()
@@ -400,7 +414,7 @@ export interface AISearchParams {
   page?: number
   limit?: number
   sortBy?: 'relevance' | 'price_asc' | 'price_desc' | 'date_desc' | 'date_asc' | 'best_value'
-  userId?: string
+  token?: string // JWT token for authenticated requests
   filters?: ExplicitFilters
 }
 
@@ -468,27 +482,21 @@ export interface PremiumFiltersResponse {
  * AI-powered semantic search
  */
 export async function aiSearch(params: AISearchParams): Promise<AISearchResponse> {
-  const { userId, filters, ...searchParams } = params
-  
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
-  }
-  
-  if (userId) {
-    headers['X-User-Id'] = userId
-  }
-  
+  const { token, filters, ...searchParams } = params
+
+  const headers = buildAuthHeaders(token)
+
   const body: any = { ...searchParams }
   if (filters && Object.keys(filters).length > 0) {
     body.filters = filters
   }
-  
+
   const response = await fetch(`${API_BASE_URL}/api/search/semantic`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body)
   })
-  
+
   if (!response.ok) {
     const errorText = await response.text().catch(() => '')
     console.error('[aiSearch] Request failed', {
@@ -500,32 +508,26 @@ export async function aiSearch(params: AISearchParams): Promise<AISearchResponse
     })
     throw new Error(`AI search failed (${response.status})`)
   }
-  
+
   return response.json()
 }
 
 /**
  * Parse a natural language query into structured filters
  */
-export async function parseQueryToFilters(query: string, userId?: string): Promise<ParsedFiltersResponse> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
-  }
-  
-  if (userId) {
-    headers['X-User-Id'] = userId
-  }
-  
+export async function parseQueryToFilters(query: string, token?: string): Promise<ParsedFiltersResponse> {
+  const headers = buildAuthHeaders(token)
+
   const response = await fetch(`${API_BASE_URL}/api/search/nl-to-filters`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ query })
   })
-  
+
   if (!response.ok) {
     throw new Error('Query parsing failed')
   }
-  
+
   return response.json()
 }
 
@@ -546,21 +548,17 @@ export async function getSearchSuggestions(query: string): Promise<string[]> {
 /**
  * Get available Premium filters
  */
-export async function getPremiumFilters(userId?: string): Promise<PremiumFiltersResponse> {
-  const headers: Record<string, string> = {}
-  
-  if (userId) {
-    headers['X-User-Id'] = userId
-  }
-  
+export async function getPremiumFilters(token?: string): Promise<PremiumFiltersResponse> {
+  const headers = buildAuthHeaders(token)
+
   const response = await fetch(`${API_BASE_URL}/api/search/premium-filters`, {
     headers
   })
-  
+
   if (!response.ok) {
     throw new Error('Failed to get premium filters')
   }
-  
+
   return response.json()
 }
 
@@ -651,8 +649,10 @@ import type {
  * Free: 2 calibers max, trend only
  * Premium: Unlimited calibers, Buy/Wait score
  */
-export async function getMarketPulse(userId: string): Promise<MarketPulseResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/dashboard/pulse/${userId}`)
+export async function getMarketPulse(token: string): Promise<MarketPulseResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/dashboard/pulse`, {
+    headers: buildAuthHeaders(token),
+  })
   if (!response.ok) {
     throw new Error('Failed to fetch market pulse')
   }
@@ -664,8 +664,10 @@ export async function getMarketPulse(userId: string): Promise<MarketPulseRespons
  * Free: 5 deals max
  * Premium: 20 deals + explanations
  */
-export async function getDealsForYou(userId: string): Promise<DealsResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/dashboard/deals/${userId}`)
+export async function getDealsForYou(token: string): Promise<DealsResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/dashboard/deals`, {
+    headers: buildAuthHeaders(token),
+  })
   if (!response.ok) {
     throw new Error('Failed to fetch deals')
   }
@@ -677,8 +679,10 @@ export async function getDealsForYou(userId: string): Promise<DealsResponse> {
  * Free: Potential savings only
  * Premium: Verified savings with attribution
  */
-export async function getSavings(userId: string): Promise<SavingsResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/dashboard/savings/${userId}`)
+export async function getSavings(token: string): Promise<SavingsResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/dashboard/savings`, {
+    headers: buildAuthHeaders(token),
+  })
   if (!response.ok) {
     throw new Error('Failed to fetch savings')
   }
@@ -689,13 +693,16 @@ export async function getSavings(userId: string): Promise<SavingsResponse> {
  * Get price history for a caliber (Premium only)
  */
 export async function getCaliberPriceHistory(
-  userId: string,
+  token: string,
   caliber: string,
   days: number = 30
 ): Promise<PriceHistoryResponse> {
   const params = new URLSearchParams({ days: days.toString() })
   const response = await fetch(
-    `${API_BASE_URL}/api/dashboard/price-history/${userId}/${encodeURIComponent(caliber)}?${params}`
+    `${API_BASE_URL}/api/dashboard/price-history/${encodeURIComponent(caliber)}?${params}`,
+    {
+      headers: buildAuthHeaders(token),
+    }
   )
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
@@ -713,8 +720,10 @@ export async function getCaliberPriceHistory(
  * Free: 5 items max, no collections
  * Premium: Unlimited items, collections
  */
-export async function getWatchlist(userId: string): Promise<WatchlistResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/watchlist/${userId}`)
+export async function getWatchlist(token: string): Promise<WatchlistResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/watchlist`, {
+    headers: buildAuthHeaders(token),
+  })
   if (!response.ok) {
     throw new Error('Failed to fetch watchlist')
   }
@@ -725,15 +734,15 @@ export async function getWatchlist(userId: string): Promise<WatchlistResponse> {
  * Add item to watchlist
  */
 export async function addToWatchlist(
-  userId: string,
+  token: string,
   productId: string,
   targetPrice?: number,
   collectionId?: string
 ): Promise<{ item: any; _meta: any }> {
   const response = await fetch(`${API_BASE_URL}/api/watchlist`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, productId, targetPrice, collectionId }),
+    headers: buildAuthHeaders(token),
+    body: JSON.stringify({ productId, targetPrice, collectionId }),
   })
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
@@ -747,11 +756,12 @@ export async function addToWatchlist(
  */
 export async function updateWatchlistItem(
   id: string,
-  updates: { targetPrice?: number | null; collectionId?: string | null }
+  updates: { targetPrice?: number | null; collectionId?: string | null },
+  token: string
 ): Promise<any> {
   const response = await fetch(`${API_BASE_URL}/api/watchlist/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildAuthHeaders(token),
     body: JSON.stringify(updates),
   })
   if (!response.ok) {
@@ -764,9 +774,10 @@ export async function updateWatchlistItem(
 /**
  * Remove item from watchlist
  */
-export async function removeFromWatchlist(id: string): Promise<void> {
+export async function removeFromWatchlist(id: string, token: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/watchlist/${id}`, {
     method: 'DELETE',
+    headers: buildAuthHeaders(token),
   })
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
@@ -777,8 +788,10 @@ export async function removeFromWatchlist(id: string): Promise<void> {
 /**
  * Get user's watchlist collections (Premium only)
  */
-export async function getWatchlistCollections(userId: string): Promise<{ collections: any[] }> {
-  const response = await fetch(`${API_BASE_URL}/api/watchlist/${userId}/collections`)
+export async function getWatchlistCollections(token: string): Promise<{ collections: any[] }> {
+  const response = await fetch(`${API_BASE_URL}/api/watchlist/collections`, {
+    headers: buildAuthHeaders(token),
+  })
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
     throw new Error(error.error || 'Failed to fetch collections')
@@ -789,11 +802,11 @@ export async function getWatchlistCollections(userId: string): Promise<{ collect
 /**
  * Create watchlist collection (Premium only)
  */
-export async function createWatchlistCollection(userId: string, name: string): Promise<any> {
+export async function createWatchlistCollection(token: string, name: string): Promise<any> {
   const response = await fetch(`${API_BASE_URL}/api/watchlist/collections`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, name }),
+    headers: buildAuthHeaders(token),
+    body: JSON.stringify({ name }),
   })
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
@@ -805,9 +818,10 @@ export async function createWatchlistCollection(userId: string, name: string): P
 /**
  * Delete watchlist collection (Premium only)
  */
-export async function deleteWatchlistCollection(id: string): Promise<void> {
+export async function deleteWatchlistCollection(id: string, token: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/watchlist/collections/${id}`, {
     method: 'DELETE',
+    headers: buildAuthHeaders(token),
   })
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))

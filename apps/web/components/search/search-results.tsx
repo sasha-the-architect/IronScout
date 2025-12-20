@@ -43,9 +43,9 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
   const page = parseInt(searchParams.page || '1')
   const sortBy = searchParams.sortBy || 'relevance'
   
-  // Get session for user tier
+  // Get session for user tier and token
   const session = await auth()
-  const userId = session?.user?.id
+  const accessToken = (session as any)?.accessToken
   const userTier = (session?.user as any)?.tier || 'FREE'
   const isPremium = userTier === 'PREMIUM'
   
@@ -117,12 +117,12 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
 
   try {
     const [searchData, adsData] = await Promise.all([
-      aiSearch({ 
-        query, 
-        page, 
-        limit: 20, 
+      aiSearch({
+        query,
+        page,
+        limit: 20,
         sortBy: sortBy as any,
-        userId,
+        token: accessToken,
         filters: hasFilters ? explicitFilters : undefined,
       }),
       getAds('middle', searchParams.category)

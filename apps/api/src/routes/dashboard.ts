@@ -2,15 +2,15 @@ import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
 import {
-  TIER_CONFIG,
   getTierConfig,
   getMaxMarketPulseCalibers,
   getMaxDealsForYou,
   hasFeature,
   hasPriceHistoryAccess,
   getPriceHistoryDays,
-  UserTier
+  shapePriceHistory
 } from '../config/tiers'
+import { getUserTier, getAuthenticatedUserId } from '../middleware/auth'
 
 const router: any = Router()
 
@@ -21,21 +21,15 @@ const router: any = Router()
 // Premium: All calibers, Buy/Wait score (1-100), charts
 // ============================================================================
 
-router.get('/pulse/:userId', async (req: Request, res: Response) => {
+router.get('/pulse', async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params
-
-    // Get user and their tier
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, tier: true }
-    })
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const userTier = user.tier as UserTier
+    const userTier = await getUserTier(req)
     const maxCalibers = getMaxMarketPulseCalibers(userTier)
     const showBuyWaitScore = hasFeature(userTier, 'buyWaitScore')
 
@@ -181,21 +175,15 @@ router.get('/pulse/:userId', async (req: Request, res: Response) => {
 // Premium: 20 deals, flash deals, stock indicators, better ranking
 // ============================================================================
 
-router.get('/deals/:userId', async (req: Request, res: Response) => {
+router.get('/deals', async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params
-
-    // Get user and their tier
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, tier: true }
-    })
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const userTier = user.tier as UserTier
+    const userTier = await getUserTier(req)
     const maxDeals = getMaxDealsForYou(userTier)
     const showBestValue = hasFeature(userTier, 'bestValueScore')
     const showStockIndicators = hasFeature(userTier, 'stockIndicators')
@@ -327,21 +315,15 @@ router.get('/deals/:userId', async (req: Request, res: Response) => {
 // Premium: Verified savings with attribution
 // ============================================================================
 
-router.get('/savings/:userId', async (req: Request, res: Response) => {
+router.get('/savings', async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params
-
-    // Get user and their tier
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, tier: true }
-    })
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const userTier = user.tier as UserTier
+    const userTier = await getUserTier(req)
     const showVerifiedSavings = hasFeature(userTier, 'verifiedSavings')
 
     // Get user's alerts with target prices
@@ -424,22 +406,18 @@ const priceHistorySchema = z.object({
   days: z.coerce.number().int().min(7).max(365).default(30)
 })
 
-router.get('/price-history/:userId/:caliber', async (req: Request, res: Response) => {
+router.get('/price-history/:caliber', async (req: Request, res: Response) => {
   try {
-    const { userId, caliber } = req.params
-    const { days } = priceHistorySchema.parse(req.query)
-
-    // Get user and their tier
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, tier: true }
-    })
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+    // Get authenticated user from JWT
+    const userId = getAuthenticatedUserId(req)
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const userTier = user.tier as UserTier
+    const { caliber } = req.params
+    const { days } = priceHistorySchema.parse(req.query)
+
+    const userTier = await getUserTier(req)
 
     // Check if user has access to price history
     if (!hasPriceHistoryAccess(userTier)) {
@@ -491,15 +469,22 @@ router.get('/price-history/:userId/:caliber', async (req: Request, res: Response
       dataPoints: day.prices.length
     }))
 
+    // Shape history based on tier (FREE gets summary only, PREMIUM gets full history)
+    const shapedHistory = shapePriceHistory(history, userTier)
+
     res.json({
       caliber: decodeURIComponent(caliber),
       days: effectiveDays,
-      history,
+      ...shapedHistory,
       _meta: {
         tier: userTier,
         requestedDays: days,
         effectiveDays,
-        maxDaysAllowed: maxDays
+        maxDaysAllowed: maxDays,
+        ...(userTier === 'FREE' && {
+          upgradeMessage: 'Upgrade to Premium for full price history charts',
+          upgradeUrl: '/pricing'
+        })
       }
     })
   } catch (error) {

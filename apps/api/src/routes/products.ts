@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
-import { TIER_CONFIG, getMaxSearchResults, hasPriceHistoryAccess, getPriceHistoryDays } from '../config/tiers'
+import { getMaxSearchResults, hasPriceHistoryAccess, getPriceHistoryDays, shapePriceHistory } from '../config/tiers'
+import { getUserTier } from '../middleware/auth'
 
 const router: any = Router()
 
@@ -23,29 +24,6 @@ const searchSchema = z.object({
   page: z.string().default('1'),
   limit: z.string().default('20')
 })
-
-/**
- * Get user tier from request
- * Checks X-User-Id header and looks up user tier
- * Falls back to FREE tier for anonymous users
- */
-async function getUserTier(req: Request): Promise<keyof typeof TIER_CONFIG> {
-  const userId = req.headers['x-user-id'] as string
-  
-  if (!userId) {
-    return 'FREE'
-  }
-
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { tier: true }
-    })
-    return (user?.tier as keyof typeof TIER_CONFIG) || 'FREE'
-  } catch {
-    return 'FREE'
-  }
-}
 
 router.get('/search', async (req: Request, res: Response) => {
   try {
@@ -508,9 +486,12 @@ router.get('/:id/history', async (req: Request, res: Response) => {
 
     const isLimited = requestedDays > maxDays
 
+    // Shape history based on tier (FREE gets summary only, PREMIUM gets full history)
+    const shapedHistory = shapePriceHistory(history, userTier)
+
     res.json({
       product,
-      history,
+      ...shapedHistory,
       summary: {
         days: daysNum,
         requestedDays,
@@ -523,9 +504,12 @@ router.get('/:id/history', async (req: Request, res: Response) => {
       _meta: {
         tier: userTier,
         historyLimited: isLimited,
-        ...(isLimited && {
-          upgradeMessage: `Upgrade to Premium for up to 365 days of price history`,
+        ...(userTier === 'FREE' && {
+          upgradeMessage: 'Upgrade to Premium for full price history charts',
           upgradeUrl: '/pricing'
+        }),
+        ...(isLimited && userTier === 'PREMIUM' && {
+          upgradeMessage: `Requested ${requestedDays} days but max is ${maxDays}`,
         })
       }
     })

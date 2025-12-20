@@ -21,11 +21,12 @@ export function RecentAlerts() {
   }, [session])
 
   const fetchAlerts = async () => {
-    if (!session?.user?.id) return
+    const token = (session as any)?.accessToken
+    if (!token) return
 
     try {
       setLoading(true)
-      const data = await getUserAlerts(session.user.id, true)
+      const data = await getUserAlerts(token, true)
       setAlerts(data.slice(0, 3)) // Show only 3 most recent
       setError(null)
     } catch (err) {
@@ -37,8 +38,11 @@ export function RecentAlerts() {
   }
 
   const handleDelete = async (alertId: string) => {
+    const token = (session as any)?.accessToken
+    if (!token) return
+
     try {
-      await deleteAlert(alertId)
+      await deleteAlert(alertId, token)
       setAlerts(alerts.filter(a => a.id !== alertId))
     } catch (err) {
       console.error('Failed to delete alert:', err)

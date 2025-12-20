@@ -22,7 +22,8 @@ export function useWatchlist(): UseWatchlistResult {
   const [error, setError] = useState<string | null>(null)
 
   const fetchWatchlist = useCallback(async () => {
-    if (!session?.user?.id) {
+    const token = (session as any)?.accessToken
+    if (!token) {
       setLoading(false)
       return
     }
@@ -30,7 +31,7 @@ export function useWatchlist(): UseWatchlistResult {
     try {
       setLoading(true)
       setError(null)
-      const response = await getWatchlist(session.user.id)
+      const response = await getWatchlist(token)
       setData(response)
     } catch (err) {
       console.error('Failed to fetch watchlist:', err)
@@ -38,7 +39,7 @@ export function useWatchlist(): UseWatchlistResult {
     } finally {
       setLoading(false)
     }
-  }, [session?.user?.id])
+  }, [(session as any)?.accessToken])
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -48,13 +49,14 @@ export function useWatchlist(): UseWatchlistResult {
 
   const addItem = useCallback(
     async (productId: string, targetPrice?: number) => {
-      if (!session?.user?.id) {
+      const token = (session as any)?.accessToken
+      if (!token) {
         throw new Error('Not authenticated')
       }
 
       try {
         setError(null)
-        await addToWatchlist(session.user.id, productId, targetPrice)
+        await addToWatchlist(token, productId, targetPrice)
         // Refetch to get updated list
         await fetchWatchlist()
       } catch (err) {
@@ -63,14 +65,19 @@ export function useWatchlist(): UseWatchlistResult {
         throw err
       }
     },
-    [session?.user?.id, fetchWatchlist]
+    [(session as any)?.accessToken, fetchWatchlist]
   )
 
   const removeItem = useCallback(
     async (id: string) => {
+      const token = (session as any)?.accessToken
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
       try {
         setError(null)
-        await removeFromWatchlist(id)
+        await removeFromWatchlist(id, token)
         // Optimistically update local state
         setData((prev) =>
           prev
@@ -91,14 +98,19 @@ export function useWatchlist(): UseWatchlistResult {
         throw err
       }
     },
-    []
+    [(session as any)?.accessToken]
   )
 
   const updateItem = useCallback(
     async (id: string, updates: { targetPrice?: number | null }) => {
+      const token = (session as any)?.accessToken
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
       try {
         setError(null)
-        await updateWatchlistItem(id, updates)
+        await updateWatchlistItem(id, updates, token)
         // Refetch to get updated item
         await fetchWatchlist()
       } catch (err) {
@@ -107,7 +119,7 @@ export function useWatchlist(): UseWatchlistResult {
         throw err
       }
     },
-    [fetchWatchlist]
+    [(session as any)?.accessToken, fetchWatchlist]
   )
 
   return {

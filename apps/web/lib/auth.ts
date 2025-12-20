@@ -307,6 +307,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.image = token.picture as string
         ;(session.user as any).tier = token.tier || 'FREE'
         ;(session.user as any).isAdmin = token.isAdmin || false
+        // Expose access token for API calls
+        ;(session as any).accessToken = token.accessToken
       }
 
       return session

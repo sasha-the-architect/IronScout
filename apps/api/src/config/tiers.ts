@@ -260,3 +260,63 @@ export function hasReachedWatchlistLimit(tier: UserTier, currentCount: number): 
   if (limit === -1) return false
   return currentCount >= limit
 }
+
+/**
+ * Price history data point type
+ */
+export interface PriceHistoryDataPoint {
+  date: string
+  avgPrice: number
+  minPrice: number
+  maxPrice: number
+  dataPoints: number
+}
+
+/**
+ * Shape price history based on user tier.
+ * FREE users get summary only (current, recentAvg, trend) - no day-by-day data.
+ * PREMIUM users get full day-by-day history limited to their tier's allowed days.
+ *
+ * IMPORTANT: Always call this before res.json() to ensure FREE users never
+ * receive raw history data. The UI should not be responsible for trimming.
+ */
+export function shapePriceHistory(
+  history: PriceHistoryDataPoint[],
+  tier: UserTier
+): { current: number | null; recentAvg: number | null; trend: 'UP' | 'DOWN' | 'STABLE' } | { history: PriceHistoryDataPoint[] } {
+  // Enforce tier-based day limit first
+  const maxDays = getPriceHistoryDays(tier)
+  const trimmedHistory = history.slice(-maxDays)
+
+  if (tier === 'FREE') {
+    // FREE tier: summary only, no day-by-day data
+    if (trimmedHistory.length === 0) {
+      return {
+        current: null,
+        recentAvg: null,
+        trend: 'STABLE' as const,
+      }
+    }
+
+    const currentPrice = trimmedHistory[trimmedHistory.length - 1].avgPrice
+    const recentAvg = trimmedHistory.reduce((sum, h) => sum + h.avgPrice, 0) / trimmedHistory.length
+
+    // Calculate trend based on first vs last price
+    let trend: 'UP' | 'DOWN' | 'STABLE' = 'STABLE'
+    if (trimmedHistory.length > 1) {
+      const firstPrice = trimmedHistory[0].avgPrice
+      const pctChange = ((currentPrice - firstPrice) / firstPrice) * 100
+      if (pctChange > 3) trend = 'UP'
+      else if (pctChange < -3) trend = 'DOWN'
+    }
+
+    return {
+      current: Math.round(currentPrice * 100) / 100,
+      recentAvg: Math.round(recentAvg * 100) / 100,
+      trend,
+    }
+  }
+
+  // PREMIUM tier: full history (already trimmed to maxDays)
+  return { history: trimmedHistory }
+}

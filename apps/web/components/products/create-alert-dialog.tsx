@@ -30,7 +30,8 @@ export function CreateAlertDialog({ product, open, onOpenChange }: CreateAlertDi
     e.preventDefault()
     setError(null)
 
-    if (!session?.user?.id) {
+    const token = (session as any)?.accessToken
+    if (!token) {
       router.push('/api/auth/signin')
       return
     }
@@ -38,7 +39,7 @@ export function CreateAlertDialog({ product, open, onOpenChange }: CreateAlertDi
     try {
       setLoading(true)
       await createAlert({
-        userId: session.user.id,
+        token,
         productId: product.id,
         targetPrice: targetPrice ? parseFloat(targetPrice) : undefined,
         alertType
