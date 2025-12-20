@@ -1,23 +1,29 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@ironscout/db';
-import { 
-  Lightbulb, 
-  TrendingUp, 
-  TrendingDown, 
-  Package, 
+import {
+  Lightbulb,
+  TrendingUp,
+  TrendingDown,
+  Package,
   AlertTriangle,
   CheckCircle
 } from 'lucide-react';
 import { InsightCard } from './insight-card';
+import { hasProAccess } from '@/lib/subscription';
 
 export default async function InsightsPage() {
   const session = await getSession();
-  
+
   if (!session || session.type !== 'dealer') {
     redirect('/login');
   }
-  
+
+  // PRO feature gate - redirect STANDARD tier to upgrade
+  if (!hasProAccess(session.tier)) {
+    redirect('/settings/billing?upgrade=pro&feature=market-context');
+  }
+
   const dealerId = session.dealerId;
 
   // Get active insights

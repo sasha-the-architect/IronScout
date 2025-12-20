@@ -21,14 +21,28 @@ interface SidebarProps {
   session: Session;
 }
 
-const dealerNavigation = [
+interface NavItem {
+  name: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  proOnly?: boolean;
+}
+
+const dealerNavigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Feed Setup', href: '/feed', icon: Rss },
   { name: 'SKUs', href: '/skus', icon: Package },
-  { name: 'Market Context', href: '/insights', icon: Lightbulb },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Market Context', href: '/insights', icon: Lightbulb, proOnly: true },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3, proOnly: true },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
+
+/**
+ * Check if tier has PRO access (PRO or FOUNDING)
+ */
+function hasProAccess(tier: string): boolean {
+  return tier === 'PRO' || tier === 'FOUNDING';
+}
 
 const adminNavigation = [
   { name: 'All Dealers', href: '/admin/dealers', icon: Users },
@@ -85,30 +99,32 @@ export function Sidebar({ session }: SidebarProps) {
             {!isAdmin && (
               <li>
                 <ul role="list" className="-mx-2 space-y-1">
-                  {dealerNavigation.map((item) => {
-                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                    return (
-                      <li key={item.name}>
-                        <Link
-                          href={item.href}
-                          className={cn(
-                            'group flex gap-x-3 rounded-md p-2 text-sm font-medium leading-6',
-                            isActive
-                              ? 'bg-gray-100 text-gray-900'
-                              : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
-                          )}
-                        >
-                          <item.icon
+                  {dealerNavigation
+                    .filter((item) => !item.proOnly || hasProAccess(session.tier))
+                    .map((item) => {
+                      const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                      return (
+                        <li key={item.name}>
+                          <Link
+                            href={item.href}
                             className={cn(
-                              'h-5 w-5 shrink-0',
-                              isActive ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-900'
+                              'group flex gap-x-3 rounded-md p-2 text-sm font-medium leading-6',
+                              isActive
+                                ? 'bg-gray-100 text-gray-900'
+                                : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
                             )}
-                          />
-                          {item.name}
-                        </Link>
-                      </li>
-                    );
-                  })}
+                          >
+                            <item.icon
+                              className={cn(
+                                'h-5 w-5 shrink-0',
+                                isActive ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-900'
+                              )}
+                            />
+                            {item.name}
+                          </Link>
+                        </li>
+                      );
+                    })}
                 </ul>
               </li>
             )}

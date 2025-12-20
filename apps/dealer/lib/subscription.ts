@@ -256,3 +256,38 @@ export function checkSubscriptionStatus(
     bannerType: null,
   };
 }
+
+// ============================================================================
+// TIER-BASED FEATURE GATING
+// ============================================================================
+
+export type DealerTier = 'STANDARD' | 'PRO' | 'FOUNDING';
+
+/**
+ * Features that require PRO tier (or FOUNDING which includes PRO features)
+ */
+export const PRO_FEATURES = {
+  marketContext: true,      // /insights page - Market pricing context
+  customAnalytics: true,    // /analytics page - Custom analytics
+  apiAccess: true,          // API access (if/when implemented)
+} as const;
+
+export type ProFeature = keyof typeof PRO_FEATURES;
+
+/**
+ * Check if a dealer tier has access to PRO features
+ * FOUNDING tier includes all PRO features
+ */
+export function hasProAccess(tier: string): boolean {
+  return tier === 'PRO' || tier === 'FOUNDING';
+}
+
+/**
+ * Check if a dealer has access to a specific PRO feature
+ */
+export function hasFeatureAccess(tier: string, feature: ProFeature): boolean {
+  if (!PRO_FEATURES[feature]) {
+    return true; // Feature not defined as PRO-only
+  }
+  return hasProAccess(tier);
+}

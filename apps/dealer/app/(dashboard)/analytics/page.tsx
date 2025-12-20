@@ -1,21 +1,27 @@
 import { getSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@ironscout/db';
-import { 
-  BarChart3, 
-  MousePointerClick, 
-  DollarSign, 
+import {
+  BarChart3,
+  MousePointerClick,
+  DollarSign,
   TrendingUp,
   Calendar
 } from 'lucide-react';
+import { hasProAccess } from '@/lib/subscription';
 
 export default async function AnalyticsPage() {
   const session = await getSession();
-  
+
   if (!session || session.type !== 'dealer') {
     redirect('/login');
   }
-  
+
+  // PRO feature gate - redirect STANDARD tier to upgrade
+  if (!hasProAccess(session.tier)) {
+    redirect('/settings/billing?upgrade=pro&feature=custom-analytics');
+  }
+
   const dealerId = session.dealerId;
 
   // Get date ranges
