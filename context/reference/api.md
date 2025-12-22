@@ -57,6 +57,37 @@ Errors should be JSON:
 
 ---
 
+## Rate Limiting
+
+Authentication endpoints are rate-limited to prevent brute-force attacks.
+
+### Limits
+
+| Endpoint | Limit | Block Duration |
+|----------|-------|----------------|
+| POST /auth/signin | 5/min per IP | 60 seconds |
+| POST /auth/signup | 3/min per IP | 120 seconds |
+| POST /auth/refresh | 30/min per IP | 60 seconds |
+| POST /auth/oauth/* | 10/min per IP | 60 seconds |
+
+### Response Headers
+
+Rate-limited endpoints include:
+- `X-RateLimit-Limit`: Maximum requests per window
+- `X-RateLimit-Remaining`: Requests remaining in current window
+- `X-RateLimit-Reset`: Unix timestamp when window resets
+
+When blocked (429):
+- `Retry-After`: Seconds until requests are allowed
+
+### Implementation
+
+- Uses Redis for distributed state (works across API instances)
+- Fail-open design: Redis errors allow requests through (logged)
+- Metrics tracked for observability via `/api/admin/rate-limits`
+
+---
+
 ## Search
 
 ### GET /search
@@ -190,6 +221,25 @@ Reactivate dealer.
 
 ### POST /admin/dealers/:id/subscription
 Change tier/status/billing method.
+
+### GET /admin/rate-limits
+Get rate limit metrics for all auth endpoints.
+
+Response:
+- `date`: The date for metrics
+- `endpoints`: Per-endpoint metrics (signin, signup, refresh, oauth)
+  - `totalRequests`, `blockedRequests`, `blockRate`
+  - `topBlockedIps[]`: Top 10 blocked IPs with counts
+- `summary`: Aggregate totals
+
+### GET /admin/rate-limits/:endpoint
+Get metrics for a specific endpoint.
+
+### GET /admin/rate-limits/status/:ip
+Check current rate limit status for a specific IP.
+
+### DELETE /admin/rate-limits/:ip
+Clear rate limits for a specific IP (unblock).
 
 MUST:
 - Write audit logs for every mutation.
