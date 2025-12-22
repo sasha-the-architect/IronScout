@@ -3,18 +3,10 @@ import { aiSearch, getAds, AISearchResponse, ExplicitFilters } from '@/lib/api'
 import { ProductCard } from '@/components/products/product-card'
 import { AdCard } from '@/components/ads/ad-card'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Sparkles, Search, Crown, SlidersHorizontal, Bookmark, TrendingUp } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, Crown, Bookmark, TrendingUp, Bell } from 'lucide-react'
 import { SearchHeader } from './search-header'
 import { AIExplanationBanner } from '@/components/premium'
 import Link from 'next/link'
-
-// Quick-start chips for empty state
-const QUICK_SEARCHES = [
-  { label: '9mm bulk', query: '9mm bulk' },
-  { label: '.223 range', query: '.223 range ammo' },
-  { label: 'home defense', query: '9mm home defense' },
-  { label: '.22 LR cheap', query: '.22 LR bulk cheap' },
-]
 
 interface SearchResultsProps {
   searchParams: {
@@ -93,41 +85,9 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
                              'suppressorSafe', 'lowFlash', 'lowRecoil', 'matchGrade', 'minVelocity', 'maxVelocity']
   const premiumFiltersActive = premiumFilterKeys.filter(k => searchParams[k as keyof typeof searchParams]).length
   
+  // No query = search bar handles the empty state, just return null
   if (!query) {
-    return (
-      <div className="text-center py-12">
-        <div className="max-w-lg mx-auto">
-          {/* Hero icon */}
-          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <Sparkles className="h-8 w-8 text-primary" />
-          </div>
-
-          <h2 className="text-2xl font-bold mb-2">Find your ammo</h2>
-          <p className="text-muted-foreground mb-6">
-            Type what you're looking for. AI understands natural language.
-          </p>
-
-          {/* Quick search chips */}
-          <div className="flex flex-wrap justify-center gap-2 mb-6">
-            {QUICK_SEARCHES.map((chip) => (
-              <Link
-                key={chip.label}
-                href={`/dashboard/search?q=${encodeURIComponent(chip.query)}`}
-                className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium"
-              >
-                {chip.label}
-              </Link>
-            ))}
-          </div>
-
-          {/* Social proof */}
-          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <TrendingUp className="h-3 w-3" />
-            <span>Most searched today: 9mm bulk, .223 range ammo, 5.56 green tip</span>
-          </div>
-        </div>
-      </div>
-    )
+    return null
   }
 
   try {
@@ -260,8 +220,8 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
             {mixedResults.map((item, index) => (
               <div key={`${item.type}-${index}`}>
                 {item.type === 'product' ? (
-                  <ProductCard 
-                    product={item.data} 
+                  <ProductCard
+                    product={item.data}
                     showRelevance={sortBy === 'relevance' || sortBy === 'best_value'}
                     showPremiumFeatures={isPremium}
                   />
@@ -271,6 +231,24 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
               </div>
             ))}
           </div>
+
+          {/* Post-search premium bridge - contextual, after value delivered */}
+          {!isPremium && products.length > 0 && (
+            <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">See how prices have changed</p>
+                  <p className="text-xs text-muted-foreground">Historical trends and advanced filters</p>
+                </div>
+              </div>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/pricing">
+                  Unlock
+                </Link>
+              </Button>
+            </div>
+          )}
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (

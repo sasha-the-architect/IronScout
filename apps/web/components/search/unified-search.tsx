@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Search, Sparkles, X, Loader2, SlidersHorizontal, ChevronDown, RotateCcw, Crown, TrendingUp, Zap } from 'lucide-react'
+import { Search, Sparkles, X, Loader2, SlidersHorizontal, ChevronDown, RotateCcw, Crown, TrendingUp, Bell, Bookmark } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getSearchSuggestions } from '@/lib/api'
 import { PremiumFilters } from '@/components/premium'
@@ -267,11 +267,11 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
       <div className="max-w-4xl mx-auto">
         <form onSubmit={handleSubmit} className="relative">
           <div className="relative">
-            {/* AI indicator with label */}
+            {/* AI Search - confident positioning */}
             <div className="absolute left-5 top-1/2 -translate-y-1/2 flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span className="text-xs font-medium text-primary hidden sm:inline">AI</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary text-primary-foreground">
+                <Sparkles className="h-4 w-4" />
+                <span className="text-xs font-semibold">AI Search</span>
               </div>
             </div>
 
@@ -285,7 +285,7 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
               }}
               onFocus={() => setShowSuggestions(true)}
               placeholder={ROTATING_PLACEHOLDERS[placeholderIndex]}
-              className="w-full pl-20 sm:pl-24 pr-32 py-5 text-lg border-2 border-border rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all bg-background shadow-lg hover:shadow-xl"
+              className="w-full pl-28 sm:pl-32 pr-32 py-5 text-lg border-2 border-border rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all bg-background shadow-lg hover:shadow-xl"
             />
 
             {/* Clear button */}
@@ -319,10 +319,9 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
             </Button>
           </div>
 
-          {/* Helper text */}
+          {/* Confident AI helper */}
           <p className="mt-2 text-xs text-muted-foreground text-center">
-            <Zap className="h-3 w-3 inline mr-1" />
-            Use natural language. AI understands intent. Filters optional.
+            Describe what you need. I'll handle the filters.
           </p>
 
           {/* Suggestions dropdown */}
@@ -351,7 +350,20 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
 
         {/* Quick-start chips - shown when no query */}
         {!query && (
-          <div className="mt-6 space-y-4">
+          <div className="mt-6 space-y-5">
+            {/* Outcome-oriented CTA - prime the save loop */}
+            <div className="flex items-center justify-center gap-4 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Bell className="h-4 w-4 text-primary" />
+                <span>Track price drops automatically</span>
+              </div>
+              <span className="text-muted-foreground/50">•</span>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Bookmark className="h-4 w-4 text-primary" />
+                <span>Save your first search</span>
+              </div>
+            </div>
+
             {/* Clickable example chips */}
             <div className="flex flex-wrap justify-center gap-2">
               {EXAMPLE_CHIPS.map((chip, i) => (
@@ -368,10 +380,12 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
               ))}
             </div>
 
-            {/* Social proof - trending searches */}
+            {/* Social proof - trending searches with stronger label */}
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <TrendingUp className="h-3 w-3" />
-              <span>Trending:</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full font-medium">
+                <TrendingUp className="h-3 w-3" />
+                Popular today
+              </span>
               {TRENDING_SEARCHES.map((term, i) => (
                 <button
                   key={i}
@@ -379,7 +393,7 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
                     setQuery(term)
                     handleSearch(term)
                   }}
-                  className="hover:text-primary transition-colors underline-offset-2 hover:underline"
+                  className="hover:text-primary transition-colors underline-offset-2 hover:underline font-medium"
                 >
                   {term}{i < TRENDING_SEARCHES.length - 1 ? ',' : ''}
                 </button>
@@ -388,10 +402,10 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
 
             {/* Premium examples */}
             {isPremium && (
-              <div className="pt-2 border-t border-border">
+              <div className="pt-3 border-t border-border">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <Crown className="h-3 w-3 text-amber-500" />
-                  <p className="text-xs text-amber-600 dark:text-amber-400">Advanced searches:</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Advanced searches:</p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   {premiumExampleQueries.map((example, i) => (
@@ -413,22 +427,36 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
         )}
       </div>
 
-      {/* Filter Toggle - Minimal */}
+      {/* Filter Toggle - Discoverable */}
       <div className="max-w-4xl mx-auto mt-6 flex items-center justify-center">
-        <button
-          onClick={() => setFiltersOpen(!filtersOpen)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm ${
-            filtersOpen || activeFilterCount > 0
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-          }`}
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          <span>
-            {activeFilterCount > 0 ? `${activeFilterCount} filter${activeFilterCount > 1 ? 's' : ''} active` : 'More filters'}
-          </span>
-          <ChevronDown className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
-        </button>
+        <div className="relative group">
+          <button
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm ${
+              filtersOpen || activeFilterCount > 0
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            <span>
+              {activeFilterCount > 0 ? `${activeFilterCount} filter${activeFilterCount > 1 ? 's' : ''} active` : 'Filters'}
+            </span>
+            {/* Count badge - shows available filters */}
+            {!filtersOpen && activeFilterCount === 0 && (
+              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-muted-foreground/20 rounded-full">
+                8+
+              </span>
+            )}
+            <ChevronDown className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {/* Hover preview tooltip */}
+          {!filtersOpen && (
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+              Caliber, price, purpose, case material, bullet weight...
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Basic Filters Panel */}
