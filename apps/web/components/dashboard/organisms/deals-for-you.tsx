@@ -72,7 +72,7 @@ export function PersonalizedFeed({ isPremium = false, onAddToWatchlist }: Person
       )}
 
       {/* Products grid */}
-      {data && (
+      {data && data.items && (
         <>
           {data.items.length === 0 ? (
             <Card className="bg-card border-border">
@@ -104,7 +104,7 @@ export function PersonalizedFeed({ isPremium = false, onAddToWatchlist }: Person
           )}
 
           {/* Free tier limit message */}
-          {!isPremium && data._meta.itemsLimit !== -1 && data.items.length >= data._meta.itemsLimit && (
+          {!isPremium && data._meta && data._meta.itemsLimit !== -1 && data.items.length >= data._meta.itemsLimit && (
             <div className="p-4 rounded-lg bg-muted/50 border border-border">
               <div className="flex items-start gap-3">
                 <Lock className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -124,7 +124,7 @@ export function PersonalizedFeed({ isPremium = false, onAddToWatchlist }: Person
           )}
 
           {/* Personalization indicator */}
-          {data._meta.personalized && data._meta.calibersUsed.length > 0 && (
+          {data._meta?.personalized && data._meta.calibersUsed?.length > 0 && (
             <p className="text-xs text-muted-foreground text-center">
               Personalized for: {data._meta.calibersUsed.join(', ')}
             </p>

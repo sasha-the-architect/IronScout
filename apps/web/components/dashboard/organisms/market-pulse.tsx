@@ -58,7 +58,7 @@ export function MarketPulse({ isPremium = false, onCaliberClick }: MarketPulsePr
           </div>
         )}
 
-        {data && (
+        {data && data.pulse && (
           <>
             <div className="space-y-1">
               {data.pulse.map((item) => (
@@ -76,7 +76,7 @@ export function MarketPulse({ isPremium = false, onCaliberClick }: MarketPulsePr
             </div>
 
             {/* Free tier limit message */}
-            {!isPremium && data._meta.calibersLimit !== -1 && (
+            {!isPremium && data._meta && data._meta.calibersLimit !== -1 && (
               <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-border">
                 <div className="flex items-start gap-2">
                   <Lock className="h-4 w-4 text-muted-foreground mt-0.5" />
