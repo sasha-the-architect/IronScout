@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 
+// Force dynamic rendering - this route uses cookies for auth
+export const dynamic = 'force-dynamic';
+
 /**
  * Test feed connection
  * This is a simplified test - in production, you'd actually fetch and parse the feed

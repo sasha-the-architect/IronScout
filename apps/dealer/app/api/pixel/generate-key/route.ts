@@ -4,6 +4,9 @@ import { prisma } from '@ironscout/db';
 import crypto from 'crypto';
 import { logger } from '@/lib/logger';
 
+// Force dynamic rendering - this route uses cookies for auth
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID().slice(0, 8);
   const reqLogger = logger.child({ requestId, endpoint: '/api/pixel/generate-key' });

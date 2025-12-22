@@ -4,6 +4,9 @@ import { prisma } from '@ironscout/db';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 
+// Force dynamic rendering - this route uses cookies for auth
+export const dynamic = 'force-dynamic';
+
 const updateSchema = z.object({
   status: z.enum(['RESOLVED', 'DISMISSED']).optional(),
 });

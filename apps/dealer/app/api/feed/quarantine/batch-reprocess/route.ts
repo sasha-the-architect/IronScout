@@ -5,6 +5,9 @@ import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { createHash } from 'crypto';
 
+// Force dynamic rendering - this route uses cookies for auth
+export const dynamic = 'force-dynamic';
+
 const batchSchema = z.object({
   recordIds: z.array(z.string()).min(1).max(100),
 });

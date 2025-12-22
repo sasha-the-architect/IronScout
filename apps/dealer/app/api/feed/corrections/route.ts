@@ -4,6 +4,9 @@ import { prisma } from '@ironscout/db';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 
+// Force dynamic rendering - this route uses cookies for auth
+export const dynamic = 'force-dynamic';
+
 const createCorrectionSchema = z.object({
   quarantinedRecordId: z.string(),
   field: z.string().min(1),

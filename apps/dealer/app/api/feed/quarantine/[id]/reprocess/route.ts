@@ -4,6 +4,9 @@ import { prisma } from '@ironscout/db';
 import { logger } from '@/lib/logger';
 import { createHash } from 'crypto';
 
+// Force dynamic rendering - this route uses cookies for auth
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/feed/quarantine/[id]/reprocess
  * Attempt to reprocess a quarantined record with corrections applied

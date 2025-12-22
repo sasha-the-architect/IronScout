@@ -4,6 +4,9 @@ import { prisma } from '@ironscout/db';
 import type { FeedFormatType } from '@ironscout/db';
 import { logger } from '@/lib/logger';
 
+// Force dynamic rendering - this route uses cookies for auth
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/feed/test-run
  * Run a dry-run test of the feed without persisting data

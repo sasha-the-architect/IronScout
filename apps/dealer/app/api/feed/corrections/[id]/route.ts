@@ -3,6 +3,9 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { logger } from '@/lib/logger';
 
+// Force dynamic rendering - this route uses cookies for auth
+export const dynamic = 'force-dynamic';
+
 /**
  * DELETE /api/feed/corrections/[id]
  * Delete a correction

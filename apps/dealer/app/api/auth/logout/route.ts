@@ -3,6 +3,9 @@ import { cookies } from 'next/headers';
 import { clearSessionCookie, getSession } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 
+// Force dynamic rendering - this route uses cookies for auth
+export const dynamic = 'force-dynamic';
+
 const DEALER_SITE_URL = process.env.NEXT_PUBLIC_DEALER_URL || 'https://dealer.ironscout.ai';
 
 // Clear both session and impersonation cookies

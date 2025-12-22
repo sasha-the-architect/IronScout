@@ -4,6 +4,9 @@ import { prisma } from '@ironscout/db';
 import { headers } from 'next/headers';
 import { logger } from '@/lib/logger';
 
+// Force dynamic rendering - this route uses cookies for auth
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
