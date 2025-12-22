@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { PulseRow, PulseRowSkeleton } from '../molecules/pulse-row'
-import { BarChart3, ChevronRight, Lock } from 'lucide-react'
+import { BarChart3, ChevronRight, Lock, Plus, TrendingUp, Target } from 'lucide-react'
 import { useMarketPulse } from '@/hooks/use-market-pulse'
 import { UPGRADE_COPY } from '@/types/dashboard'
 import Link from 'next/link'
@@ -75,22 +75,50 @@ export function MarketPulse({ isPremium = false, onCaliberClick }: MarketPulsePr
               ))}
             </div>
 
-            {/* Free tier limit message */}
-            {!isPremium && data._meta && data._meta.calibersLimit !== -1 && (
-              <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-border">
-                <div className="flex items-start gap-2">
-                  <Lock className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div className="text-xs text-muted-foreground">
-                    <p>
-                      Tracking {data._meta.calibersShown} of {data._meta.calibersLimit} calibers
-                    </p>
-                    <p className="mt-1 text-primary">
-                      {UPGRADE_COPY.MARKET_PULSE_EXPAND}
-                    </p>
+            {/* Add caliber CTA - always visible */}
+            <div className="mt-3 pt-3 border-t border-border">
+              <Link href="/dashboard/search">
+                <Button variant="ghost" size="sm" className="w-full justify-start text-xs h-9 text-muted-foreground hover:text-foreground">
+                  <Plus className="h-3.5 w-3.5 mr-2" />
+                  Track another caliber
+                </Button>
+              </Link>
+            </div>
+
+            {/* Unlock historical trends CTA (Free tier) */}
+            {!isPremium && (
+              <Link href="/pricing">
+                <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 rounded-md bg-primary/10">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        Unlock price history
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        See 30-day trends and timing signals
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </div>
-              </div>
+              </Link>
             )}
+
+            {/* Caliber limit indicator */}
+            {!isPremium && data._meta && data._meta.calibersLimit !== -1 && (
+              <p className="mt-3 text-xs text-center text-muted-foreground">
+                Tracking {data._meta.calibersShown} of {data._meta.calibersLimit} calibers
+              </p>
+            )}
+
+            {/* Helper text */}
+            <p className="mt-3 text-xs text-center text-muted-foreground">
+              <Target className="h-3 w-3 inline mr-1" />
+              Tracked calibers power price insights
+            </p>
           </>
         )}
       </CardContent>

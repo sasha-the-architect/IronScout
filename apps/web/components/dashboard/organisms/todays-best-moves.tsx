@@ -5,11 +5,15 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ContextChip } from '../atoms/context-chip'
 import { PriceDelta } from '../atoms/price-delta'
-import { ExternalLink, Sparkles } from 'lucide-react'
+import { ExternalLink, Search, Target, Zap } from 'lucide-react'
 import { useDealsForYou } from '@/hooks/use-deals-for-you'
 import { useMarketPulse } from '@/hooks/use-market-pulse'
 import { UPGRADE_COPY } from '@/types/dashboard'
 import type { ProductFeedItem, PriceContext } from '@/types/dashboard'
+import Link from 'next/link'
+
+// Popular calibers for quick start
+const POPULAR_CALIBERS = ['9mm', '5.56 NATO', '.223 Rem', '.45 ACP', '.308 Win']
 
 interface TopMatchProps {
   isPremium?: boolean
@@ -70,13 +74,64 @@ export function TopMatch({ isPremium = false }: TopMatchProps) {
 
   if (!topItem) {
     return (
-      <Card className="bg-gradient-to-br from-card to-card/80 border-border overflow-hidden">
-        <CardContent className="p-6 md:p-8 text-center">
-          <Sparkles className="h-8 w-8 text-primary mx-auto mb-3" />
-          <h2 className="text-lg font-semibold">No Matches Yet</h2>
-          <p className="text-sm text-muted-foreground mt-2">
-            Set up alerts and track products to see personalized matches.
-          </p>
+      <Card className="bg-gradient-to-br from-card via-card to-primary/5 border-border overflow-hidden">
+        <CardContent className="p-6 md:p-8">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+            {/* Left: Action-oriented messaging */}
+            <div className="flex-1 space-y-4">
+              <div className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-primary" />
+                <span className="text-xs font-medium text-primary uppercase tracking-wide">
+                  Quick Start
+                </span>
+              </div>
+
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-foreground">
+                  Track your first price in 30 seconds
+                </h2>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Save one product to unlock alerts, price history, and market insights.
+                </p>
+              </div>
+
+              {/* Quick caliber chips */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Most users start with:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {POPULAR_CALIBERS.slice(0, 3).map((caliber) => (
+                    <Link
+                      key={caliber}
+                      href={`/dashboard/search?caliber=${encodeURIComponent(caliber)}`}
+                    >
+                      <Button variant="outline" size="sm" className="h-7 text-xs">
+                        <Target className="h-3 w-3 mr-1.5" />
+                        {caliber}
+                      </Button>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Primary CTAs */}
+            <div className="flex flex-col gap-3 lg:items-end">
+              <Link href="/dashboard/search" className="w-full lg:w-auto">
+                <Button
+                  size="lg"
+                  className="w-full lg:w-auto bg-primary hover:bg-primary/90 text-primary-foreground px-8"
+                >
+                  <Search className="mr-2 h-4 w-4" />
+                  Search Ammo
+                </Button>
+              </Link>
+              <p className="text-xs text-muted-foreground text-center lg:text-right">
+                No account required to browse
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     )

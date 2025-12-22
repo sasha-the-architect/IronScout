@@ -4,10 +4,26 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ProductCard } from '../molecules/deal-card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Search, ChevronRight, Lock } from 'lucide-react'
+import { Search, ChevronRight, Lock, Sparkles, TrendingDown, Bell } from 'lucide-react'
 import { useDealsForYou } from '@/hooks/use-deals-for-you'
 import { UPGRADE_COPY } from '@/types/dashboard'
 import Link from 'next/link'
+
+// Sample teasers to show value before user saves items
+const SAMPLE_TEASERS = [
+  {
+    icon: TrendingDown,
+    title: '9mm FMJ dropped 12% this month',
+    subtitle: 'Save items to track prices like this',
+    color: 'text-status-buy',
+  },
+  {
+    icon: Bell,
+    title: 'Alert: Notify when < $0.24/rd',
+    subtitle: 'Set custom price thresholds',
+    color: 'text-primary',
+  },
+]
 
 interface PersonalizedFeedProps {
   isPremium?: boolean
@@ -75,17 +91,56 @@ export function PersonalizedFeed({ isPremium = false, onAddToWatchlist }: Person
       {data && data.items && (
         <>
           {data.items.length === 0 ? (
-            <Card className="bg-card border-border">
-              <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                <p>No products found for your tracked calibers.</p>
-                <p className="mt-2">
-                  <Link href="/dashboard/saved" className="text-primary hover:underline">
-                    Save some items
-                  </Link>{' '}
-                  to start seeing personalized products.
-                </p>
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              {/* Value teaser cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {SAMPLE_TEASERS.map((teaser, i) => {
+                  const Icon = teaser.icon
+                  return (
+                    <Card key={i} className="bg-muted/30 border-dashed border-border">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-lg bg-background ${teaser.color}`}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">
+                              {teaser.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {teaser.subtitle}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
+                          <Sparkles className="h-3 w-3" />
+                          <span>Example</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+
+              {/* Action prompt */}
+              <Card className="bg-primary/5 border-primary/20">
+                <CardContent className="py-6 text-center">
+                  <Sparkles className="h-6 w-6 text-primary mx-auto mb-2" />
+                  <p className="text-sm font-medium text-foreground">
+                    Your feed is empty. Let's fix that.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 mb-4">
+                    Save your first item to unlock personalized recommendations
+                  </p>
+                  <Link href="/dashboard/search">
+                    <Button size="sm">
+                      <Search className="mr-2 h-4 w-4" />
+                      Find Products
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {data.items.map((item) => (

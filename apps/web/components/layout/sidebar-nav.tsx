@@ -13,7 +13,8 @@ import {
   Menu,
   X,
   LogOut,
-  Crown
+  Crown,
+  Plus
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
@@ -97,6 +98,16 @@ export function SidebarNav({ isPremium = false, userName }: SidebarNavProps) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Primary Action Button */}
+      <div className="px-3 py-3">
+        <Link href="/dashboard/search" onClick={() => setIsMobileOpen(false)}>
+          <Button className="w-full bg-primary hover:bg-primary/90" size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Track Item
+          </Button>
+        </Link>
       </div>
 
       {/* Navigation */}

@@ -5,11 +5,18 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PriceDelta } from '../atoms/price-delta'
 import { Sparkline, generateSparklineFromTrend } from '../atoms/sparkline'
-import { Bookmark, ChevronRight, Lock, TrendingDown } from 'lucide-react'
+import { Bookmark, ChevronRight, Lock, TrendingDown, Bell, TrendingUp, Search, Sparkles } from 'lucide-react'
 import { useWatchlist } from '@/hooks/use-watchlist'
 import { UPGRADE_COPY } from '@/types/dashboard'
 import type { WatchlistItem } from '@/types/dashboard'
 import Link from 'next/link'
+
+// Value props for empty state
+const WATCHLIST_VALUE_PROPS = [
+  { icon: Bell, text: 'Get price drop alerts' },
+  { icon: TrendingUp, text: 'Track price history' },
+  { icon: Sparkles, text: 'Personalized matches' },
+]
 
 interface SavedItemsPreviewProps {
   isPremium?: boolean
@@ -66,15 +73,47 @@ export function SavedItemsPreview({ isPremium = false, maxItems = 5 }: SavedItem
         {data && (
           <>
             {previewItems.length === 0 ? (
-              <div className="py-6 text-center">
-                <Bookmark className="h-8 w-8 text-muted-foreground mx-auto mb-3 opacity-50" />
-                <p className="text-sm text-muted-foreground">No saved items yet</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  <Link href="/dashboard/search" className="text-primary hover:underline">
-                    Search products
-                  </Link>{' '}
-                  to start tracking prices.
-                </p>
+              <div className="py-4">
+                {/* Headline */}
+                <div className="text-center mb-4">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-3">
+                    <Bookmark className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Your Watchlist Drives Everything
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Save items to unlock these features:
+                  </p>
+                </div>
+
+                {/* Value props */}
+                <div className="space-y-2 mb-4">
+                  {WATCHLIST_VALUE_PROPS.map((prop, i) => {
+                    const Icon = prop.icon
+                    return (
+                      <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/30">
+                        <Icon className="h-4 w-4 text-primary flex-shrink-0" />
+                        <span className="text-sm text-foreground">{prop.text}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* CTAs */}
+                <div className="space-y-2">
+                  <Link href="/dashboard/search" className="block">
+                    <Button className="w-full" size="sm">
+                      <Search className="mr-2 h-4 w-4" />
+                      Add First Item
+                    </Button>
+                  </Link>
+                  <Link href="/dashboard/search?popular=true" className="block">
+                    <Button variant="ghost" size="sm" className="w-full text-xs">
+                      Browse Popular Calibers
+                    </Button>
+                  </Link>
+                </div>
               </div>
             ) : (
               <div className="space-y-1">

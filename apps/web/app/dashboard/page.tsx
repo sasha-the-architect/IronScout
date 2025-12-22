@@ -5,6 +5,7 @@ import { DealsForYou } from '@/components/dashboard/organisms/deals-for-you'
 import { MarketPulse } from '@/components/dashboard/organisms/market-pulse'
 import { SavingsTracker } from '@/components/dashboard/organisms/savings-tracker'
 import { WatchlistPreview } from '@/components/dashboard/organisms/watchlist-preview'
+import { OnboardingPanel } from '@/components/dashboard/organisms/onboarding-panel'
 
 /**
  * Dashboard Page - Trading Terminal Style
@@ -34,15 +35,19 @@ export default async function DashboardPage() {
         <TodaysBestMoves isPremium={isPremium} />
       </section>
 
-      {/* Main Content: Deals + Market Pulse */}
+      {/* Main Content: Deals + Market Pulse + Onboarding */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
         {/* Deals Feed - Primary Click Engine */}
         <div className="lg:col-span-8">
           <DealsForYou isPremium={isPremium} />
         </div>
 
-        {/* Market Pulse - Context Panel */}
-        <div className="lg:col-span-4">
+        {/* Right Rail: Market Pulse + Onboarding */}
+        <div className="lg:col-span-4 space-y-6">
+          {/* Onboarding Checklist - shows until completed */}
+          <OnboardingPanel />
+
+          {/* Market Pulse - Context Panel */}
           <MarketPulse isPremium={isPremium} />
         </div>
       </section>
