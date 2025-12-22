@@ -39,7 +39,8 @@ export const TEMPLATE_PLACEHOLDERS = {
   CAMPAIGN_ID: 'CAMPAIGN_ID',
 } as const
 
-const KNOWN_PLACEHOLDERS = new Set(Object.values(TEMPLATE_PLACEHOLDERS))
+type PlaceholderKey = keyof typeof TEMPLATE_PLACEHOLDERS
+const KNOWN_PLACEHOLDERS = new Set<string>(Object.values(TEMPLATE_PLACEHOLDERS))
 
 /**
  * Result of template validation.
