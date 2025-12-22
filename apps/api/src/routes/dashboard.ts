@@ -304,11 +304,11 @@ router.get('/deals', async (req: Request, res: Response) => {
       })
 
     res.json({
-      deals,
+      items: deals,
       _meta: {
         tier: userTier,
-        dealsShown: deals.length,
-        dealsLimit: maxDeals,
+        itemsShown: deals.length,
+        itemsLimit: maxDeals,
         personalized: calibers.length > 0,
         calibersUsed: calibers
       }

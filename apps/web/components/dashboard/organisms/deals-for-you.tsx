@@ -79,10 +79,10 @@ export function PersonalizedFeed({ isPremium = false, onAddToWatchlist }: Person
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
                 <p>No products found for your tracked calibers.</p>
                 <p className="mt-2">
-                  <Link href="/dashboard/alerts" className="text-primary hover:underline">
-                    Set up alerts
+                  <Link href="/dashboard/saved" className="text-primary hover:underline">
+                    Save some items
                   </Link>{' '}
-                  to start tracking prices.
+                  to start seeing personalized products.
                 </p>
               </CardContent>
             </Card>
