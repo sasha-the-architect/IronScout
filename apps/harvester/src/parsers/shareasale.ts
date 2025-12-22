@@ -7,7 +7,7 @@ import { XMLParser } from 'fast-xml-parser'
  * Supports CSV (pipe-delimited), XML, and JSON formats
  *
  * ShareASale feed documentation:
- * https://www.shareasale.com/info/datafeed/
+ *https://help.shareasale.com/hc/en-us/articles/5377618989975-Datafeeds
  *
  * Note: ShareASale typically uses pipe (|) delimited CSV files
  */
