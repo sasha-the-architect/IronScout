@@ -520,44 +520,45 @@ export async function getAllAuthRateLimitMetrics(date?: string): Promise<{
 
 /**
  * Pre-configured rate limiters for authentication endpoints.
- * These have stricter limits to prevent brute-force attacks.
  *
- * Note: OAuth limits are higher because:
- * - OAuth flows involve multiple redirects/requests
- * - Server-to-server calls from web app don't indicate abuse
- * - Multiple users behind NAT share the same IP
+ * These limits are designed to prevent abuse (DoS, credential stuffing)
+ * while being permissive enough for legitimate users, including:
+ * - Users retrying after errors
+ * - Multiple users behind NAT/corporate proxies
+ * - OAuth flows with multiple redirects
+ * - Server-to-server calls from web/dealer apps
  */
 export const authRateLimits = {
-  /** Strict limit for login attempts: 10 per minute per IP */
+  /** Login attempts: 100 per minute per IP - blocks sustained brute force */
   signin: redisRateLimit({
     windowMs: 60 * 1000,
-    max: 10,
+    max: 100,
     keyPrefix: 'rl:auth:signin:',
     blockDurationSec: 60,
     endpoint: 'signin',
   }),
 
-  /** Strict limit for signup attempts: 5 per minute per IP */
+  /** Signup attempts: 50 per minute per IP - blocks account spam */
   signup: redisRateLimit({
     windowMs: 60 * 1000,
-    max: 5,
+    max: 50,
     keyPrefix: 'rl:auth:signup:',
     blockDurationSec: 60,
     endpoint: 'signup',
   }),
 
-  /** Moderate limit for token refresh: 60 per minute per IP */
+  /** Token refresh: 200 per minute per IP - high volume for active apps */
   refresh: redisRateLimit({
     windowMs: 60 * 1000,
-    max: 60,
+    max: 200,
     keyPrefix: 'rl:auth:refresh:',
     endpoint: 'refresh',
   }),
 
-  /** Higher limit for OAuth: 30 per minute per IP (server-to-server calls) */
+  /** OAuth: 100 per minute per IP - server-to-server + user retries */
   oauth: redisRateLimit({
     windowMs: 60 * 1000,
-    max: 30,
+    max: 100,
     keyPrefix: 'rl:auth:oauth:',
     endpoint: 'oauth',
   }),
