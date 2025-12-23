@@ -14,7 +14,7 @@ import Link from 'next/link'
 // Value props for empty state
 const WATCHLIST_VALUE_PROPS = [
   { icon: Bell, text: 'Get price drop alerts' },
-  { icon: TrendingUp, text: 'Track price history' },
+  { icon: TrendingUp, text: 'See price history' },
   { icon: Sparkles, text: 'Personalized matches' },
 ]
 
@@ -130,7 +130,7 @@ export function SavedItemsPreview({ isPremium = false, maxItems = 5 }: SavedItem
                   <Lock className="h-4 w-4 text-muted-foreground mt-0.5" />
                   <div className="text-xs text-muted-foreground">
                     <p>
-                      Tracking {data._meta.itemCount} of {data._meta.itemLimit} items
+                      Saved {data._meta.itemCount} of {data._meta.itemLimit} items
                     </p>
                     <p className="mt-1 text-primary">{UPGRADE_COPY.WATCHLIST_LIMIT}</p>
                   </div>

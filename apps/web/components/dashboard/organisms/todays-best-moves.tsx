@@ -88,10 +88,10 @@ export function TopMatch({ isPremium = false }: TopMatchProps) {
 
               <div>
                 <h2 className="text-xl md:text-2xl font-bold text-foreground">
-                  Track your first price in 30 seconds
+                  Find your first deal in 30 seconds
                 </h2>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Save one product to unlock alerts, price history, and market insights.
+                  Search, compare prices, then save what you find to get alerts.
                 </p>
               </div>
 

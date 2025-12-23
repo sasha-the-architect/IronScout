@@ -7,14 +7,13 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
   Search,
-  Bell,
+  Bookmark,
   Settings,
   CreditCard,
   Menu,
   X,
   LogOut,
   Crown,
-  Plus
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
@@ -40,7 +39,7 @@ const navItems = [
   {
     title: 'Saved Items',
     href: '/dashboard/saved',
-    icon: Bell,
+    icon: Bookmark,
   },
   {
     title: 'Billing',
@@ -100,12 +99,12 @@ export function SidebarNav({ isPremium = false, userName }: SidebarNavProps) {
         </div>
       </div>
 
-      {/* Primary Action Button */}
+      {/* Primary Action - Search is the entry point */}
       <div className="px-3 py-3">
         <Link href="/dashboard/search" onClick={() => setIsMobileOpen(false)}>
           <Button className="w-full bg-primary hover:bg-primary/90" size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Track Item
+            <Search className="h-4 w-4 mr-2" />
+            Search
           </Button>
         </Link>
       </div>

@@ -351,18 +351,10 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
         {/* Quick-start chips - shown when no query */}
         {!query && (
           <div className="mt-6 space-y-5">
-            {/* Outcome-oriented CTA - prime the save loop */}
-            <div className="flex items-center justify-center gap-4 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Bell className="h-4 w-4 text-primary" />
-                <span>Track price drops automatically</span>
-              </div>
-              <span className="text-muted-foreground/50">•</span>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Bookmark className="h-4 w-4 text-primary" />
-                <span>Save your first search</span>
-              </div>
-            </div>
+            {/* Value proposition - what search unlocks */}
+            <p className="text-sm text-muted-foreground text-center">
+              Compare prices across retailers. Save what you find.
+            </p>
 
             {/* Clickable example chips */}
             <div className="flex flex-wrap justify-center gap-2">

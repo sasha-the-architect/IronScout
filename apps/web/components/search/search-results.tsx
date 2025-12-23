@@ -170,10 +170,10 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
         />
 
         <div className="space-y-6 mt-6">
-          {/* Retention hint - save to track */}
+          {/* Retention hint - contextual, after value delivered */}
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/30 py-2 px-4 rounded-lg">
             <Bookmark className="h-4 w-4 text-primary" />
-            <span>Save an item to track price drops and get alerts</span>
+            <span>Save items to get price drop alerts</span>
           </div>
 
           {/* AI Explanation Banner */}

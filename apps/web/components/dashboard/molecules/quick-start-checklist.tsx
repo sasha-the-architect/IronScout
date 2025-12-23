@@ -47,7 +47,7 @@ export function QuickStartChecklist({
     {
       id: 'save',
       label: 'Save your first item',
-      description: 'Track prices on products you want',
+      description: 'Save from search results to get alerts',
       completed: savedCount > 0,
       href: '/dashboard/search',
       icon: Bookmark,

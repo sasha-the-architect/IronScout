@@ -75,12 +75,12 @@ export function MarketPulse({ isPremium = false, onCaliberClick }: MarketPulsePr
               ))}
             </div>
 
-            {/* Add caliber CTA - always visible */}
+            {/* Search CTA - always visible */}
             <div className="mt-3 pt-3 border-t border-border">
               <Link href="/dashboard/search">
                 <Button variant="ghost" size="sm" className="w-full justify-start text-xs h-9 text-muted-foreground hover:text-foreground">
                   <Plus className="h-3.5 w-3.5 mr-2" />
-                  Track another caliber
+                  Search more calibers
                 </Button>
               </Link>
             </div>
@@ -110,14 +110,14 @@ export function MarketPulse({ isPremium = false, onCaliberClick }: MarketPulsePr
             {/* Caliber limit indicator */}
             {!isPremium && data._meta && data._meta.calibersLimit !== -1 && (
               <p className="mt-3 text-xs text-center text-muted-foreground">
-                Tracking {data._meta.calibersShown} of {data._meta.calibersLimit} calibers
+                Showing {data._meta.calibersShown} of {data._meta.calibersLimit} calibers
               </p>
             )}
 
             {/* Helper text */}
             <p className="mt-3 text-xs text-center text-muted-foreground">
               <Target className="h-3 w-3 inline mr-1" />
-              Tracked calibers power price insights
+              Saved items power price insights
             </p>
           </>
         )}
