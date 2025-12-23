@@ -1,9 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { Sparkles, ChevronDown, ChevronUp, SlidersHorizontal, Crown } from 'lucide-react'
+import { Sparkles, SlidersHorizontal, Crown, Info } from 'lucide-react'
 import { ExplicitFilters } from '@/lib/api'
 import { EnhancedSortSelect } from './sort-select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface SearchIntent {
   calibers?: string[]
@@ -35,10 +40,10 @@ interface SearchHeaderProps {
   premiumFiltersActive?: number
 }
 
-export function SearchHeader({ 
-  query, 
-  resultCount, 
-  intent, 
+export function SearchHeader({
+  query,
+  resultCount,
+  intent,
   processingTimeMs,
   vectorSearchUsed,
   hasFilters,
@@ -46,7 +51,6 @@ export function SearchHeader({
   isPremium = false,
   premiumFiltersActive = 0
 }: SearchHeaderProps) {
-  const [showDetails, setShowDetails] = useState(false)
   
   const hasIntent = intent && (
     intent.calibers?.length || 
@@ -145,17 +149,34 @@ export function SearchHeader({
             </span>
           )}
 
-          {/* AI Confirmation - subtle text link, not competing with results */}
+          {/* AI Confirmation - icon with tooltip, never louder than the decision */}
           {hasIntent && (
-            <button
-              onClick={() => setShowDetails(!showDetails)}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Sparkles className="h-3 w-3 opacity-60" />
-              <span className="underline underline-offset-2 decoration-dotted">
-                {showDetails ? 'Hide interpretation' : 'View interpretation'}
-              </span>
-            </button>
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="inline-flex items-center gap-1 text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+                    <Sparkles className="h-3 w-3" />
+                    <Info className="h-3 w-3" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <p className="text-xs">
+                    <span className="font-medium">AI understood: </span>
+                    {[
+                      ...(intent.calibers || []),
+                      intent.purpose,
+                      intent.grainWeights?.length ? `${intent.grainWeights.join('/')}gr` : null,
+                      ...(intent.caseMaterials || []),
+                      intent.qualityLevel,
+                      isPremium && intent.premiumIntent?.environment,
+                      isPremium && intent.premiumIntent?.barrelLength ? `${intent.premiumIntent.barrelLength} barrel` : null,
+                      isPremium && intent.premiumIntent?.suppressorUse ? 'suppressor' : null,
+                    ].filter(Boolean).join(', ')}
+                    <span className="opacity-60"> · {Math.round(intent.confidence * 100)}% confident</span>
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
 
           {/* Active filter count */}
@@ -186,45 +207,6 @@ export function SearchHeader({
         </div>
       )}
 
-      {/* AI Understanding Details - collapsed behind "View interpretation" */}
-      {hasIntent && showDetails && (
-        <div className="mt-2 py-2 px-3 bg-muted/30 rounded border border-border text-xs text-muted-foreground">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-foreground/70">Understood:</span>
-            {intent.calibers?.map((cal, i) => (
-              <span key={i} className={explicitFilters?.caliber ? 'line-through opacity-50' : ''}>
-                {cal}
-              </span>
-            ))}
-            {intent.purpose && (
-              <span className={explicitFilters?.purpose ? 'line-through opacity-50' : ''}>
-                {intent.purpose}
-              </span>
-            )}
-            {(intent.grainWeights?.length ?? 0) > 0 && (
-              <span className={explicitFilters?.minGrain !== undefined || explicitFilters?.maxGrain !== undefined ? 'line-through opacity-50' : ''}>
-                {intent.grainWeights?.join('/')}gr
-              </span>
-            )}
-            {intent.caseMaterials?.map((mat, i) => (
-              <span key={i} className={explicitFilters?.caseMaterial ? 'line-through opacity-50' : ''}>
-                {mat}
-              </span>
-            ))}
-            {intent.qualityLevel && <span>{intent.qualityLevel}</span>}
-            {isPremium && intent.premiumIntent?.environment && (
-              <span>{intent.premiumIntent.environment}</span>
-            )}
-            {isPremium && intent.premiumIntent?.barrelLength && (
-              <span>{intent.premiumIntent.barrelLength} barrel</span>
-            )}
-            {isPremium && intent.premiumIntent?.suppressorUse && (
-              <span>suppressor</span>
-            )}
-            <span className="opacity-50">· {Math.round(intent.confidence * 100)}%</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

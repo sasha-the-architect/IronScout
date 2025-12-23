@@ -139,11 +139,16 @@ export function ResultCard({
       )}
     >
       <CardContent className="p-4 space-y-2.5">
-        {/* 1. Best Price Badge - visual crown for default choice */}
+        {/* 1. Best Price Badge - visual crown with qualifier for trust */}
         {isBestPrice && (
-          <div className="flex items-center gap-1.5 text-xs font-medium text-primary -mt-1 mb-1">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
-            Best price
+          <div className="-mt-1 mb-1">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
+              Best price
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-0.5 pl-3">
+              Lowest available right now
+            </p>
           </div>
         )}
 
@@ -182,32 +187,15 @@ export function ResultCard({
         <Button
           onClick={handlePrimaryClick}
           disabled={!isValidUrl}
-          className={cn(
-            'w-full h-10 font-medium',
-            isBestPrice
-              ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
-              : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-          )}
+          className="w-full h-10 font-medium bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           View at {retailerName}
           <ExternalLink className="ml-2 h-3.5 w-3.5" />
         </Button>
 
-        {/* 5. Track price - inline text link, not a button (safety net, not fork) */}
-        <button
-          onClick={handleTrackToggle}
-          className={cn(
-            'w-full text-xs text-center py-1 transition-colors',
-            trackingOptimistic
-              ? 'text-primary hover:text-primary/80'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          {trackingOptimistic ? 'Tracking · Stop' : 'Track price'}
-        </button>
-
-        {/* 6. Details - collapsed, truncated title */}
-        <div className="pt-2 border-t border-border">
+        {/* 5. Footer: Details toggle + Track price (insurance, not fork) */}
+        <div className="pt-2 border-t border-border space-y-2">
+          {/* Details toggle */}
           <button
             onClick={handleDetailsToggle}
             className="flex items-center justify-between w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -223,13 +211,10 @@ export function ResultCard({
           </button>
 
           {detailsExpanded && (
-            <div className="mt-2.5 space-y-1.5 text-sm animate-in slide-in-from-top-2 duration-200">
-              {/* Full product title */}
+            <div className="space-y-1.5 text-sm animate-in slide-in-from-top-2 duration-200">
               <p className="font-medium text-foreground leading-tight">
                 {productTitle}
               </p>
-
-              {/* Specs: Caliber, Grain, Case Material */}
               <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                 <span>{caliber}</span>
                 {grain && <span>· {grain}gr</span>}
@@ -237,6 +222,19 @@ export function ResultCard({
               </div>
             </div>
           )}
+
+          {/* Track price - subtle text at bottom, insurance not a fork */}
+          <button
+            onClick={handleTrackToggle}
+            className={cn(
+              'text-[11px] transition-colors',
+              trackingOptimistic
+                ? 'text-primary/70 hover:text-primary'
+                : 'text-muted-foreground/60 hover:text-muted-foreground'
+            )}
+          >
+            {trackingOptimistic ? 'Tracking · Stop' : 'Track price'}
+          </button>
         </div>
       </CardContent>
     </Card>

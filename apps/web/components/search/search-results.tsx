@@ -245,30 +245,17 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
             </div>
           )}
 
-          {/* Momentum CTAs - don't let page dead-end */}
-          <div className="mt-8 pt-6 border-t border-border">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-              {/* Track this search */}
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
-                <Bell className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Track this search</p>
-                  <p className="text-xs text-muted-foreground">Get notified when prices drop for "{query}"</p>
-                </div>
-              </div>
-
-              {/* Refine search */}
-              <Link
-                href={`/search?q=${encodeURIComponent(query)}`}
-                className="flex items-start gap-3 p-4 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors"
-              >
-                <TrendingDown className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">See price trends</p>
-                  <p className="text-xs text-muted-foreground">Historical pricing for this caliber</p>
-                </div>
-              </Link>
-            </div>
+          {/* Soft closing nudge - captures hesitant users without pressure */}
+          <div className="mt-10 text-center">
+            <p className="text-sm text-muted-foreground mb-3">
+              Not ready to buy?
+            </p>
+            <p className="text-xs text-muted-foreground/70">
+              We'll watch this for you and alert you if prices drop.
+            </p>
+            <button className="mt-2 text-xs text-primary hover:text-primary/80 underline underline-offset-2">
+              Track "{query}"
+            </button>
           </div>
         </div>
       </>

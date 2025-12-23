@@ -119,22 +119,33 @@ export function SearchResultsGrid({
     }
   })
 
+  const hasBestPrice = bestPriceProductId !== null
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {mixedResults.map((item, index) => (
-        <div key={`${item.type}-${index}`}>
-          {item.type === 'product' ? (
-            <SearchResultCard
-              product={item.data as Product}
-              isTracked={trackedIds.has((item.data as Product).id)}
-              isBestPrice={(item.data as Product).id === bestPriceProductId}
-              onTrackChange={handleTrackChange}
-            />
-          ) : (
-            <AdCard ad={item.data as Advertisement} />
-          )}
-        </div>
-      ))}
+    <div className="space-y-3">
+      {/* Anchoring line - reassures user they're seeing the best option */}
+      {hasBestPrice && products.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          We found the best available option for your search
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {mixedResults.map((item, index) => (
+          <div key={`${item.type}-${index}`}>
+            {item.type === 'product' ? (
+              <SearchResultCard
+                product={item.data as Product}
+                isTracked={trackedIds.has((item.data as Product).id)}
+                isBestPrice={(item.data as Product).id === bestPriceProductId}
+                onTrackChange={handleTrackChange}
+              />
+            ) : (
+              <AdCard ad={item.data as Advertisement} />
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
