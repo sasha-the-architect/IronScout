@@ -4,7 +4,7 @@ export type { ResultCardProps, CardBadge, BadgeType } from './result-card'
 
 // Result row components (grid/table view)
 export { ResultRow, ResultTableHeader, ResultRowSkeleton } from './result-row'
-export type { ResultRowProps } from './result-row'
+export type { ResultRowProps, GridSort, GridSortColumn } from './result-row'
 
 // View toggle
 export { ViewToggle } from './view-toggle'

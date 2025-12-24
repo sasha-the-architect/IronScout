@@ -203,47 +203,82 @@ export interface ColumnSort {
   direction: SortDirection
 }
 
+/**
+ * Grid-specific sort options (client-side)
+ * These extend the URL-based sorts with grid-only columns
+ */
+export type GridSortColumn = 'price' | 'total' | 'stock'
+export type GridSort = {
+  column: GridSortColumn
+  direction: 'asc' | 'desc'
+} | null
+
 interface ResultTableHeaderProps {
   currentSort?: string // e.g., 'price_asc', 'price_desc', 'date_desc'
+  gridSort?: GridSort // Client-side grid sorting
   onSortChange?: (sortValue: string) => void
+  onGridSortChange?: (sort: GridSort) => void
 }
 
 /**
- * Sortable column header
+ * Sortable column header - supports both URL-based and client-side sorting
  */
 function SortableHeader({
   children,
   column,
   currentSort,
+  gridSort,
   onSortChange,
+  onGridSortChange,
   ascValue,
   descValue,
+  isGridSort = false,
   className = '',
 }: {
   children: React.ReactNode
   column: string
   currentSort?: string
+  gridSort?: GridSort
   onSortChange?: (sortValue: string) => void
-  ascValue: string
-  descValue: string
+  onGridSortChange?: (sort: GridSort) => void
+  ascValue?: string
+  descValue?: string
+  isGridSort?: boolean // If true, use client-side grid sorting
   className?: string
 }) {
-  const isAsc = currentSort === ascValue
-  const isDesc = currentSort === descValue
+  // Determine active state based on sort type
+  let isAsc = false
+  let isDesc = false
+
+  if (isGridSort && gridSort) {
+    isAsc = gridSort.column === column && gridSort.direction === 'asc'
+    isDesc = gridSort.column === column && gridSort.direction === 'desc'
+  } else if (!isGridSort && currentSort) {
+    isAsc = currentSort === ascValue
+    isDesc = currentSort === descValue
+  }
+
   const isActive = isAsc || isDesc
 
   const handleClick = () => {
-    if (!onSortChange) return
-
-    if (isAsc) {
-      // Currently asc, switch to desc
-      onSortChange(descValue)
-    } else if (isDesc) {
-      // Currently desc, switch to relevance (clear)
-      onSortChange('relevance')
-    } else {
-      // Not sorted by this column, start with asc
-      onSortChange(ascValue)
+    if (isGridSort && onGridSortChange) {
+      // Client-side grid sorting
+      if (isAsc) {
+        onGridSortChange({ column: column as GridSortColumn, direction: 'desc' })
+      } else if (isDesc) {
+        onGridSortChange(null) // Clear sort
+      } else {
+        onGridSortChange({ column: column as GridSortColumn, direction: 'asc' })
+      }
+    } else if (!isGridSort && onSortChange && ascValue && descValue) {
+      // URL-based sorting
+      if (isAsc) {
+        onSortChange(descValue)
+      } else if (isDesc) {
+        onSortChange('relevance')
+      } else {
+        onSortChange(ascValue)
+      }
     }
   }
 
@@ -280,7 +315,12 @@ function SortableHeader({
 /**
  * ResultTableHeader - Column headers for grid view with sortable columns
  */
-export function ResultTableHeader({ currentSort, onSortChange }: ResultTableHeaderProps) {
+export function ResultTableHeader({
+  currentSort,
+  gridSort,
+  onSortChange,
+  onGridSortChange
+}: ResultTableHeaderProps) {
   return (
     <thead className="bg-muted/30">
       <tr className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -295,8 +335,23 @@ export function ResultTableHeader({ currentSort, onSortChange }: ResultTableHead
         >
           $/rd
         </SortableHeader>
-        <th className="py-3 px-4">Total</th>
-        <th className="py-3 px-4 text-center">Stock</th>
+        <SortableHeader
+          column="total"
+          gridSort={gridSort}
+          onGridSortChange={onGridSortChange}
+          isGridSort
+        >
+          Total
+        </SortableHeader>
+        <SortableHeader
+          column="stock"
+          gridSort={gridSort}
+          onGridSortChange={onGridSortChange}
+          isGridSort
+          className="text-center"
+        >
+          Stock
+        </SortableHeader>
         <th className="py-3 px-4 text-center">Alert</th>
         <th className="py-3 px-4">Action</th>
       </tr>
