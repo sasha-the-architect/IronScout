@@ -3,7 +3,7 @@
 import { useCallback, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Bell, ArrowUpRight, Check, X, ChevronUp, ChevronDown } from 'lucide-react'
+import { Bell, ArrowUpRight, Circle, ChevronUp, ChevronDown } from 'lucide-react'
 import { trackAffiliateClick, trackTrackToggle } from '@/lib/analytics'
 import { toast } from 'sonner'
 import {
@@ -138,11 +138,25 @@ export function ResultRow({
       {/* In Stock */}
       <td className="py-3 px-4 text-center">
         {inStock !== undefined && (
-          inStock ? (
-            <Check className="h-4 w-4 text-emerald-500 mx-auto" />
-          ) : (
-            <X className="h-4 w-4 text-muted-foreground/50 mx-auto" />
-          )
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex" aria-label={inStock ? 'In stock' : 'Out of stock'}>
+                  <Circle
+                    className={cn(
+                      'h-3 w-3 mx-auto',
+                      inStock
+                        ? 'text-emerald-500 fill-emerald-500'
+                        : 'text-red-400'
+                    )}
+                  />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">{inStock ? 'In stock' : 'Out of stock'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </td>
 
@@ -341,7 +355,7 @@ export function ResultTableHeader({
           onGridSortChange={onGridSortChange}
           isGridSort
         >
-          Total
+          Total Price
         </SortableHeader>
         <SortableHeader
           column="stock"

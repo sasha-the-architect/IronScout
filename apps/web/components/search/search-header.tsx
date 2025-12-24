@@ -82,7 +82,7 @@ export function SearchHeader({
       const priceRange = explicitFilters.minPrice !== undefined && explicitFilters.maxPrice !== undefined
         ? `$${explicitFilters.minPrice}-$${explicitFilters.maxPrice}`
         : explicitFilters.minPrice !== undefined ? `$${explicitFilters.minPrice}+` : `≤$${explicitFilters.maxPrice}`
-      activeFilters.push({ label: 'Price', value: priceRange, color: 'emerald' })
+      activeFilters.push({ label: 'Total', value: priceRange, color: 'emerald' })
     }
     if (explicitFilters.inStock) {
       activeFilters.push({ label: 'Stock', value: 'In Stock Only', color: 'teal' })
@@ -148,7 +148,7 @@ export function SearchHeader({
   const headline = getHeadline()
 
   return (
-    <div className="pb-2">
+    <div className="pb-1">
       {/* Headline */}
       {headline && (
         <p className="text-base font-medium text-foreground mb-1">

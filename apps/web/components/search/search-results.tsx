@@ -158,8 +158,8 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
           premiumFiltersActive={premiumFiltersActive}
         />
 
-        {/* Results Zone - visually separated from controls */}
-        <div className="space-y-4 mt-4">
+        {/* Results Zone */}
+        <div className="space-y-4">
           {/* Results Limited Banner */}
           {_meta?.resultsLimited && (
             <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-center justify-between">

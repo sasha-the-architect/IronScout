@@ -6,6 +6,8 @@ import { Search, Sparkles, X, Loader2, SlidersHorizontal, ChevronDown, RotateCcw
 import { Button } from '@/components/ui/button'
 import { getSearchSuggestions } from '@/lib/api'
 import { PremiumFilters } from '@/components/premium'
+import { cn } from '@/lib/utils'
+import { useSearchLoading } from './search-loading-context'
 
 // Common calibers for the ammunition market
 const CALIBERS = [
@@ -68,12 +70,12 @@ interface UnifiedSearchProps {
 export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedSearchProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { isSearching, startSearch } = useSearchLoading()
 
   // Search state
   const [query, setQuery] = useState(initialQuery)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [placeholderIndex, setPlaceholderIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
@@ -142,6 +144,7 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
     const q = searchQuery || query
     if (q.trim()) {
       setShowSuggestions(false)
+      startSearch()
       const params = new URLSearchParams(searchParams.toString())
       params.set('q', q.trim())
       params.delete('page') // Reset to page 1
@@ -263,15 +266,18 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
 
   return (
     <div className="w-full">
-      {/* Hero Search Bar */}
+      {/* Hero Search Bar - Tactical Console Style */}
       <div className="max-w-4xl mx-auto">
         <form onSubmit={handleSubmit} className="relative">
           <div className="relative">
             {/* AI Search - confident positioning */}
             <div className="absolute left-5 top-1/2 -translate-y-1/2 flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary text-primary-foreground">
-                <Sparkles className="h-4 w-4" />
-                <span className="text-xs font-semibold">AI Search</span>
+              <div className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-mono text-xs font-bold tracking-wider transition-all",
+                isSearching && "animate-pulse"
+              )}>
+                <Sparkles className={cn("h-4 w-4", isSearching && "animate-spin")} />
+                <span className="text-xs font-semibold">AI</span>
               </div>
             </div>
 
@@ -285,7 +291,7 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
               }}
               onFocus={() => setShowSuggestions(true)}
               placeholder={ROTATING_PLACEHOLDERS[placeholderIndex]}
-              className="w-full pl-28 sm:pl-32 pr-32 py-5 text-lg border-2 border-border rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all bg-background shadow-lg hover:shadow-xl"
+              className="w-full pl-24 sm:pl-28 pr-36 py-5 text-lg bg-transparent border-2 border-border rounded-2xl focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground/60 transition-all shadow-lg hover:shadow-xl dark:shadow-primary/5"
             />
 
             {/* Clear button */}
@@ -304,11 +310,11 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
 
             <Button
               type="submit"
-              disabled={isLoading}
+              disabled={isSearching}
               size="lg"
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary hover:bg-primary/90 rounded-xl px-6"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-primary hover:bg-primary/90 rounded-xl px-5 font-semibold tracking-wide shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-200"
             >
-              {isLoading ? (
+              {isSearching ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
                 <>
@@ -365,7 +371,7 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
                     setQuery(chip.query)
                     handleSearch(chip.query)
                   }}
-                  className="px-4 py-2 rounded-full border border-border bg-background hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-foreground shadow-sm hover:shadow"
+                  className="px-4 py-2.5 rounded-xl border border-border bg-card hover:border-primary/50 transition-all text-sm font-medium text-foreground shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
                 >
                   {chip.label}
                 </button>
@@ -419,55 +425,40 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
         )}
       </div>
 
-      {/* Filter Toggle - Discoverable */}
-      <div className="max-w-4xl mx-auto mt-6 flex items-center justify-center">
-        <div className="relative group">
+      {/* Refine Toggle - Minimal, secondary action */}
+      {query && (
+        <div className="max-w-4xl mx-auto mt-4 flex items-center justify-center">
           <button
             onClick={() => setFiltersOpen(!filtersOpen)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-xs ${
               filtersOpen || activeFilterCount > 0
                 ? 'bg-muted text-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
-            <SlidersHorizontal className="h-4 w-4" />
+            <SlidersHorizontal className="h-3.5 w-3.5" />
             <span>
-              {activeFilterCount > 0 ? `${activeFilterCount} filter${activeFilterCount > 1 ? 's' : ''} active` : 'Filters'}
+              {activeFilterCount > 0 ? `Refine (${activeFilterCount})` : 'Refine results'}
             </span>
-            {/* Count badge - shows available filters */}
-            {!filtersOpen && activeFilterCount === 0 && (
-              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-muted-foreground/20 rounded-full">
-                8+
-              </span>
-            )}
-            <ChevronDown className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
           </button>
-          {/* Hover preview tooltip */}
-          {!filtersOpen && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-foreground text-background text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-              Caliber, price, purpose, case material, bullet weight...
+        </div>
+      )}
+
+      {/* Refine Panel */}
+      {filtersOpen && (
+        <div className="max-w-4xl mx-auto mt-3 p-4 bg-muted/30 rounded-xl border border-border/50 animate-in slide-in-from-top-2 duration-200">
+          {activeFilterCount > 0 && (
+            <div className="flex justify-end mb-3">
+              <button
+                onClick={clearFilters}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Clear
+              </button>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Basic Filters Panel */}
-      {filtersOpen && (
-        <div className="max-w-4xl mx-auto mt-4 p-5 bg-muted/30 rounded-xl border border-border animate-in slide-in-from-top-2 duration-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-foreground">Quick Filters</h3>
-            {activeFilterCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="text-muted-foreground hover:text-foreground h-7 text-xs"
-              >
-                <RotateCcw className="h-3 w-3 mr-1" />
-                Clear
-              </Button>
-            )}
-          </div>
 
           {/* Core 3 filters - always visible */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -488,10 +479,10 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
               </select>
             </div>
 
-            {/* Price Range */}
+            {/* Total Price */}
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                Price Range
+                Total Price
               </label>
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
@@ -536,110 +527,82 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
             </div>
           </div>
 
-          {/* Expandable advanced filters */}
-          <details className="mt-4 group">
-            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors list-none flex items-center gap-1">
+          {/* Advanced Refinements - collapsed by default */}
+          <details className="mt-3 pt-3 border-t border-border/50 group">
+            <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors list-none flex items-center gap-1.5">
               <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
-              More options
+              Advanced refinements
             </summary>
 
-            <div className="mt-4 pt-4 border-t border-border space-y-4">
-              {/* Purpose & Casing */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                    Purpose
-                  </label>
-                  <select
-                    value={filters.purpose}
-                    onChange={(e) => handleSelectChange('purpose', e.target.value)}
-                    className="w-full px-3 py-2 text-sm border rounded-lg bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-                  >
-                    <option value="">Any purpose</option>
-                    {PURPOSES.map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
+            <div className="mt-3 space-y-3">
+              {/* Purpose, Case Material, Grain - in a compact row */}
+              <div className="grid grid-cols-3 gap-3">
+                <select
+                  value={filters.purpose}
+                  onChange={(e) => handleSelectChange('purpose', e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded-lg bg-background focus:border-primary transition-colors"
+                >
+                  <option value="">Purpose</option>
+                  {PURPOSES.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
 
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                    Brass or Steel
-                    <span className="ml-1 text-[10px] text-muted-foreground/70">(case material)</span>
-                  </label>
-                  <select
-                    value={filters.caseMaterial}
-                    onChange={(e) => handleSelectChange('caseMaterial', e.target.value)}
-                    className="w-full px-3 py-2 text-sm border rounded-lg bg-background focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-                  >
-                    <option value="">Any material</option>
-                    {CASE_MATERIALS.map(mat => (
-                      <option key={mat} value={mat}>{mat}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+                <select
+                  value={filters.caseMaterial}
+                  onChange={(e) => handleSelectChange('caseMaterial', e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded-lg bg-background focus:border-primary transition-colors"
+                >
+                  <option value="">Case material</option>
+                  {CASE_MATERIALS.map(mat => (
+                    <option key={mat} value={mat}>{mat}</option>
+                  ))}
+                </select>
 
-              {/* Bullet Weight */}
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-2">
-                  Bullet weight
-                  <span className="ml-1 text-[10px] text-muted-foreground/70">(heavier = more stopping power)</span>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => {
+                <select
+                  value={filters.minGrain && filters.maxGrain ? `${filters.minGrain}-${filters.maxGrain}` : ''}
+                  onChange={(e) => {
+                    if (!e.target.value) {
                       const newFilters = { ...filters, minGrain: '', maxGrain: '' }
                       setFilters(newFilters)
                       applyFilters(newFilters)
-                    }}
-                    className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                      !filters.minGrain && !filters.maxGrain
-                        ? 'bg-primary/10 border-primary text-primary'
-                        : 'border-border hover:border-primary hover:bg-primary/5'
-                    }`}
-                  >
-                    Any
-                  </button>
-                  {GRAIN_RANGES.map(range => {
-                    const isActive = filters.minGrain === String(range.min) && filters.maxGrain === String(range.max)
-                    return (
-                      <button
-                        key={range.label}
-                        onClick={() => handleGrainRange(range.min, range.max)}
-                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                          isActive
-                            ? 'bg-primary/10 border-primary text-primary'
-                            : 'border-border hover:border-primary hover:bg-primary/5'
-                        }`}
-                      >
-                        {range.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Premium Filters - Aspirational framing */}
-              <div className="pt-4 border-t border-border">
-                <button
-                  onClick={() => setPremiumFiltersOpen(!premiumFiltersOpen)}
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    } else {
+                      const [min, max] = e.target.value.split('-').map(Number)
+                      handleGrainRange(min, max)
+                    }
+                  }}
+                  className="w-full px-2 py-1.5 text-xs border rounded-lg bg-background focus:border-primary transition-colors"
                 >
-                  <Crown className="h-4 w-4 text-amber-500" />
-                  <span>Advanced filters used by serious buyers</span>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${premiumFiltersOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Subsonic, match grade, suppressor-safe, low flash
-                </p>
-
-                {premiumFiltersOpen && (
-                  <div className="mt-4">
-                    <PremiumFilters isPremium={isPremium} />
-                  </div>
-                )}
+                  <option value="">Grain weight</option>
+                  {GRAIN_RANGES.map(range => (
+                    <option key={range.label} value={`${range.min}-${range.max}`}>{range.label}</option>
+                  ))}
+                </select>
               </div>
+
+              {/* Premium Filters Toggle */}
+              {isPremium ? (
+                <div className="pt-2">
+                  <button
+                    onClick={() => setPremiumFiltersOpen(!premiumFiltersOpen)}
+                    className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 transition-colors"
+                  >
+                    <Crown className="h-3 w-3" />
+                    <span>Premium filters</span>
+                    <ChevronDown className={`h-3 w-3 transition-transform ${premiumFiltersOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {premiumFiltersOpen && (
+                    <div className="mt-2">
+                      <PremiumFilters isPremium={isPremium} />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="pt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Crown className="h-3 w-3 text-amber-500" />
+                  <span>Subsonic, match grade, suppressor-safe filters available with <a href="/pricing" className="text-primary underline-offset-2 hover:underline">Premium</a></span>
+                </div>
+              )}
             </div>
           </details>
         </div>

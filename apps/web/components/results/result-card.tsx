@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Bell, ChevronDown, ArrowUpRight } from 'lucide-react'
+import { Bell, ChevronDown, ArrowUpRight, Circle } from 'lucide-react'
 import { trackAffiliateClick, trackTrackToggle } from '@/lib/analytics'
 import { toast } from 'sonner'
 import {
@@ -155,10 +155,15 @@ export function ResultCard({
     displayBadges.unshift({ type: 'lowest_price', label: 'Current Lowest Price' })
   }
 
-  // Add "In Stock" badge if in stock and not already present
-  if (inStock && !displayBadges.some(b => b.type === 'in_stock')) {
-    displayBadges.push({ type: 'in_stock', label: 'In Stock' })
+  // Stock indicator helper
+  const getStockIndicator = () => {
+    if (inStock === undefined) return null
+    if (inStock) {
+      return { color: 'text-emerald-500', fill: 'fill-emerald-500', label: 'In stock' }
+    }
+    return { color: 'text-red-400', fill: '', label: 'Out of stock' }
   }
+  const stockIndicator = getStockIndicator()
 
   const handlePrimaryClick = useCallback(() => {
     trackAffiliateClick(id, retailerName, pricePerRound, placement)
@@ -234,33 +239,50 @@ export function ResultCard({
           {productTitle}
         </h3>
 
-        {/* 2. Badges */}
-        {displayBadges.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {displayBadges.map((badge, index) => (
-              <span
-                key={`${badge.type}-${index}`}
-                className={cn(
-                  'px-2 py-0.5 rounded text-xs font-medium',
-                  getBadgeStyles(badge.type)
-                )}
-              >
-                {badge.label}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* 3. Pricing Block */}
-        <div className="space-y-0.5 mb-3">
-          <p className="text-xs text-muted-foreground">Primary price</p>
-          <div className="font-bold font-mono tracking-tight text-2xl text-foreground">
-            {formatPricePerRound(pricePerRound)}
-            <span className="text-base font-normal text-muted-foreground ml-1">/ rd</span>
+        {/* 2. Pricing Block - fixed height for alignment */}
+        <div className="mb-3">
+          <div className="flex items-center gap-2">
+            <div className="font-bold font-mono tracking-tight text-2xl text-foreground">
+              {formatPricePerRound(pricePerRound)}
+              <span className="text-base font-normal text-muted-foreground ml-1">/ rd</span>
+            </div>
+            {stockIndicator && (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex" aria-label={stockIndicator.label}>
+                      <Circle className={cn('h-3 w-3', stockIndicator.color, stockIndicator.fill)} />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p className="text-xs">{stockIndicator.label}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             {formatTotalPrice(displayTotal, roundCount)}
           </p>
+        </div>
+
+        {/* 3. Badges - below pricing for alignment */}
+        <div className="min-h-[24px] mb-3">
+          {displayBadges.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {displayBadges.map((badge, index) => (
+                <span
+                  key={`${badge.type}-${index}`}
+                  className={cn(
+                    'px-2 py-0.5 rounded text-xs font-medium',
+                    getBadgeStyles(badge.type)
+                  )}
+                >
+                  {badge.label}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* 4. Retailer Line */}

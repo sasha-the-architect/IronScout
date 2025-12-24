@@ -215,16 +215,11 @@ export function SearchResultsGrid({
   const hasBestPrice = bestPriceProductId !== null
 
   return (
-    <div className="space-y-3">
-      {/* View Toggle + Card view anchoring line */}
-      <div className="flex items-center justify-between">
-        {viewMode === 'card' && hasBestPrice && products.length > 0 ? (
-          <p className="text-sm text-muted-foreground">
-            We found a strong option for your search
-          </p>
-        ) : viewMode === 'grid' ? (
-          // Grid view: Hide out of stock toggle
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+    <div className="space-y-2">
+      {/* View Toggle - right aligned, with filter on left for grid view */}
+      <div className="flex items-center justify-end gap-4">
+        {viewMode === 'grid' && (
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none mr-auto">
             <input
               type="checkbox"
               checked={hideOutOfStock}
@@ -238,8 +233,6 @@ export function SearchResultsGrid({
               )}
             </span>
           </label>
-        ) : (
-          <div /> // Spacer
         )}
         <ViewToggle value={viewMode} onChange={setViewMode} />
       </div>

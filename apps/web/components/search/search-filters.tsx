@@ -180,10 +180,10 @@ export function SearchFilters() {
         </CardContent>
       </Card>
 
-      {/* Price Range */}
+      {/* Total Price */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Price Range</CardTitle>
+          <CardTitle className="text-sm">Total Price</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Slider
