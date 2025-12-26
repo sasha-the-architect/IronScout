@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express'
 import { prisma } from '@ironscout/db'
 import { TIER_CONFIG } from '../config/tiers'
 import { getRedisClient } from '../config/redis'
+import { loggers } from '../config/logger'
+
+const log = loggers.auth
 
 /**
  * List of admin email addresses
@@ -122,7 +125,7 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
       }
     } catch (error) {
       // Token parsing failed
-      console.error('Admin auth token parse error:', error)
+      log.error('Admin auth token parse error', {}, error)
     }
   }
   
@@ -141,7 +144,7 @@ export function requireApiKey(req: Request, res: Response, next: NextFunction) {
   const expectedKey = process.env.INTERNAL_API_KEY
   
   if (!expectedKey) {
-    console.warn('INTERNAL_API_KEY not set - API key authentication disabled')
+    log.warn('INTERNAL_API_KEY not set - API key authentication disabled')
     return next()
   }
   
@@ -228,6 +231,8 @@ export interface RedisRateLimitOptions {
 const METRICS_PREFIX = 'rl:metrics:'
 const METRICS_TTL_SEC = 86400 // 24 hours
 
+const rateLimitLog = log.child('rateLimit')
+
 /**
  * Log a rate limit event with structured context
  */
@@ -236,27 +241,15 @@ function logRateLimitEvent(
   event: string,
   context: Record<string, unknown>
 ): void {
-  const timestamp = new Date().toISOString()
-  const logEntry = {
-    timestamp,
-    level,
-    service: 'api',
-    event,
-    ...context,
-  }
-
-  const prefix = `[${timestamp}] [RateLimit] [${level}]`
-  const message = `${prefix} ${event} ${JSON.stringify(context)}`
-
   switch (level) {
     case 'INFO':
-      console.info(message)
+      rateLimitLog.info(event, context)
       break
     case 'WARN':
-      console.warn(message)
+      rateLimitLog.warn(event, context)
       break
     case 'ERROR':
-      console.error(message)
+      rateLimitLog.error(event, context)
       break
   }
 }
@@ -295,7 +288,7 @@ async function trackRateLimitMetrics(
     await pipeline.exec()
   } catch (error) {
     // Don't let metrics tracking break the request
-    console.error('[RateLimit] Metrics tracking error:', error)
+    rateLimitLog.error('Metrics tracking error', {}, error)
   }
 }
 

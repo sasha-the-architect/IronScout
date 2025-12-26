@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Copy, RefreshCw, Check } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface PixelActionsProps {
   dealerId: string;
@@ -31,7 +32,7 @@ export function PixelActions({ dealerId, apiKey, pixelEnabled }: PixelActionsPro
         setIsEnabled(true);
       }
     } catch (error) {
-      console.error('Failed to generate API key:', error);
+      logger.error('Failed to generate API key', {}, error instanceof Error ? error : new Error(String(error)));
     } finally {
       setIsGenerating(false);
     }
@@ -45,7 +46,7 @@ export function PixelActions({ dealerId, apiKey, pixelEnabled }: PixelActionsPro
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy:', error);
+      logger.error('Failed to copy', {}, error instanceof Error ? error : new Error(String(error)));
     }
   };
 
@@ -62,7 +63,7 @@ export function PixelActions({ dealerId, apiKey, pixelEnabled }: PixelActionsPro
         setIsEnabled(!isEnabled);
       }
     } catch (error) {
-      console.error('Failed to toggle pixel:', error);
+      logger.error('Failed to toggle pixel', {}, error instanceof Error ? error : new Error(String(error)));
     } finally {
       setIsToggling(false);
     }

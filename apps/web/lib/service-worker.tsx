@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect } from 'react'
+import { createLogger } from './logger'
+
+const logger = createLogger('lib:service-worker')
 
 export function useServiceWorker() {
   useEffect(() => {
@@ -13,7 +16,7 @@ export function useServiceWorker() {
       navigator.serviceWorker
         .register('/sw.js')
         .then((registration) => {
-          console.log('Service Worker registered with scope:', registration.scope)
+          logger.info('Service Worker registered', { scope: registration.scope })
 
           // Check for updates periodically
           registration.addEventListener('updatefound', () => {
@@ -22,7 +25,7 @@ export function useServiceWorker() {
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                   // New content is available, notify user
-                  console.log('New content available, refresh to update')
+                  logger.info('New content available, refresh to update')
                   // You could show a toast here prompting user to refresh
                 }
               })
@@ -30,12 +33,12 @@ export function useServiceWorker() {
           })
         })
         .catch((error) => {
-          console.error('Service Worker registration failed:', error)
+          logger.error('Service Worker registration failed', {}, error)
         })
 
       // Handle controller change (when new SW takes over)
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        console.log('New service worker activated')
+        logger.info('New service worker activated')
       })
     }
   }, [])

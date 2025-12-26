@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('app:admin:sources')
 
 interface Source {
   id: string
@@ -34,7 +37,7 @@ export default function SourcesPage() {
       const data = await response.json()
       setSources(data)
     } catch (error) {
-      console.error('Error fetching sources:', error)
+      logger.error('Error fetching sources', {}, error)
     } finally {
       setLoading(false)
     }
@@ -50,7 +53,7 @@ export default function SourcesPage() {
         fetchSources()
       }
     } catch (error) {
-      console.error('Error toggling source:', error)
+      logger.error('Error toggling source', {}, error)
     }
   }
 
@@ -66,7 +69,7 @@ export default function SourcesPage() {
         fetchSources()
       }
     } catch (error) {
-      console.error('Error deleting source:', error)
+      logger.error('Error deleting source', {}, error)
     }
   }
 
@@ -84,7 +87,7 @@ export default function SourcesPage() {
         fetchSources()
       }
     } catch (error) {
-      console.error('Error triggering crawl:', error)
+      logger.error('Error triggering crawl', {}, error)
     }
   }
 

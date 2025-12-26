@@ -13,6 +13,9 @@ import { prisma } from '@ironscout/db'
 import { saveItem, unsaveItem, getSavedItems, countSavedItems } from '../services/saved-items'
 import { getUserTier, getAuthenticatedUserId } from '../middleware/auth'
 import { getMaxWatchlistItems, hasReachedWatchlistLimit, hasFeature } from '../config/tiers'
+import { loggers } from '../config/logger'
+
+const log = loggers.watchlist
 
 const router: any = Router()
 
@@ -74,7 +77,7 @@ router.get('/', async (req: Request, res: Response) => {
       _deprecated: 'This endpoint is deprecated. Use GET /api/saved-items instead.',
     })
   } catch (error) {
-    console.error('Get watchlist error (deprecated):', error)
+    log.error('Get watchlist error (deprecated)', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch watchlist' })
   }
 })
@@ -127,7 +130,7 @@ router.post('/', async (req: Request, res: Response) => {
       _deprecated: 'This endpoint is deprecated. Use POST /api/saved-items/:productId instead.',
     })
   } catch (error: any) {
-    console.error('Create watchlist item error (deprecated):', error)
+    log.error('Create watchlist item error (deprecated)', { error }, error as Error)
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid data', details: error.errors })
     }

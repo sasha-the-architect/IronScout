@@ -11,6 +11,9 @@ import {
 import { batchCalculatePriceSignalIndex, PriceSignalIndex } from './price-signal-index'
 import { BulletType, PressureRating, BULLET_TYPE_CATEGORIES } from '../../types/product-metadata'
 import { visibleDealerPriceWhere } from '../../config/tiers'
+import { loggers } from '../../config/logger'
+
+const log = loggers.ai
 
 /**
  * Explicit filters that can override AI intent
@@ -110,7 +113,7 @@ export async function aiSearch(
   const isPremium = userTier === 'PREMIUM'
   const premiumFeaturesUsed: string[] = []
   
-  console.log('[AI Search] Starting search with:', {
+  log.debug('Starting search', {
     query,
     page,
     limit,
@@ -163,24 +166,24 @@ export async function aiSearch(
         embedding: { not: null }
       }
       total = await prisma.product.count({ where: vectorCountWhere })
-      console.log('[AI Search] Vector search returned', products.length, 'results, total:', total)
+      log.debug('Vector search returned', { productsCount: products.length, total })
     } catch (error) {
-      console.warn('[AI Search] Vector search failed, falling back to standard search:', error)
+      log.warn('Vector search failed, falling back to standard search', { error })
       products = await standardSearch(where, skip, limit * 2, isPremium)
       total = await prisma.product.count({ where })
     }
   } else {
     // Use standard Prisma search with explicit filters
-    console.log('[AI Search] Using standard search', hasExplicitFilters ? '(explicit filters active)' : '')
+    log.debug('Using standard search', { hasExplicitFilters })
     products = await standardSearch(where, skip, limit * 2, isPremium)
     total = await prisma.product.count({ where })
-    console.log('[AI Search] Standard search returned', products.length, 'results, total:', total)
+    log.debug('Standard search returned', { productsCount: products.length, total })
   }
 
   // Ensure total is at least the number of products returned on this page
   // This handles edge cases where count query doesn't match actual results
   if (page === 1 && products.length > total) {
-    console.warn('[AI Search] Count mismatch: products.length', products.length, '> total', total, '- adjusting')
+    log.warn('Count mismatch - adjusting', { productsLength: products.length, total })
     total = products.length
   }
   
@@ -307,16 +310,16 @@ function mergeFiltersWithIntent(intent: SearchIntent, filters: ExplicitFilters):
   const merged = { ...intent }
   
   // Track if caliber was explicitly changed from AI interpretation
-  const caliberExplicitlyChanged = filters.caliber && 
+  const caliberExplicitlyChanged = filters.caliber &&
     !intent.calibers?.some(c => c.toLowerCase().includes(filters.caliber!.toLowerCase()))
-  
+
   // Explicit caliber overrides AI-detected calibers
   if (filters.caliber) {
     merged.calibers = [filters.caliber]
-    
+
     // If caliber changed, discard AI grain weights (they're caliber-specific)
     if (caliberExplicitlyChanged) {
-      console.log('[AI Search] Caliber explicitly changed - discarding AI grain weights')
+      log.debug('Caliber explicitly changed - discarding AI grain weights')
       merged.grainWeights = undefined
     }
   }
@@ -364,7 +367,7 @@ function mergeFiltersWithIntent(intent: SearchIntent, filters: ExplicitFilters):
     }
   }
   
-  console.log('[AI Search] Merged intent:', {
+  log.debug('Merged intent', {
     calibers: merged.calibers,
     purpose: merged.purpose,
     grainWeights: merged.grainWeights,
@@ -507,7 +510,7 @@ function buildWhereClause(intent: SearchIntent, explicitFilters: ExplicitFilters
     }
   }
   
-  console.log('[AI Search] Built where clause:', JSON.stringify(where, null, 2))
+  log.debug('Built where clause', { where })
   
   return where
 }

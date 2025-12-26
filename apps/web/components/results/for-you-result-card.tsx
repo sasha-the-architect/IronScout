@@ -6,6 +6,9 @@ import type { ProductFeedItem } from '@/types/dashboard'
 import { addToWatchlist, removeFromWatchlist } from '@/lib/api'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('for-you-result-card')
 
 interface ForYouResultCardProps {
   item: ProductFeedItem
@@ -54,7 +57,7 @@ export function ForYouResultCard({
         onTrackChange?.(item.product.id, true)
       }
     } catch (error) {
-      console.error('Failed to toggle tracking:', error)
+      logger.error('Failed to toggle tracking', {}, error)
       toast.error('Failed to update alert')
     }
   }, [accessToken, item.isWatched, item.id, item.product.id, onTrackChange])

@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Search, Crown, Bell, TrendingDown } from 'lucide-react'
 import { SearchHeader } from './search-header'
 import Link from 'next/link'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('search-results')
 
 interface SearchResultsProps {
   searchParams: {
@@ -265,7 +268,7 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
       </>
     )
   } catch (error) {
-    console.error('Search error:', error)
+    logger.error('Search error', {}, error)
     const message = error instanceof Error ? error.message : 'Unknown error'
     return (
       <>

@@ -11,6 +11,9 @@ import {
   notifyDealerSubscriptionExpired,
   type SubscriptionExpiredInfo,
 } from '@ironscout/notifications'
+import { logger } from '../config/logger'
+
+const log = logger.dealer
 
 // ============================================================================
 // TYPES
@@ -196,7 +199,7 @@ export async function sendSubscriptionExpiryNotification(
   })
 
   if (!dealer) {
-    console.log('[Subscription] Cannot send notification - dealer not found')
+    log.debug('Cannot send notification - dealer not found')
     return
   }
 
@@ -219,7 +222,8 @@ export async function sendSubscriptionExpiryNotification(
   // Update last notification timestamp
   await updateLastNotificationTime(dealerId)
 
-  console.log(
-    `[Subscription] Sent expiry notification for dealer ${dealer.businessName} (${dealerId})`
-  )
+  log.info('Sent expiry notification', {
+    businessName: dealer.businessName,
+    dealerId,
+  })
 }

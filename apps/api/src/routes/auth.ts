@@ -21,13 +21,16 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { z } from 'zod'
 import { authRateLimits } from '../middleware/auth'
+import { loggers } from '../config/logger'
+
+const log = loggers.auth
 
 const router: RouterType = Router()
 
 // JWT secret - must be set in environment
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
 if (!JWT_SECRET) {
-  console.error('[Auth] WARNING: JWT_SECRET not set. Auth will not work properly.')
+  log.error('JWT_SECRET not set - auth will not work properly')
 }
 
 // Admin emails - must use OAuth, not credentials
@@ -164,7 +167,7 @@ router.post('/signup', authRateLimits.signup, async (req: Request, res: Response
       ...tokens,
     })
   } catch (error) {
-    console.error('[Auth] Signup error:', error)
+    log.error('Signup error', {}, error)
     return res.status(500).json({
       error: 'An error occurred during signup',
     })
@@ -189,7 +192,7 @@ router.post('/signin', authRateLimits.signin, async (req: Request, res: Response
 
     // Block admin emails from credentials login
     if (ADMIN_EMAILS.includes(emailLower)) {
-      console.warn(`[Auth] Blocked credentials login attempt for admin email: ${emailLower}`)
+      log.warn('Blocked credentials login attempt for admin email', { email: emailLower })
       return res.status(403).json({
         error: 'Admin accounts must use OAuth sign-in',
       })
@@ -205,6 +208,8 @@ router.post('/signin', authRateLimits.signin, async (req: Request, res: Response
         password: true,
         tier: true,
         image: true,
+        status: true,
+        deletionScheduledFor: true,
       },
     })
 
@@ -213,6 +218,16 @@ router.post('/signin', authRateLimits.signin, async (req: Request, res: Response
         error: 'Invalid email or password',
       })
     }
+
+    // Check for deleted account
+    if (user.status === 'DELETED') {
+      return res.status(401).json({
+        error: 'This account has been deleted',
+      })
+    }
+
+    // Allow login for PENDING_DELETION to let them cancel
+    // The frontend will show them the cancel option
 
     // Verify password
     const isValid = await bcrypt.compare(password, user.password)
@@ -226,14 +241,18 @@ router.post('/signin', authRateLimits.signin, async (req: Request, res: Response
     const tokens = generateTokens(user.id, user.email)
 
     // Return user without password
-    const { password: _, ...userWithoutPassword } = user
+    const { password: _, status, deletionScheduledFor, ...userWithoutPassword } = user
 
     return res.json({
       user: userWithoutPassword,
       ...tokens,
+      // Include pending deletion info so frontend can show cancel option
+      pendingDeletion: status === 'PENDING_DELETION' ? {
+        scheduledFor: deletionScheduledFor?.toISOString()
+      } : null,
     })
   } catch (error) {
-    console.error('[Auth] Signin error:', error)
+    log.error('Signin error', {}, error)
     return res.status(500).json({
       error: 'An error occurred during sign in',
     })
@@ -246,8 +265,7 @@ router.post('/signin', authRateLimits.signin, async (req: Request, res: Response
 
 router.post('/oauth/signin', authRateLimits.oauth, async (req: Request, res: Response) => {
   try {
-    // Log incoming request for debugging
-    console.log('[Auth] OAuth signin request:', {
+    log.debug('OAuth signin request', {
       provider: req.body?.provider,
       email: req.body?.email,
       hasProviderAccountId: !!req.body?.providerAccountId,
@@ -255,7 +273,7 @@ router.post('/oauth/signin', authRateLimits.oauth, async (req: Request, res: Res
 
     // Check JWT_SECRET before proceeding
     if (!JWT_SECRET) {
-      console.error('[Auth] JWT_SECRET not configured - cannot generate tokens')
+      log.error('JWT_SECRET not configured - cannot generate tokens')
       return res.status(500).json({
         error: 'Server configuration error: JWT_SECRET not set',
       })
@@ -263,7 +281,7 @@ router.post('/oauth/signin', authRateLimits.oauth, async (req: Request, res: Res
 
     const parsed = oauthSigninSchema.safeParse(req.body)
     if (!parsed.success) {
-      console.error('[Auth] OAuth validation failed:', parsed.error.issues)
+      log.error('OAuth validation failed', { issues: parsed.error.issues })
       return res.status(400).json({
         error: 'Validation failed',
         details: parsed.error.issues,
@@ -290,20 +308,34 @@ router.post('/oauth/signin', authRateLimits.oauth, async (req: Request, res: Res
             name: true,
             tier: true,
             image: true,
+            status: true,
+            deletionScheduledFor: true,
           },
         },
       },
     })
 
     if (existingAccount) {
+      const existingUser = existingAccount.user
+
+      // Block deleted accounts
+      if (existingUser.status === 'DELETED') {
+        return res.status(401).json({
+          error: 'This account has been deleted',
+        })
+      }
+
       // User exists, return tokens
-      const tokens = generateTokens(existingAccount.user.id, existingAccount.user.email)
-      const isAdmin = ADMIN_EMAILS.includes(existingAccount.user.email.toLowerCase())
+      const tokens = generateTokens(existingUser.id, existingUser.email)
+      const isAdmin = ADMIN_EMAILS.includes(existingUser.email.toLowerCase())
 
       return res.json({
-        user: { ...existingAccount.user, isAdmin },
+        user: { ...existingUser, isAdmin },
         ...tokens,
         isNewUser: false,
+        pendingDeletion: existingUser.status === 'PENDING_DELETION' ? {
+          scheduledFor: existingUser.deletionScheduledFor?.toISOString()
+        } : null,
       })
     }
 
@@ -316,11 +348,20 @@ router.post('/oauth/signin', authRateLimits.oauth, async (req: Request, res: Res
         name: true,
         tier: true,
         image: true,
+        status: true,
+        deletionScheduledFor: true,
       },
     })
 
     if (user) {
-      // Link OAuth account to existing user
+      // Block deleted accounts
+      if (user.status === 'DELETED') {
+        return res.status(401).json({
+          error: 'This account has been deleted',
+        })
+      }
+
+      // Link OAuth account to existing user (re-links after pending deletion)
       await prisma.account.create({
         data: {
           userId: user.id,
@@ -340,11 +381,14 @@ router.post('/oauth/signin', authRateLimits.oauth, async (req: Request, res: Res
         user: { ...user, isAdmin },
         ...tokens,
         isNewUser: false,
+        pendingDeletion: user.status === 'PENDING_DELETION' ? {
+          scheduledFor: user.deletionScheduledFor?.toISOString()
+        } : null,
       })
     }
 
     // Create new user with OAuth account
-    user = await prisma.user.create({
+    const newUser = await prisma.user.create({
       data: {
         email: emailLower,
         name: name || null,
@@ -371,21 +415,16 @@ router.post('/oauth/signin', authRateLimits.oauth, async (req: Request, res: Res
       },
     })
 
-    const tokens = generateTokens(user.id, user.email)
-    const isAdmin = ADMIN_EMAILS.includes(user.email.toLowerCase())
+    const tokens = generateTokens(newUser.id, newUser.email)
+    const isAdmin = ADMIN_EMAILS.includes(newUser.email.toLowerCase())
 
     return res.status(201).json({
-      user: { ...user, isAdmin },
+      user: { ...newUser, isAdmin },
       ...tokens,
       isNewUser: true,
     })
   } catch (error) {
-    // Log full error details for debugging
-    console.error('[Auth] OAuth signin error:', {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined,
-    })
+    log.error('OAuth signin error', {}, error)
     return res.status(500).json({
       error: 'An error occurred during OAuth sign in',
     })
@@ -442,7 +481,7 @@ router.post('/oauth/link', authRateLimits.oauth, async (req: Request, res: Respo
 
     return res.json({ message: 'Account linked successfully' })
   } catch (error) {
-    console.error('[Auth] OAuth link error:', error)
+    log.error('OAuth link error', {}, error)
     return res.status(500).json({
       error: 'An error occurred while linking account',
     })
@@ -489,7 +528,7 @@ router.get('/session', async (req: Request, res: Response) => {
       user: { ...user, isAdmin },
     })
   } catch (error) {
-    console.error('[Auth] Session error:', error)
+    log.error('Session error', {}, error)
     return res.status(500).json({
       error: 'An error occurred while validating session',
     })
@@ -527,7 +566,7 @@ router.post('/refresh', authRateLimits.refresh, async (req: Request, res: Respon
 
     return res.json(tokens)
   } catch (error) {
-    console.error('[Auth] Refresh error:', error)
+    log.error('Refresh error', {}, error)
     return res.status(500).json({
       error: 'An error occurred while refreshing token',
     })
@@ -585,7 +624,7 @@ router.get('/user/:id', async (req: Request, res: Response) => {
 
     return res.json({ user })
   } catch (error) {
-    console.error('[Auth] Get user error:', error)
+    log.error('Get user error', {}, error)
     return res.status(500).json({
       error: 'An error occurred while fetching user',
     })
@@ -632,7 +671,7 @@ router.patch('/user/:id', async (req: Request, res: Response) => {
 
     return res.json({ user })
   } catch (error) {
-    console.error('[Auth] Update user error:', error)
+    log.error('Update user error', {}, error)
     return res.status(500).json({
       error: 'An error occurred while updating user',
     })

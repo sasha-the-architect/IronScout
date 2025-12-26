@@ -1,5 +1,8 @@
 import OpenAI from 'openai'
 import { prisma } from '@ironscout/db'
+import { loggers } from '../../config/logger'
+
+const log = loggers.ai
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -161,8 +164,8 @@ export async function backfillProductEmbeddings(options: {
   
   const total = products.length
   let processed = 0
-  
-  console.log(`Found ${total} products without embeddings`)
+
+  log.info('Found products without embeddings', { total })
   
   // Process in batches
   for (let i = 0; i < products.length; i += batchSize) {
@@ -190,12 +193,12 @@ export async function backfillProductEmbeddings(options: {
       
       processed += batch.length
       onProgress?.(processed, total)
-      
-      console.log(`Processed ${processed}/${total} products`)
-      
+
+      log.info('Processed products', { processed, total })
+
     } catch (err) {
       errors.push(`Batch ${i} failed: ${err}`)
-      console.error(`Batch ${i} failed:`, err)
+      log.error('Batch failed', { batchIndex: i, error: err }, err as Error)
     }
     
     // Small delay between batches

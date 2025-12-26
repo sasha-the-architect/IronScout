@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
+import { logger } from '../config/logger'
+
+const log = logger.child('logs')
 
 const router: any = Router()
 
@@ -61,7 +64,7 @@ router.get('/', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('Error fetching logs:', error)
+    log.error('Error fetching logs', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch logs' })
   }
 })
@@ -81,7 +84,7 @@ router.get('/events', async (req: Request, res: Response) => {
 
     res.json(events.map((e: any) => e.event))
   } catch (error) {
-    console.error('Error fetching events:', error)
+    log.error('Error fetching events', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch events' })
   }
 })

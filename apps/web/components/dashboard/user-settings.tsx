@@ -1,28 +1,143 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { User, Mail, Bell, Crown, LogOut, Trash2, Shield } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { User, Mail, Bell, Crown, LogOut, Trash2, Shield, AlertTriangle, Clock, XCircle, Loader2 } from 'lucide-react'
 import Image from 'next/image'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('user-settings')
+
+interface DeletionBlocker {
+  code: string
+  message: string
+  resolution?: string
+}
+
+interface DeletionEligibility {
+  eligible: boolean
+  blockers: DeletionBlocker[]
+  pendingDeletion: {
+    requestedAt: string
+    scheduledFor: string
+  } | null
+}
 
 export function UserSettings() {
   const { data: session } = useSession()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [emailNotifications, setEmailNotifications] = useState(true)
   const [priceDropAlerts, setPriceDropAlerts] = useState(true)
   const [backInStockAlerts, setBackInStockAlerts] = useState(true)
   const [weeklyDigest, setWeeklyDigest] = useState(false)
 
+  // Deletion state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [deletionEligibility, setDeletionEligibility] = useState<DeletionEligibility | null>(null)
+  const [loadingEligibility, setLoadingEligibility] = useState(false)
+  const [deletionLoading, setDeletionLoading] = useState(false)
+  const [deletionError, setDeletionError] = useState<string | null>(null)
+
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' })
   }
 
-  const handleDeleteAccount = () => {
-    if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-      // TODO: Implement account deletion
-      alert('Account deletion will be implemented soon')
+  // Check if user came back to cancel deletion
+  useEffect(() => {
+    if (searchParams.get('cancel-deletion') === 'true') {
+      handleCancelDeletion()
+      // Remove the query param
+      router.replace('/dashboard/settings')
+    }
+  }, [searchParams])
+
+  // Fetch deletion eligibility when dialog opens
+  useEffect(() => {
+    if (showDeleteDialog && !deletionEligibility) {
+      fetchDeletionEligibility()
+    }
+  }, [showDeleteDialog])
+
+  const fetchDeletionEligibility = async () => {
+    setLoadingEligibility(true)
+    try {
+      const res = await fetch('/api/users/me/deletion-eligibility', {
+        headers: {
+          'Authorization': `Bearer ${(session as any)?.accessToken}`
+        }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setDeletionEligibility(data)
+      }
+    } catch (error) {
+      logger.error('Failed to check deletion eligibility', {}, error)
+    } finally {
+      setLoadingEligibility(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE MY ACCOUNT') {
+      setDeletionError('Please type "DELETE MY ACCOUNT" exactly to confirm')
+      return
+    }
+
+    setDeletionLoading(true)
+    setDeletionError(null)
+
+    try {
+      const res = await fetch('/api/users/me/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(session as any)?.accessToken}`
+        },
+        body: JSON.stringify({ confirmation: deleteConfirmation })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setDeletionError(data.error || 'Failed to initiate account deletion')
+        return
+      }
+
+      // Sign out after successful deletion request
+      await signOut({ callbackUrl: '/?deleted=pending' })
+    } catch (error) {
+      setDeletionError('An error occurred. Please try again.')
+    } finally {
+      setDeletionLoading(false)
+    }
+  }
+
+  const handleCancelDeletion = async () => {
+    setDeletionLoading(true)
+    try {
+      const res = await fetch('/api/users/me/cancel-deletion', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${(session as any)?.accessToken}`
+        }
+      })
+
+      if (res.ok) {
+        // Refresh eligibility state
+        setDeletionEligibility(null)
+        fetchDeletionEligibility()
+      }
+    } catch (error) {
+      logger.error('Failed to cancel deletion', {}, error)
+    } finally {
+      setDeletionLoading(false)
     }
   }
 
@@ -253,7 +368,7 @@ export function UserSettings() {
             <Button
               variant="outline"
               className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-              onClick={handleDeleteAccount}
+              onClick={() => setShowDeleteDialog(true)}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete Account
@@ -261,6 +376,169 @@ export function UserSettings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Account Dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-background border rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-full bg-destructive/10">
+                  <AlertTriangle className="h-6 w-6 text-destructive" />
+                </div>
+                <h2 className="text-xl font-semibold">Delete Account</h2>
+              </div>
+
+              {loadingEligibility ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : deletionEligibility?.pendingDeletion ? (
+                /* Pending deletion - show cancel option */
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                    <div className="flex items-start gap-3">
+                      <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-amber-800 dark:text-amber-200">
+                          Deletion Scheduled
+                        </p>
+                        <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                          Your account is scheduled for permanent deletion on{' '}
+                          <strong>
+                            {new Date(deletionEligibility.pendingDeletion.scheduledFor).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </strong>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-muted-foreground">
+                    You can cancel this deletion request if you change your mind. After the scheduled date, your data will be permanently removed.
+                  </p>
+
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setShowDeleteDialog(false)}
+                    >
+                      Close
+                    </Button>
+                    <Button
+                      variant="default"
+                      className="flex-1"
+                      onClick={handleCancelDeletion}
+                      disabled={deletionLoading}
+                    >
+                      {deletionLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Cancel Deletion
+                    </Button>
+                  </div>
+                </div>
+              ) : !deletionEligibility?.eligible ? (
+                /* Not eligible - show blockers */
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Your account cannot be deleted at this time. Please resolve the following:
+                  </p>
+
+                  <div className="space-y-3">
+                    {deletionEligibility?.blockers.map((blocker, i) => (
+                      <div key={i} className="p-4 rounded-lg bg-destructive/5 border border-destructive/20">
+                        <p className="font-medium text-destructive">{blocker.message}</p>
+                        {blocker.resolution && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {blocker.resolution}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowDeleteDialog(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              ) : (
+                /* Eligible - show confirmation form */
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/20">
+                    <p className="text-sm">
+                      <strong>This action cannot be easily undone.</strong> After a 14-day cooling-off period, all your data will be permanently deleted, including:
+                    </p>
+                    <ul className="text-sm mt-2 space-y-1 list-disc list-inside text-muted-foreground">
+                      <li>Saved items and watchlists</li>
+                      <li>Price alerts and notification preferences</li>
+                      <li>Search history and preferences</li>
+                      <li>Account settings and profile information</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Type <span className="font-mono bg-muted px-1 py-0.5 rounded">DELETE MY ACCOUNT</span> to confirm:
+                    </label>
+                    <Input
+                      value={deleteConfirmation}
+                      onChange={(e) => {
+                        setDeleteConfirmation(e.target.value)
+                        setDeletionError(null)
+                      }}
+                      placeholder="DELETE MY ACCOUNT"
+                      className="font-mono"
+                    />
+                  </div>
+
+                  {deletionError && (
+                    <p className="text-sm text-destructive">{deletionError}</p>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setShowDeleteDialog(false)
+                        setDeleteConfirmation('')
+                        setDeletionError(null)
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={handleDeleteAccount}
+                      disabled={deletionLoading || deleteConfirmation !== 'DELETE MY ACCOUNT'}
+                    >
+                      {deletionLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-2" />
+                      )}
+                      Delete Account
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

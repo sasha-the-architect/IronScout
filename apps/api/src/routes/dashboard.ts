@@ -12,6 +12,9 @@ import {
   visibleDealerPriceWhere
 } from '../config/tiers'
 import { getUserTier, getAuthenticatedUserId } from '../middleware/auth'
+import { loggers } from '../config/logger'
+
+const log = loggers.dashboard
 
 const router: any = Router()
 
@@ -172,7 +175,7 @@ router.get('/pulse', async (req: Request, res: Response) => {
       }
     })
   } catch (error) {
-    console.error('Market pulse error:', error)
+    log.error('Market pulse error', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch market pulse' })
   }
 })
@@ -314,7 +317,7 @@ router.get('/deals', async (req: Request, res: Response) => {
       }
     })
   } catch (error) {
-    console.error('Deals for you error:', error)
+    log.error('Deals for you error', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch deals' })
   }
 })
@@ -370,7 +373,7 @@ router.get('/savings', async (req: Request, res: Response) => {
       _deprecated: 'Price delta/savings feature was deprecated with ADR-011. targetPrice no longer exists.'
     })
   } catch (error) {
-    console.error('Savings error:', error)
+    log.error('Savings error', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch savings' })
   }
 })
@@ -469,7 +472,7 @@ router.get('/price-history/:caliber', async (req: Request, res: Response) => {
       }
     })
   } catch (error) {
-    console.error('Price history error:', error)
+    log.error('Price history error', { error }, error as Error)
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid parameters', details: error.errors })
     }

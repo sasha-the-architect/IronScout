@@ -35,7 +35,7 @@ export async function sendApprovalEmail(
   email: string,
   businessName: string
 ): Promise<SendEmailResult> {
-  const emailLogger = logger.child({ action: 'sendApprovalEmail', email });
+  const emailLogger = logger.child('email', { action: 'sendApprovalEmail', email });
   
   emailLogger.info('Sending approval notification email');
   

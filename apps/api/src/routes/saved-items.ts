@@ -23,6 +23,9 @@ import {
 } from '../services/saved-items'
 import { getUserTier, getAuthenticatedUserId } from '../middleware/auth'
 import { getMaxWatchlistItems, hasReachedWatchlistLimit } from '../config/tiers'
+import { loggers } from '../config/logger'
+
+const log = loggers.watchlist
 
 const router: any = Router()
 
@@ -64,7 +67,7 @@ router.get('/', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('Get saved items error:', error)
+    log.error('Get saved items error', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch saved items' })
   }
 })
@@ -116,7 +119,7 @@ router.post('/:productId', async (req: Request, res: Response) => {
       },
     })
   } catch (error: any) {
-    console.error('Save item error:', error)
+    log.error('Save item error', { error }, error as Error)
 
     if (error.message === 'Product not found') {
       return res.status(404).json({ error: 'Product not found' })
@@ -143,7 +146,7 @@ router.delete('/:productId', async (req: Request, res: Response) => {
 
     res.json({ message: 'Item removed', productId })
   } catch (error: any) {
-    console.error('Unsave item error:', error)
+    log.error('Unsave item error', { error }, error as Error)
 
     if (error.message === 'Item not found') {
       return res.status(404).json({ error: 'Item not found' })
@@ -171,7 +174,7 @@ router.patch('/:productId', async (req: Request, res: Response) => {
 
     res.json(item)
   } catch (error: any) {
-    console.error('Update prefs error:', error)
+    log.error('Update prefs error', { error }, error as Error)
 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid data', details: error.errors })
@@ -209,7 +212,7 @@ router.get('/:productId', async (req: Request, res: Response) => {
 
     res.json({ ...item, isSaved: true })
   } catch (error) {
-    console.error('Get saved item error:', error)
+    log.error('Get saved item error', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch item' })
   }
 })

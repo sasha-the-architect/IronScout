@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify, SignJWT } from 'jose';
 import { prisma } from '@ironscout/db';
+import { loggers } from '@/lib/logger';
 
 // Force dynamic rendering - this route uses cookies for auth
 export const dynamic = 'force-dynamic';
@@ -33,7 +34,7 @@ function getBaseUrl(request: NextRequest): string {
 export async function GET(request: NextRequest) {
   const baseUrl = getBaseUrl(request);
   
-  console.log('[Impersonate Route] Environment:', {
+  loggers.auth.info('Impersonate route environment', {
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     DEALER_PORTAL_URL: process.env.DEALER_PORTAL_URL,
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
   const token = searchParams.get('token');
 
   if (!token) {
-    console.error('Impersonation: No token provided');
+    loggers.auth.error('Impersonation: No token provided');
     return NextResponse.redirect(`${baseUrl}/login?error=missing_token`);
   }
 
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     // Check if this is an impersonation token
     if (!payload.isImpersonating) {
-      console.error('Impersonation: Token is not an impersonation token');
+      loggers.auth.error('Impersonation: Token is not an impersonation token');
       return NextResponse.redirect(`${baseUrl}/login?error=invalid_token`);
     }
 
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!dealerUser) {
-      console.error('Impersonation: Dealer user not found:', payload.dealerUserId);
+      loggers.auth.error('Impersonation: Dealer user not found', { dealerUserId: payload.dealerUserId });
       return NextResponse.redirect(`${baseUrl}/login?error=dealer_not_found`);
     }
 
@@ -90,7 +91,10 @@ export async function GET(request: NextRequest) {
       .setExpirationTime('4h')
       .sign(DEALER_JWT_SECRET);
 
-    console.log('Impersonation: Success for', dealerUser.email, 'by', payload.impersonatedBy);
+    loggers.auth.info('Impersonation success', {
+      dealerEmail: dealerUser.email,
+      impersonatedBy: payload.impersonatedBy
+    });
 
     // Create redirect response and set cookies on it
     // Note: cookies().set() doesn't work with redirects - must set on response directly
@@ -120,12 +124,7 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('Impersonation error:', error);
-    // Log more details about the error
-    if (error instanceof Error) {
-      console.error('Error message:', error.message);
-      console.error('Error name:', error.name);
-    }
+    loggers.auth.error('Impersonation error', {}, error instanceof Error ? error : new Error(String(error)));
     return NextResponse.redirect(`${baseUrl}/login?error=invalid_token`);
   }
 }

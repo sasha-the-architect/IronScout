@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { createCheckoutSession, createPortalSession } from './actions';
+import { logger } from '@/lib/logger';
 
 interface DealerBillingData {
   id: string;
@@ -103,7 +104,7 @@ export function BillingSettings({ dealer, canManage }: BillingSettingsProps) {
       }
     } catch (err) {
       setError('An unexpected error occurred');
-      console.error('Checkout error:', err);
+      logger.error('Checkout error', {}, err instanceof Error ? err : new Error(String(err)));
     } finally {
       setIsLoading(false);
       setLoadingAction(null);
@@ -128,7 +129,7 @@ export function BillingSettings({ dealer, canManage }: BillingSettingsProps) {
       }
     } catch (err) {
       setError('An unexpected error occurred');
-      console.error('Portal error:', err);
+      logger.error('Portal error', {}, err instanceof Error ? err : new Error(String(err)));
     } finally {
       setIsLoading(false);
       setLoadingAction(null);

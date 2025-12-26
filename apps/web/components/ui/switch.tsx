@@ -3,15 +3,17 @@
 import * as React from 'react'
 
 interface SwitchProps {
+  id?: string
   checked?: boolean
   onCheckedChange?: (checked: boolean) => void
   disabled?: boolean
   className?: string
 }
 
-export function Switch({ checked = false, onCheckedChange, disabled = false, className = '' }: SwitchProps) {
+export function Switch({ id, checked = false, onCheckedChange, disabled = false, className = '' }: SwitchProps) {
   return (
     <button
+      id={id}
       type="button"
       role="switch"
       aria-checked={checked}

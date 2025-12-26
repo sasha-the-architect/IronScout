@@ -6,6 +6,9 @@
  */
 
 import { NextResponse } from 'next/server'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('api:signup')
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -28,7 +31,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
-    console.error('[Signup] Error:', error)
+    logger.error('Signup error', {}, error)
     return NextResponse.json(
       { error: 'An error occurred during signup' },
       { status: 500 }

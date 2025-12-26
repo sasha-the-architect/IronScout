@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { getMarketPulse } from '@/lib/api'
 import type { MarketPulseResponse, UseMarketPulseResult } from '@/types/dashboard'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('hooks:market-pulse')
 
 /**
  * Hook for fetching Market Pulse data
@@ -30,7 +33,7 @@ export function useMarketPulse(): UseMarketPulseResult {
       const response = await getMarketPulse(token)
       setData(response)
     } catch (err) {
-      console.error('Failed to fetch market pulse:', err)
+      logger.error('Failed to fetch market pulse', {}, err)
       setError(err instanceof Error ? err.message : 'Failed to load market pulse')
     } finally {
       setLoading(false)

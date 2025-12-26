@@ -9,6 +9,9 @@ import {
   normalizePurpose,
   getCaliberVariations,
 } from './ammo-knowledge'
+import { loggers } from '../../config/logger'
+
+const log = loggers.ai
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -145,7 +148,7 @@ export async function parseSearchIntent(
     const intent = await parseWithClaude(query, userTier)
     return intent
   } catch (error) {
-    console.error('Claude parsing failed, falling back to local parse:', error)
+    log.error('Claude parsing failed, falling back to local parse', { error }, error as Error)
     return quickParse || {
       originalQuery: query,
       keywords: query.split(/\s+/).filter(w => w.length > 2),

@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import { Search, Sparkles, X, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getSearchSuggestions } from '@/lib/api'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('ai-search-bar')
 
 interface AISearchBarProps {
   initialQuery?: string
@@ -52,7 +55,7 @@ export function AISearchBar({ initialQuery = '' }: AISearchBarProps) {
         const results = await getSearchSuggestions(query)
         setSuggestions(results.slice(0, 5))
       } catch (error) {
-        console.error('Failed to fetch suggestions:', error)
+        logger.error('Failed to fetch suggestions', {}, error)
       }
     }, 200)
 

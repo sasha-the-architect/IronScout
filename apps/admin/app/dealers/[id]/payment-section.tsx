@@ -240,7 +240,7 @@ export function PaymentSection({
       }
     } catch (err) {
       setError('An unexpected error occurred');
-      console.error('Error updating payment details:', err);
+      // Error already logged by the server action
     } finally {
       setIsSaving(false);
     }

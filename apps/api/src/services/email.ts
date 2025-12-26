@@ -1,5 +1,7 @@
 import { Resend } from 'resend'
+import { loggers } from '../config/logger'
 
+const log = loggers.email
 const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM_EMAIL = process.env.FROM_EMAIL || 'alerts@ironscout.ai'
 
@@ -25,6 +27,12 @@ interface BackInStockEmailData {
   retailerUrl: string
 }
 
+interface AccountDeletionEmailData {
+  userName: string
+  scheduledFor: Date
+  cancelUrl: string
+}
+
 export async function sendPriceDropEmail(
   to: string,
   data: PriceDropEmailData
@@ -38,9 +46,9 @@ export async function sendPriceDropEmail(
       subject: `🎉 Price Drop Alert: ${data.productName}`,
       html
     })
-    console.log(`Price drop email sent to ${to} for ${data.productName}`)
+    log.info('Price drop email sent', { to, productName: data.productName })
   } catch (error) {
-    console.error('Failed to send price drop email:', error)
+    log.error('Failed to send price drop email', { to, error }, error as Error)
     throw error
   }
 }
@@ -58,9 +66,9 @@ export async function sendBackInStockEmail(
       subject: `✨ Back in Stock: ${data.productName}`,
       html
     })
-    console.log(`Back in stock email sent to ${to} for ${data.productName}`)
+    log.info('Back in stock email sent', { to, productName: data.productName })
   } catch (error) {
-    console.error('Failed to send back in stock email:', error)
+    log.error('Failed to send back in stock email', { to, error }, error as Error)
     throw error
   }
 }
@@ -281,6 +289,132 @@ function generateBackInStockEmailHTML(data: BackInStockEmailData): string {
                     <p style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center;">
                       <a href="${process.env.FRONTEND_URL}/dashboard/alerts" style="color: #f5576c; text-decoration: none;">Manage your alerts</a> |
                       <a href="${process.env.FRONTEND_URL}/dashboard/settings" style="color: #f5576c; text-decoration: none;">Notification settings</a>
+                    </p>
+                    <p style="margin: 15px 0 0 0; color: #9ca3af; font-size: 11px; text-align: center;">
+                      © ${new Date().getFullYear()} IronScout.ai. All rights reserved.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `
+}
+
+export async function sendAccountDeletionEmail(
+  to: string,
+  data: AccountDeletionEmailData
+): Promise<void> {
+  const html = generateAccountDeletionEmailHTML(data)
+
+  try {
+    await resend.emails.send({
+      from: `IronScout.ai <${FROM_EMAIL}>`,
+      to: [to],
+      subject: 'Account Deletion Request Received',
+      html
+    })
+    log.info('Account deletion email sent', { to })
+  } catch (error) {
+    log.error('Failed to send account deletion email', { to, error }, error as Error)
+    throw error
+  }
+}
+
+function generateAccountDeletionEmailHTML(data: AccountDeletionEmailData): string {
+  const formattedDate = data.scheduledFor.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Account Deletion Request</title>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 20px 0;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <tr>
+                  <td style="background-color: #dc2626; padding: 30px 40px; text-align: center;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">
+                      Account Deletion Request
+                    </h1>
+                  </td>
+                </tr>
+
+                <!-- Content -->
+                <tr>
+                  <td style="padding: 40px;">
+                    <p style="margin: 0 0 20px 0; color: #1a1a1a; font-size: 16px; line-height: 1.6;">
+                      Hi ${data.userName},
+                    </p>
+
+                    <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                      We received your request to delete your IronScout.ai account. Your account will be permanently deleted on:
+                    </p>
+
+                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 30px;">
+                      <tr>
+                        <td style="padding: 20px; background-color: #fef2f2; border-radius: 8px; border-left: 4px solid #dc2626; text-align: center;">
+                          <p style="margin: 0; color: #991b1b; font-size: 20px; font-weight: 600;">
+                            ${formattedDate}
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px; font-weight: 600;">
+                      What happens next?
+                    </h3>
+
+                    <ul style="margin: 0 0 25px 0; padding-left: 20px; color: #4b5563; font-size: 14px; line-height: 1.8;">
+                      <li>You have been signed out of all devices</li>
+                      <li>Your account is inaccessible during the 14-day waiting period</li>
+                      <li>After ${formattedDate}, your data will be permanently deleted</li>
+                      <li>This action cannot be undone after the waiting period</li>
+                    </ul>
+
+                    <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px; font-weight: 600;">
+                      Changed your mind?
+                    </h3>
+
+                    <p style="margin: 0 0 25px 0; color: #4b5563; font-size: 14px; line-height: 1.6;">
+                      If you didn't request this deletion or want to keep your account, you can cancel the deletion by signing back in within the next 14 days.
+                    </p>
+
+                    <!-- CTA Button -->
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" style="padding: 10px 0 20px 0;">
+                          <a href="${data.cancelUrl}" style="display: inline-block; padding: 14px 32px; background-color: #1a1a1a; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600;">
+                            Cancel Deletion
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td style="padding: 30px 40px; background-color: #f8f9fa; border-top: 1px solid #e5e5e5;">
+                    <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 13px; text-align: center;">
+                      If you didn't request this deletion, please contact us immediately.
+                    </p>
+                    <p style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center;">
+                      <a href="mailto:support@ironscout.ai" style="color: #667eea; text-decoration: none;">support@ironscout.ai</a>
                     </p>
                     <p style="margin: 15px 0 0 0; color: #9ca3af; font-size: 11px; text-align: center;">
                       © ${new Date().getFullYear()} IronScout.ai. All rights reserved.

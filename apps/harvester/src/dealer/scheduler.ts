@@ -22,6 +22,9 @@ import {
   dealerBenchmarkQueue,
   QUEUE_NAMES,
 } from '../config/queues'
+import { logger } from '../config/logger'
+
+const log = logger.scheduler
 
 // ============================================================================
 // SCHEDULING QUEUE (for repeatable scheduler jobs)
@@ -155,7 +158,7 @@ export async function scheduleDealerFeeds(): Promise<number> {
   }
 
   if (scheduledCount > 0 || skippedCount > 0) {
-    console.log(`[Dealer Scheduler] Feed scheduling: ${scheduledCount} new, ${skippedCount} already scheduled`)
+    log.info('Feed scheduling', { scheduledCount, skippedCount })
   }
 
   return scheduledCount
@@ -243,9 +246,10 @@ export async function scheduleImmediateFeedIngest(
   )
 
   if (adminOverride) {
-    console.log(
-      `[Dealer Scheduler] Admin override feed ingestion for ${feed.dealer.businessName} (admin: ${adminId || 'unknown'})`
-    )
+    log.info('Admin override feed ingestion', {
+      businessName: feed.dealer.businessName,
+      adminId: adminId || 'unknown',
+    })
   }
 
   return feedRun.id
@@ -268,7 +272,7 @@ export async function setFeedEnabled(feedId: string, enabled: boolean): Promise<
     },
   })
 
-  console.log(`[Dealer Scheduler] Feed ${feedId} ${enabled ? 'enabled' : 'disabled'}`)
+  log.info('Feed status changed', { feedId, enabled })
 }
 
 // ============================================================================
@@ -297,7 +301,7 @@ export async function scheduleBenchmarkRecalc(fullRecalc: boolean = false): Prom
   // Check if job already exists (idempotency check)
   const existingJob = await dealerBenchmarkQueue.getJob(jobId)
   if (existingJob) {
-    console.log(`[Dealer Scheduler] Benchmark already scheduled for window ${benchmarkWindow}`)
+    log.debug('Benchmark already scheduled for window', { benchmarkWindow })
     return false
   }
 
@@ -311,7 +315,7 @@ export async function scheduleBenchmarkRecalc(fullRecalc: boolean = false): Prom
     }
   )
 
-  console.log(`[Dealer Scheduler] Scheduled ${fullRecalc ? 'full' : 'incremental'} benchmark recalculation`)
+  log.info('Scheduled benchmark recalculation', { fullRecalc })
   return true
 }
 
@@ -356,10 +360,13 @@ async function withRetry<T>(
       }
 
       const delayMs = Math.min(initialDelayMs * Math.pow(2, attempt - 1), maxDelayMs)
-      console.log(
-        `[Dealer Scheduler] ${label} failed (attempt ${attempt}/${maxAttempts}), ` +
-          `retrying in ${delayMs / 1000}s: ${lastError.message?.substring(0, 100)}`
-      )
+      log.warn('Operation failed, retrying', {
+        label,
+        attempt,
+        maxAttempts,
+        retryInSeconds: delayMs / 1000,
+        error: lastError.message?.substring(0, 100),
+      })
 
       await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
@@ -393,7 +400,7 @@ let schedulerWorker: Worker<DealerSchedulerJobData> | null = null
  * Safe for multiple replicas - BullMQ ensures only one instance processes each job
  */
 export async function startDealerScheduler(): Promise<void> {
-  console.log('[Dealer Scheduler] Starting with BullMQ repeatable jobs...')
+  log.info('Starting with BullMQ repeatable jobs')
 
   // Create the worker to process scheduler jobs
   schedulerWorker = new Worker<DealerSchedulerJobData>(
@@ -414,7 +421,7 @@ export async function startDealerScheduler(): Promise<void> {
           })
         }
       } catch (error) {
-        console.error(`[Dealer Scheduler] ${type} scheduling error:`, error)
+        log.error('Scheduling error', { type, error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined)
         throw error // Let BullMQ handle retry
       }
     },
@@ -425,11 +432,11 @@ export async function startDealerScheduler(): Promise<void> {
   )
 
   schedulerWorker.on('completed', (job) => {
-    console.log(`[Dealer Scheduler] ${job.data.type} job completed`)
+    log.info('Job completed', { type: job.data.type })
   })
 
   schedulerWorker.on('failed', (job, err) => {
-    console.error(`[Dealer Scheduler] ${job?.data?.type} job failed:`, err.message)
+    log.error('Job failed', { type: job?.data?.type, error: err.message }, err)
   })
 
   // Remove any existing repeatable jobs before adding new ones
@@ -476,13 +483,14 @@ export async function startDealerScheduler(): Promise<void> {
         initialDelayMs: 5000,
       })
     } catch (error) {
-      console.error('[Dealer Scheduler] Initial scheduling failed after retries:', error)
+      log.error('Initial scheduling failed after retries', { error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined)
     }
   }, 10000) // 10 seconds after startup
 
-  console.log('[Dealer Scheduler] Started with repeatable jobs')
-  console.log('  - Feed scheduling: every 5 minutes')
-  console.log('  - Benchmark scheduling: every 2 hours')
+  log.info('Started with repeatable jobs', {
+    feedSchedule: 'every 5 minutes',
+    benchmarkSchedule: 'every 2 hours',
+  })
 }
 
 /**
@@ -494,5 +502,5 @@ export async function stopDealerScheduler(): Promise<void> {
     schedulerWorker = null
   }
 
-  console.log('[Dealer Scheduler] Stopped')
+  log.info('Stopped')
 }

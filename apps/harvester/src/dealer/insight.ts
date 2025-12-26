@@ -12,6 +12,9 @@ import { Worker, Job } from 'bullmq'
 import { prisma } from '@ironscout/db'
 import { redisConnection } from '../config/redis'
 import { QUEUE_NAMES, DealerInsightJobData } from '../config/queues'
+import { logger } from '../config/logger'
+
+const log = logger.dealer
 
 // ============================================================================
 // TYPES
@@ -364,7 +367,7 @@ function truncate(str: string, maxLength: number): string {
 async function processInsightGeneration(job: Job<DealerInsightJobData>) {
   const { dealerId, dealerSkuIds } = job.data
 
-  console.log(`[Insight] Generating insights for dealer ${dealerId}`)
+  log.info('Generating insights', { dealerId })
 
   // Check dealer subscription status before generating insights
   const dealer = await prisma.dealer.findUnique({
@@ -373,13 +376,16 @@ async function processInsightGeneration(job: Job<DealerInsightJobData>) {
   })
 
   if (!dealer) {
-    console.log(`[Insight] Dealer ${dealerId} not found, skipping`)
+    log.debug('Dealer not found, skipping', { dealerId })
     return { skipped: true, reason: 'dealer_not_found' }
   }
 
   // Only generate insights for ACTIVE or EXPIRED (grace period) subscriptions
   if (dealer.subscriptionStatus !== 'ACTIVE' && dealer.subscriptionStatus !== 'EXPIRED') {
-    console.log(`[Insight] Dealer ${dealerId} subscription ${dealer.subscriptionStatus}, skipping insights`)
+    log.debug('Dealer subscription inactive, skipping insights', {
+      dealerId,
+      subscriptionStatus: dealer.subscriptionStatus,
+    })
     return { skipped: true, reason: 'subscription_inactive', status: dealer.subscriptionStatus }
   }
   
@@ -402,9 +408,9 @@ async function processInsightGeneration(job: Job<DealerInsightJobData>) {
       },
     })
   }
-  
-  console.log(`[Insight] Analyzing ${skus.length} SKUs`)
-  
+
+  log.info('Analyzing SKUs', { count: skus.length })
+
   const allInsights: InsightCandidate[] = []
   const activeSkuIds: string[] = []
   
@@ -418,17 +424,20 @@ async function processInsightGeneration(job: Job<DealerInsightJobData>) {
   // Find stock opportunities
   const stockOpportunities = await findStockOpportunities(dealerId)
   allInsights.push(...stockOpportunities)
-  
-  console.log(`[Insight] Generated ${allInsights.length} insight candidates`)
-  
+
+  log.info('Generated insight candidates', { count: allInsights.length })
+
   // Save insights
   const savedCount = await saveInsights(dealerId, allInsights)
   
   // Deactivate stale insights
   const deactivatedCount = await deactivateStaleInsights(dealerId, activeSkuIds)
-  
-  console.log(`[Insight] Saved ${savedCount} new insights, deactivated ${deactivatedCount} stale insights`)
-  
+
+  log.info('Insight generation completed', {
+    savedCount,
+    deactivatedCount,
+  })
+
   return {
     analyzedSkus: skus.length,
     generatedInsights: allInsights.length,
@@ -451,9 +460,9 @@ export const dealerInsightWorker = new Worker(
 )
 
 dealerInsightWorker.on('completed', (job) => {
-  console.log(`[Insight] Job ${job.id} completed`)
+  log.info('Job completed', { jobId: job.id })
 })
 
 dealerInsightWorker.on('failed', (job, error) => {
-  console.error(`[Insight] Job ${job?.id} failed:`, error)
+  log.error('Job failed', { jobId: job?.id, error: error.message }, error)
 })

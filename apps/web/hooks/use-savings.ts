@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { getSavings } from '@/lib/api'
 import type { SavingsResponse, UseSavingsResult } from '@/types/dashboard'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('hooks:savings')
 
 /**
  * Hook for fetching savings tracking data
@@ -31,7 +34,7 @@ export function useSavings(): UseSavingsResult {
       const response = await getSavings(token)
       setData(response)
     } catch (err) {
-      console.error('Failed to fetch savings:', err)
+      logger.error('Failed to fetch savings', {}, err)
       setError(err instanceof Error ? err.message : 'Failed to load savings')
     } finally {
       setLoading(false)

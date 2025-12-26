@@ -1,18 +1,20 @@
 'use client'
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { SearchResultCard } from './search-result-card'
 import { SearchResultRow } from './search-result-row'
 import { ResultCardSkeleton } from './result-card'
 import { ResultTableHeader, ResultRowSkeleton, type GridSort } from './result-row'
-import { ViewToggle, type ViewMode } from './view-toggle'
 import { AdCard } from '@/components/ads/ad-card'
 import type { Product, Advertisement } from '@/lib/api'
 import { getSavedItems } from '@/lib/api'
 import { useSession } from 'next-auth/react'
 import { useViewPreference } from '@/hooks/use-view-preference'
-import { cn } from '@/lib/utils'
+import { useSearchLoading } from '@/components/search/search-loading-context'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('search-results-grid')
 
 interface SearchResultsGridProps {
   products: Product[]
@@ -57,11 +59,11 @@ export function SearchResultsGrid({
 }: SearchResultsGridProps) {
   const { data: session } = useSession()
   const accessToken = (session as any)?.accessToken
-  const router = useRouter()
   const searchParams = useSearchParams()
+  const { navigateWithLoading } = useSearchLoading()
 
-  // View mode with localStorage persistence
-  const [viewMode, setViewMode] = useViewPreference('card')
+  // View mode with localStorage persistence (controlled by SearchControls in header)
+  const [viewMode] = useViewPreference('card')
 
   // Current sort from URL (for price sorting)
   const currentSort = searchParams.get('sortBy') || 'relevance'
@@ -83,8 +85,8 @@ export function SearchResultsGrid({
       params.set('sortBy', sortValue)
     }
     params.delete('page')
-    router.push(`/search?${params.toString()}`)
-  }, [router, searchParams])
+    navigateWithLoading(`/search?${params.toString()}`)
+  }, [searchParams, navigateWithLoading])
 
   // Handle grid-specific sort change (client-side)
   const handleGridSortChange = useCallback((sort: GridSort) => {
@@ -106,7 +108,7 @@ export function SearchResultsGrid({
         setTrackedIds(savedIds)
       })
       .catch((error) => {
-        console.error('Failed to load saved items:', error)
+        logger.error('Failed to load saved items', {}, error)
       })
       .finally(() => {
         setLoadingTracked(false)
@@ -216,10 +218,10 @@ export function SearchResultsGrid({
 
   return (
     <div className="space-y-2">
-      {/* View Toggle - right aligned, with filter on left for grid view */}
-      <div className="flex items-center justify-end gap-4">
-        {viewMode === 'grid' && (
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none mr-auto">
+      {/* Grid view filter - only shown in grid mode */}
+      {viewMode === 'grid' && (
+        <div className="flex items-center">
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
             <input
               type="checkbox"
               checked={hideOutOfStock}
@@ -233,9 +235,8 @@ export function SearchResultsGrid({
               )}
             </span>
           </label>
-        )}
-        <ViewToggle value={viewMode} onChange={setViewMode} />
-      </div>
+        </div>
+      )}
 
       {viewMode === 'card' ? (
         // Card View - Discovery mode
@@ -298,7 +299,7 @@ export function SearchResultsGridSkeleton({
   viewMode = 'card'
 }: {
   count?: number
-  viewMode?: ViewMode
+  viewMode?: 'card' | 'grid'
 }) {
   if (viewMode === 'grid') {
     return (
@@ -323,6 +324,3 @@ export function SearchResultsGridSkeleton({
     </div>
   )
 }
-
-// Re-export ViewToggle for use in search header
-export { ViewToggle, type ViewMode }

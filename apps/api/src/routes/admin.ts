@@ -19,6 +19,9 @@ import {
   getRateLimitMetrics,
 } from '../middleware/auth'
 import { getRedisClient } from '../config/redis'
+import { loggers } from '../config/logger'
+
+const log = loggers.admin
 
 const router: any = Router()
 
@@ -40,7 +43,7 @@ router.get('/rate-limits', async (req: Request, res: Response) => {
 
     return res.json(metrics)
   } catch (error) {
-    console.error('[Admin] Error fetching rate limit metrics:', error)
+    log.error('Error fetching rate limit metrics', { error }, error as Error)
     return res.status(500).json({
       error: 'Failed to fetch rate limit metrics',
     })
@@ -67,7 +70,7 @@ router.get('/rate-limits/:endpoint', async (req: Request, res: Response) => {
     const metrics = await getRateLimitMetrics(endpoint, date)
     return res.json(metrics)
   } catch (error) {
-    console.error('[Admin] Error fetching endpoint metrics:', error)
+    log.error('Error fetching endpoint metrics', { error }, error as Error)
     return res.status(500).json({
       error: 'Failed to fetch endpoint metrics',
     })
@@ -102,7 +105,7 @@ router.delete('/rate-limits/:ip', async (req: Request, res: Response) => {
       await redis.del(...keysToDelete)
     }
 
-    console.info(`[Admin] Cleared rate limits for IP ${ip} on endpoints: ${endpoints.join(', ')}`)
+    log.info('Cleared rate limits', { ip, endpoints, keysDeleted: keysToDelete.length })
 
     return res.json({
       message: 'Rate limits cleared',
@@ -111,7 +114,7 @@ router.delete('/rate-limits/:ip', async (req: Request, res: Response) => {
       keysDeleted: keysToDelete.length,
     })
   } catch (error) {
-    console.error('[Admin] Error clearing rate limit:', error)
+    log.error('Error clearing rate limit', { error }, error as Error)
     return res.status(500).json({
       error: 'Failed to clear rate limit',
     })
@@ -160,7 +163,7 @@ router.get('/rate-limits/status/:ip', async (req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error('[Admin] Error checking rate limit status:', error)
+    log.error('Error checking rate limit status', { error }, error as Error)
     return res.status(500).json({
       error: 'Failed to check rate limit status',
     })

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
+import { loggers } from '@/lib/logger';
 
 // Force dynamic rendering - this route uses cookies for auth
 export const dynamic = 'force-dynamic';
@@ -54,7 +55,7 @@ export async function POST(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Dismiss insight error:', error);
+    loggers.insights.error('Dismiss insight error', {}, error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

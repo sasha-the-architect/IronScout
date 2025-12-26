@@ -1,27 +1,30 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useTransition, useCallback, ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface SearchLoadingContextType {
   isSearching: boolean
-  startSearch: () => void
-  endSearch: () => void
+  navigateWithLoading: (url: string) => void
 }
 
 const SearchLoadingContext = createContext<SearchLoadingContextType>({
   isSearching: false,
-  startSearch: () => {},
-  endSearch: () => {},
+  navigateWithLoading: () => {},
 })
 
 export function SearchLoadingProvider({ children }: { children: ReactNode }) {
-  const [isSearching, setIsSearching] = useState(false)
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
 
-  const startSearch = useCallback(() => setIsSearching(true), [])
-  const endSearch = useCallback(() => setIsSearching(false), [])
+  const navigateWithLoading = useCallback((url: string) => {
+    startTransition(() => {
+      router.push(url)
+    })
+  }, [router])
 
   return (
-    <SearchLoadingContext.Provider value={{ isSearching, startSearch, endSearch }}>
+    <SearchLoadingContext.Provider value={{ isSearching: isPending, navigateWithLoading }}>
       {children}
     </SearchLoadingContext.Provider>
   )

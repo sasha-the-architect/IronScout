@@ -15,6 +15,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { TrendingDown, TrendingUp, Minus, Crown, Lock } from 'lucide-react'
 import Link from 'next/link'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('price-history-chart')
 
 interface PriceHistoryProps {
   productId: string
@@ -80,7 +83,7 @@ export function PriceHistoryChart({ productId, isPremium }: PriceHistoryProps) {
       setData(history)
     } catch (err) {
       setError('Failed to load price history')
-      console.error('Price history error:', err)
+      logger.error('Price history error', {}, err)
     } finally {
       setLoading(false)
     }

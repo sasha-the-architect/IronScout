@@ -5,6 +5,10 @@
  * Events are structured for easy consumption by analytics platforms.
  */
 
+import { createLogger } from './logger'
+
+const logger = createLogger('analytics')
+
 export type AnalyticsEvent =
   | AffiliateClickEvent
   | TrackToggleEvent
@@ -40,7 +44,7 @@ export interface DetailsToggleEvent {
 export function trackEvent(event: AnalyticsEvent): void {
   // Development logging
   if (process.env.NODE_ENV === 'development') {
-    console.log('[Analytics]', event)
+    logger.debug('Track event', { event })
   }
 
   // Google Analytics 4 integration (if available)

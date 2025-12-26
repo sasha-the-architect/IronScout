@@ -1,6 +1,7 @@
 'use server';
 
 import { getSession } from '@/lib/auth';
+import { loggers } from '@/lib/logger';
 
 const API_URL = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -48,7 +49,7 @@ export async function createCheckoutSession(
         : process.env.STRIPE_PRICE_ID_DEALER_STANDARD_MONTHLY;
 
     if (!priceIdEnvVar) {
-      console.error(`Missing price ID for plan: ${planId}`);
+      loggers.billing.error('Missing price ID for plan', { planId });
       return { success: false, error: 'Plan configuration error' };
     }
 
@@ -71,7 +72,7 @@ export async function createCheckoutSession(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('Checkout API error:', errorData);
+      loggers.billing.error('Checkout API error', { errorData });
       return {
         success: false,
         error: errorData.error || 'Failed to create checkout session',
@@ -86,7 +87,7 @@ export async function createCheckoutSession(
       sessionId: data.sessionId,
     };
   } catch (error) {
-    console.error('Checkout error:', error);
+    loggers.billing.error('Checkout error', {}, error instanceof Error ? error : new Error(String(error)));
     return {
       success: false,
       error: 'Failed to create checkout session. Please try again.',
@@ -131,7 +132,7 @@ export async function createPortalSession(dealerId: string): Promise<PortalResul
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('Portal API error:', errorData);
+      loggers.billing.error('Portal API error', { errorData });
       return {
         success: false,
         error: errorData.error || 'Failed to open billing portal',
@@ -145,7 +146,7 @@ export async function createPortalSession(dealerId: string): Promise<PortalResul
       url: data.url,
     };
   } catch (error) {
-    console.error('Portal error:', error);
+    loggers.billing.error('Portal error', {}, error instanceof Error ? error : new Error(String(error)));
     return {
       success: false,
       error: 'Failed to open billing portal. Please try again.',

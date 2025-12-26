@@ -34,6 +34,9 @@ import {
   checkDealerSubscription,
   sendSubscriptionExpiryNotification,
 } from './subscription'
+import { logger } from '../config/logger'
+
+const log = logger.dealer
 
 // ============================================================================
 // NOTIFICATION HELPERS
@@ -79,13 +82,13 @@ async function sendFeedNotifications(
     })
 
     if (!dealer || !feed) {
-      console.log('[Dealer Feed] Skipping notification - dealer or feed not found')
+      log.debug('Skipping notification - dealer or feed not found')
       return
     }
 
     const dealerEmail = dealer.contacts[0]?.email
     if (!dealerEmail) {
-      console.log('[Dealer Feed] Skipping notification - no opted-in contact email')
+      log.debug('Skipping notification - no opted-in contact email')
       return
     }
 
@@ -100,11 +103,11 @@ async function sendFeedNotifications(
 
     // Send appropriate notification based on status transition
     if (currentStatus === 'FAILED') {
-      console.log(`[Dealer Feed] Sending failure notification to ${dealerEmail}`)
+      log.info('Sending failure notification', { dealerEmail })
       await notifyFeedFailed(feedInfo)
     } else if (currentStatus === 'WARNING' && previousStatus !== 'WARNING') {
       // Only send warning on first transition to WARNING
-      console.log(`[Dealer Feed] Sending warning notification to ${dealerEmail}`)
+      log.info('Sending warning notification', { dealerEmail })
       await notifyFeedWarning(feedInfo, {
         indexedCount: stats.indexedCount,
         quarantineCount: stats.quarantinedCount,
@@ -112,12 +115,12 @@ async function sendFeedNotifications(
       })
     } else if (currentStatus === 'HEALTHY' && (previousStatus === 'FAILED' || previousStatus === 'WARNING')) {
       // Recovered from failed/warning state
-      console.log(`[Dealer Feed] Sending recovery notification to ${dealerEmail}`)
+      log.info('Sending recovery notification', { dealerEmail })
       await notifyFeedRecovered(feedInfo)
     }
   } catch (error) {
     // Don't let notification failures break the feed processing
-    console.error('[Dealer Feed] Failed to send notification:', error)
+    log.error('Failed to send notification', { error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined)
   }
 }
 
@@ -199,9 +202,11 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
       const subscriptionResult = await checkDealerSubscription(dealerId)
 
       if (!subscriptionResult.isActive) {
-        console.log(
-          `[Dealer Feed] Skipping feed for dealer ${dealerId} - subscription ${subscriptionResult.status}: ${subscriptionResult.reason}`
-        )
+        log.info('Skipping feed - subscription inactive', {
+          dealerId,
+          subscriptionStatus: subscriptionResult.status,
+          reason: subscriptionResult.reason,
+        })
 
         // Update feed run as skipped
         await prisma.dealerFeedRun.update({
@@ -232,9 +237,7 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
         }
       }
     } else {
-      console.log(
-        `[Dealer Feed] Admin override active for dealer ${dealerId} (admin: ${adminId || 'unknown'})`
-      )
+      log.info('Admin override active', { dealerId, adminId: adminId || 'unknown' })
     }
 
     // Update feed run status
@@ -248,7 +251,7 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
       throw new Error('Feed URL is required')
     }
 
-    console.log(`[Dealer Feed] Fetching feed for dealer ${dealerId}`)
+    log.info('Fetching feed', { dealerId })
     const content = await fetchFeed(url, accessType, username, password)
 
     // Calculate content hash for change detection
@@ -260,7 +263,7 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
     })
 
     if (feed?.feedHash === contentHash) {
-      console.log(`[Dealer Feed] No changes detected for dealer ${dealerId}`)
+      log.debug('No changes detected', { dealerId })
       await prisma.dealerFeedRun.update({
         where: { id: feedRunId },
         data: {
@@ -282,18 +285,18 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
         ? detectConnector(content)
         : getConnector(formatType as FeedFormatType)
 
-    console.log(`[Dealer Feed] Using connector: ${connector.name} for dealer ${dealerId}`)
+    log.info('Using connector', { connectorName: connector.name, dealerId })
 
     // Parse feed using connector
-    console.log(`[Dealer Feed] Parsing feed for dealer ${dealerId}`)
+    log.info('Parsing feed', { dealerId })
     parseResult = await connector.parse(content)
 
-    console.log(
-      `[Dealer Feed] Parsed ${parseResult.totalRows} rows: ` +
-        `${parseResult.indexableCount} indexable, ` +
-        `${parseResult.quarantineCount} quarantine, ` +
-        `${parseResult.rejectCount} rejected`
-    )
+    log.info('Feed parsed', {
+      totalRows: parseResult.totalRows,
+      indexableCount: parseResult.indexableCount,
+      quarantineCount: parseResult.quarantineCount,
+      rejectCount: parseResult.rejectCount,
+    })
 
     // Process records
     const dealerSkuIds: string[] = []
@@ -327,7 +330,7 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
         // Log progress every 100 items
         const processed = dealerSkuIds.length + quarantinedIds.length + errors.length
         if (processed % 100 === 0 && processed > 0) {
-          console.log(`[Dealer Feed] Processed ${processed}/${parseResult.totalRows} items`)
+          log.debug('Processing progress', { processed, total: parseResult.totalRows })
         }
       } catch (error) {
         errors.push({
@@ -435,10 +438,11 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
       }
     }
 
-    console.log(
-      `[Dealer Feed] Completed: ${dealerSkuIds.length} indexed, ` +
-        `${quarantinedIds.length} quarantined, ${errors.length} rejected`
-    )
+    log.info('Feed ingestion completed', {
+      indexedCount: dealerSkuIds.length,
+      quarantinedCount: quarantinedIds.length,
+      rejectedCount: errors.length,
+    })
 
     return {
       rowCount: parseResult.totalRows,
@@ -449,7 +453,7 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
       status: feedStatus,
     }
   } catch (error) {
-    console.error(`[Dealer Feed] Error for dealer ${dealerId}:`, error)
+    log.error('Feed ingestion error', { dealerId, error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined)
 
     // Determine error code
     const errorMessage = String(error)
@@ -649,9 +653,9 @@ export const dealerFeedIngestWorker = new Worker(QUEUE_NAMES.DEALER_FEED_INGEST,
 })
 
 dealerFeedIngestWorker.on('completed', (job) => {
-  console.log(`[Dealer Feed] Job ${job.id} completed`)
+  log.info('Job completed', { jobId: job.id })
 })
 
 dealerFeedIngestWorker.on('failed', (job, error) => {
-  console.error(`[Dealer Feed] Job ${job?.id} failed:`, error)
+  log.error('Job failed', { jobId: job?.id, error: error.message }, error)
 })

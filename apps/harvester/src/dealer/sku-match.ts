@@ -25,6 +25,9 @@ import {
   classifyPurpose,
   extractRoundCount,
 } from '../normalizer/ammo-utils'
+import { logger } from '../config/logger'
+
+const log = logger.dealer
 
 // ============================================================================
 // TYPES
@@ -463,7 +466,7 @@ async function batchUpdateDealerSkus(updates: SkuUpdate[]): Promise<void> {
 async function processSkuMatch(job: Job<DealerSkuMatchJobData>): Promise<BatchStats> {
   const { dealerId, feedRunId, dealerSkuIds } = job.data
 
-  console.log(`[SKU Match] Processing ${dealerSkuIds.length} SKUs for dealer ${dealerId}`)
+  log.info('Processing SKUs', { count: dealerSkuIds.length, dealerId })
 
   // STEP 1: Batch fetch all dealer SKUs
   const dealerSkus = await prisma.dealerSku.findMany({
@@ -473,7 +476,7 @@ async function processSkuMatch(job: Job<DealerSkuMatchJobData>): Promise<BatchSt
   })
 
   if (dealerSkus.length === 0) {
-    console.log(`[SKU Match] No SKUs found for IDs`)
+    log.debug('No SKUs found for IDs')
     return { matchedCount: 0, createdCount: 0, reviewCount: 0 }
   }
 
@@ -584,9 +587,11 @@ async function processSkuMatch(job: Job<DealerSkuMatchJobData>): Promise<BatchSt
     },
   })
 
-  console.log(
-    `[SKU Match] Completed: ${stats.matchedCount} matched, ${stats.createdCount} created, ${stats.reviewCount} need review`
-  )
+  log.info('SKU matching completed', {
+    matchedCount: stats.matchedCount,
+    createdCount: stats.createdCount,
+    reviewCount: stats.reviewCount,
+  })
 
   return stats
 }
@@ -601,9 +606,9 @@ export const dealerSkuMatchWorker = new Worker(QUEUE_NAMES.DEALER_SKU_MATCH, pro
 })
 
 dealerSkuMatchWorker.on('completed', (job) => {
-  console.log(`[SKU Match] Job ${job.id} completed`)
+  log.info('Job completed', { jobId: job.id })
 })
 
 dealerSkuMatchWorker.on('failed', (job, error) => {
-  console.error(`[SKU Match] Job ${job?.id} failed:`, error)
+  log.error('Job failed', { jobId: job?.id, error: error.message }, error)
 })

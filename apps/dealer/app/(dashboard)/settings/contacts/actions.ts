@@ -3,6 +3,7 @@
 import { prisma } from '@ironscout/db';
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/lib/auth';
+import { loggers } from '@/lib/logger';
 
 export interface ContactData {
   firstName: string;
@@ -59,7 +60,7 @@ export async function createContact(data: ContactData) {
 
     return { success: true, contact };
   } catch (error) {
-    console.error('Failed to create contact:', error);
+    loggers.settings.error('Failed to create contact', {}, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to create contact' };
   }
 }
@@ -119,7 +120,7 @@ export async function updateContact(contactId: string, data: Partial<ContactData
 
     return { success: true, contact };
   } catch (error) {
-    console.error('Failed to update contact:', error);
+    loggers.settings.error('Failed to update contact', {}, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to update contact' };
   }
 }
@@ -168,7 +169,7 @@ export async function deleteContact(contactId: string) {
 
     return { success: true };
   } catch (error) {
-    console.error('Failed to delete contact:', error);
+    loggers.settings.error('Failed to delete contact', {}, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to delete contact' };
   }
 }
@@ -233,7 +234,7 @@ export async function transferOwnership(newOwnerId: string) {
       newOwner: newOwnerAfter,
     };
   } catch (error) {
-    console.error('Failed to transfer account ownership:', error);
+    loggers.settings.error('Failed to transfer account ownership', {}, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to transfer account ownership' };
   }
 }

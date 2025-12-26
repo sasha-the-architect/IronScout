@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Bell, ExternalLink, Trash2 } from 'lucide-react'
 import { getUserAlerts, deleteAlert, type Alert } from '@/lib/api'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('components:recent-alerts')
 
 export function RecentAlerts() {
   const { data: session } = useSession()
@@ -31,7 +34,7 @@ export function RecentAlerts() {
       setError(null)
     } catch (err) {
       setError('Failed to load alerts')
-      console.error(err)
+      logger.error('Failed to load alerts', {}, err)
     } finally {
       setLoading(false)
     }
@@ -45,7 +48,7 @@ export function RecentAlerts() {
       await deleteAlert(alertId, token)
       setAlerts(alerts.filter(a => a.id !== alertId))
     } catch (err) {
-      console.error('Failed to delete alert:', err)
+      logger.error('Failed to delete alert', {}, err)
     }
   }
 

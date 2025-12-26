@@ -4,6 +4,9 @@ import { aiSearch, getSearchSuggestions, parseSearchIntent, backfillProductEmbed
 import { prisma } from '@ironscout/db'
 import { requireAdmin, rateLimit, getUserTier } from '../middleware/auth'
 import { getMaxSearchResults, hasPriceHistoryAccess } from '../config/tiers'
+import { loggers } from '../config/logger'
+
+const log = loggers.search
 
 const router: any = Router()
 
@@ -67,11 +70,11 @@ const semanticSearchSchema = z.object({
 
 router.post('/semantic', async (req: Request, res: Response) => {
   try {
-    console.log('[Search Route] Received request body:', JSON.stringify(req.body, null, 2))
-    
+    log.debug('Semantic search request', { body: req.body })
+
     const { query, page, limit, sortBy, filters } = semanticSearchSchema.parse(req.body)
-    
-    console.log('[Search Route] Parsed filters:', filters)
+
+    log.debug('Parsed filters', { filters })
     
     // Get user tier
     const userTier = await getUserTier(req)
@@ -92,7 +95,7 @@ router.post('/semantic', async (req: Request, res: Response) => {
       // Log if Premium filters were stripped
       const strippedCount = Object.keys(filters).length - Object.keys(basicFilters).length
       if (strippedCount > 0) {
-        console.log(`[Search Route] Stripped ${strippedCount} Premium filters for FREE user`)
+        log.debug('Stripped premium filters for FREE user', { strippedCount })
       }
     }
     
@@ -147,8 +150,8 @@ router.post('/semantic', async (req: Request, res: Response) => {
     
     res.json(adjustedResult)
   } catch (error) {
-    console.error('Semantic search error:', error)
-    
+    log.error('Semantic search error', {}, error)
+
     if (error instanceof z.ZodError) {
       return res.status(400).json({ 
         error: 'Invalid request parameters',
@@ -187,8 +190,8 @@ router.post('/parse', async (req: Request, res: Response) => {
       premiumParsing: userTier === 'PREMIUM' && !!intent.premiumIntent
     })
   } catch (error) {
-    console.error('Parse error:', error)
-    
+    log.error('Parse error', {}, error)
+
     if (error instanceof z.ZodError) {
       return res.status(400).json({ 
         error: 'Invalid request parameters',
@@ -216,8 +219,8 @@ router.get('/suggestions', async (req: Request, res: Response) => {
     
     res.json({ suggestions })
   } catch (error) {
-    console.error('Suggestions error:', error)
-    
+    log.error('Suggestions error', {}, error)
+
     if (error instanceof z.ZodError) {
       return res.status(400).json({ 
         error: 'Invalid request parameters',
@@ -315,7 +318,7 @@ router.post('/nl-to-filters', async (req: Request, res: Response) => {
       tier: userTier
     })
   } catch (error) {
-    console.error('NL to filters error:', error)
+    log.error('NL to filters error', {}, error)
     res.status(500).json({ error: 'Conversion failed' })
   }
 })
@@ -446,7 +449,7 @@ router.get('/premium-filters', async (req: Request, res: Response) => {
         : undefined
     })
   } catch (error) {
-    console.error('Premium filters error:', error)
+    log.error('Premium filters error', {}, error)
     res.status(500).json({ error: 'Failed to get premium filters' })
   }
 })
@@ -484,7 +487,7 @@ router.get('/admin/embedding-stats', requireAdmin, async (req: Request, res: Res
         : 0
     })
   } catch (error) {
-    console.error('Embedding stats error:', error)
+    log.error('Embedding stats error', {}, error)
     res.status(500).json({ error: 'Failed to get embedding stats' })
   }
 })
@@ -560,7 +563,7 @@ router.get('/admin/ballistic-stats', requireAdmin, async (req: Request, res: Res
       }
     })
   } catch (error) {
-    console.error('Ballistic stats error:', error)
+    log.error('Ballistic stats error', {}, error)
     res.status(500).json({ error: 'Failed to get ballistic stats' })
   }
 })
@@ -592,11 +595,11 @@ router.post('/admin/backfill-embeddings', requireAdmin, rateLimit({ max: 1, wind
   }).then(result => {
     backfillProgress.errors = result.errors
     backfillInProgress = false
-    console.log('Backfill complete:', result)
+    log.info('Backfill complete', { processed: result.processed, errors: result.errors.length })
   }).catch(error => {
     backfillProgress.errors.push(error.message)
     backfillInProgress = false
-    console.error('Backfill failed:', error)
+    log.error('Backfill failed', {}, error)
   })
   
   res.json({ 
@@ -631,7 +634,7 @@ router.post('/admin/update-embedding/:productId', requireAdmin, rateLimit({ max:
     
     res.json({ success: true, productId })
   } catch (error: any) {
-    console.error('Update embedding error:', error)
+    log.error('Update embedding error', { productId: req.params.productId }, error)
     res.status(500).json({ error: error.message || 'Failed to update embedding' })
   }
 })
@@ -653,7 +656,7 @@ router.get('/debug/calibers', async (req: Request, res: Response) => {
       calibers: calibers.map(c => ({ value: c.caliber, count: c._count.caliber }))
     })
   } catch (error) {
-    console.error('Debug calibers error:', error)
+    log.error('Debug calibers error', {}, error)
     res.status(500).json({ error: 'Failed to get calibers' })
   }
 })
@@ -675,7 +678,7 @@ router.get('/debug/purposes', async (req: Request, res: Response) => {
       purposes: purposes.map(p => ({ value: p.purpose, count: p._count.purpose }))
     })
   } catch (error) {
-    console.error('Debug purposes error:', error)
+    log.error('Debug purposes error', {}, error)
     res.status(500).json({ error: 'Failed to get purposes' })
   }
 })
@@ -697,7 +700,7 @@ router.get('/debug/bullet-types', async (req: Request, res: Response) => {
       bulletTypes: bulletTypes.map(b => ({ value: b.bulletType, count: b._count.bulletType }))
     })
   } catch (error) {
-    console.error('Debug bullet types error:', error)
+    log.error('Debug bullet types error', {}, error)
     res.status(500).json({ error: 'Failed to get bullet types' })
   }
 })

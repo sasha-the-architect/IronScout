@@ -9,6 +9,9 @@ import { Check, X, BarChart3, Bell, Search, Brain, Star } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { createCheckoutSession } from '@/lib/api'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('pricing-plans')
 
 // Pricing configuration
 const PRICING = {
@@ -152,7 +155,7 @@ export function PricingPlans() {
 
       window.location.href = url
     } catch (error) {
-      console.error('Failed to process upgrade:', error)
+      logger.error('Failed to process upgrade', {}, error)
       alert('Failed to process your request. Please try again.')
     } finally {
       setLoading(null)

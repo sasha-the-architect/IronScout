@@ -1,3 +1,5 @@
+import { logger } from './logger'
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 /**
@@ -525,7 +527,7 @@ export async function aiSearch(params: AISearchParams): Promise<AISearchResponse
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '')
-    console.error('[aiSearch] Request failed', {
+    logger.api.error('AI search request failed', {
       status: response.status,
       statusText: response.statusText,
       url: `${API_BASE_URL}/api/search/semantic`,

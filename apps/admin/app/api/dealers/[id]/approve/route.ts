@@ -10,7 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const requestId = crypto.randomUUID().slice(0, 8);
-  const reqLogger = logger.child({ requestId, endpoint: '/api/dealers/[id]/approve' });
+  const reqLogger = logger.child('approve', { requestId });
   
   try {
     const session = await getAdminSession();

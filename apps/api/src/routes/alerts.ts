@@ -12,6 +12,9 @@ import { z } from 'zod'
 import { saveItem, unsaveItem, getSavedItems } from '../services/saved-items'
 import { getUserTier, getAuthenticatedUserId } from '../middleware/auth'
 import { getMaxWatchlistItems } from '../config/tiers'
+import { loggers } from '../config/logger'
+
+const log = loggers.alerts
 
 const router: any = Router()
 
@@ -54,7 +57,7 @@ router.post('/', async (req: Request, res: Response) => {
       _deprecated: 'This endpoint is deprecated. Use POST /api/saved-items/:productId instead.',
     })
   } catch (error: any) {
-    console.error('Create alert error (deprecated):', error)
+    log.error('Create alert error (deprecated)', { error }, error as Error)
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid alert data', details: error.errors })
     }
@@ -108,7 +111,7 @@ router.get('/', async (req: Request, res: Response) => {
       _deprecated: 'This endpoint is deprecated. Use GET /api/saved-items instead.',
     })
   } catch (error) {
-    console.error('Fetch alerts error (deprecated):', error)
+    log.error('Fetch alerts error (deprecated)', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch alerts' })
   }
 })

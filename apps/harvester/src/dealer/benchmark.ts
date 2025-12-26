@@ -15,6 +15,9 @@ import { Worker, Job } from 'bullmq'
 import { prisma } from '@ironscout/db'
 import { redisConnection } from '../config/redis'
 import { QUEUE_NAMES, DealerBenchmarkJobData, dealerInsightQueue } from '../config/queues'
+import { logger } from '../config/logger'
+
+const log = logger.dealer
 
 // ============================================================================
 // TYPES
@@ -272,9 +275,9 @@ async function processBenchmark(job: Job<DealerBenchmarkJobData>) {
     })
     skuIds = skus.map(s => s.id)
   }
-  
-  console.log(`[Benchmark] Processing ${skuIds.length} canonical SKUs`)
-  
+
+  log.info('Processing canonical SKUs', { count: skuIds.length })
+
   let calculatedCount = 0
   let skippedCount = 0
   const dealersToNotify = new Set<string>()
@@ -353,13 +356,13 @@ async function processBenchmark(job: Job<DealerBenchmarkJobData>) {
       }
       
       calculatedCount++
-      
+
       if (calculatedCount % 50 === 0) {
-        console.log(`[Benchmark] Processed ${calculatedCount}/${skuIds.length}`)
+        log.debug('Processing progress', { processed: calculatedCount, total: skuIds.length })
       }
-      
+
     } catch (error) {
-      console.error(`[Benchmark] Error processing SKU ${skuId}:`, error)
+      log.error('Error processing SKU', { skuId, error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined)
     }
   }
   
@@ -383,9 +386,12 @@ async function processBenchmark(job: Job<DealerBenchmarkJobData>) {
       }
     )
   }
-  
-  console.log(`[Benchmark] Completed: ${calculatedCount} calculated, ${skippedCount} skipped`)
-  
+
+  log.info('Benchmark calculation completed', {
+    calculatedCount,
+    skippedCount,
+  })
+
   return { calculatedCount, skippedCount }
 }
 
@@ -410,9 +416,9 @@ export const dealerBenchmarkWorker = new Worker(
 )
 
 dealerBenchmarkWorker.on('completed', (job) => {
-  console.log(`[Benchmark] Job ${job.id} completed`)
+  log.info('Job completed', { jobId: job.id })
 })
 
 dealerBenchmarkWorker.on('failed', (job, error) => {
-  console.error(`[Benchmark] Job ${job?.id} failed:`, error)
+  log.error('Job failed', { jobId: job?.id, error: error.message }, error)
 })

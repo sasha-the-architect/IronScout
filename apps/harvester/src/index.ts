@@ -7,6 +7,9 @@
 
 import { scheduleAllCrawls } from './scheduler'
 import { crawlQueue } from './config/queues'
+import { rootLogger } from './config/logger'
+
+const log = rootLogger
 
 const command = process.argv[2]
 
@@ -14,17 +17,17 @@ async function main() {
   switch (command) {
     case 'run':
       // Trigger immediate crawl of all enabled sources
-      console.log('Triggering crawl for all enabled sources...')
+      log.info('Triggering crawl for all enabled sources')
       await scheduleAllCrawls()
-      console.log('Crawl jobs queued successfully')
+      log.info('Crawl jobs queued successfully')
       process.exit(0)
       break
 
     case 'schedule':
       // Set up recurring crawls (hourly)
-      console.log('Setting up recurring crawls (every hour)...')
+      log.info('Setting up recurring crawls (every hour)')
       await setupRecurringCrawls()
-      console.log('Recurring crawls scheduled')
+      log.info('Recurring crawls scheduled')
       break
 
     case 'status':
@@ -34,14 +37,14 @@ async function main() {
       break
 
     default:
-      console.log('IronScout.ai Harvester Service')
-      console.log('')
-      console.log('Usage:')
-      console.log('  pnpm dev run       - Trigger immediate crawl of all enabled sources')
-      console.log('  pnpm dev schedule  - Set up recurring hourly crawls')
-      console.log('  pnpm dev status    - Show queue status')
-      console.log('  pnpm worker        - Start worker processes')
-      console.log('')
+      log.info('IronScout.ai Harvester Service')
+      log.info('')
+      log.info('Usage:')
+      log.info('  pnpm dev run       - Trigger immediate crawl of all enabled sources')
+      log.info('  pnpm dev schedule  - Set up recurring hourly crawls')
+      log.info('  pnpm dev status    - Show queue status')
+      log.info('  pnpm worker        - Start worker processes')
+      log.info('')
       process.exit(0)
   }
 }
@@ -58,8 +61,8 @@ async function setupRecurringCrawls() {
     }
   )
 
-  console.log('Scheduled crawls will run every hour')
-  console.log('Make sure worker process is running: pnpm worker')
+  log.info('Scheduled crawls will run every hour')
+  log.info('Make sure worker process is running: pnpm worker')
 }
 
 async function showQueueStatus() {
@@ -68,14 +71,10 @@ async function showQueueStatus() {
   const completed = await crawlQueue.getCompletedCount()
   const failed = await crawlQueue.getFailedCount()
 
-  console.log('Queue Status:')
-  console.log(`  Waiting:   ${waiting}`)
-  console.log(`  Active:    ${active}`)
-  console.log(`  Completed: ${completed}`)
-  console.log(`  Failed:    ${failed}`)
+  log.info('Queue Status:', { waiting, active, completed, failed })
 }
 
 main().catch((error) => {
-  console.error('Error:', error)
+  log.error('Error', { error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined)
   process.exit(1)
 })

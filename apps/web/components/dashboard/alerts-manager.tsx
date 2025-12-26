@@ -10,6 +10,9 @@ import { Bell, ExternalLink, Trash2, Edit2, Check, X, Filter } from 'lucide-reac
 import { getUserAlerts, updateAlert, deleteAlert, type Alert as AlertType } from '@/lib/api'
 import { ProductImage } from '@/components/products/product-image'
 import { toast } from 'sonner'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('components:alerts-manager')
 
 export function AlertsManager() {
   const { data: session } = useSession()
@@ -42,7 +45,7 @@ export function AlertsManager() {
       setError(null)
     } catch (err) {
       setError('Failed to load alerts')
-      console.error(err)
+      logger.error('Failed to load alerts', {}, err)
     } finally {
       setLoading(false)
     }
@@ -75,7 +78,7 @@ export function AlertsManager() {
       setAlerts(alerts.filter(a => a.id !== alertId))
       toast.success('Alert deleted')
     } catch (err) {
-      console.error('Failed to delete alert:', err)
+      logger.error('Failed to delete alert', {}, err)
       toast.error('Failed to delete alert')
     }
   }
@@ -91,7 +94,7 @@ export function AlertsManager() {
       ))
       toast.success(alert.isActive ? 'Alert paused' : 'Alert activated')
     } catch (err) {
-      console.error('Failed to toggle alert:', err)
+      logger.error('Failed to toggle alert', {}, err)
       toast.error('Failed to update alert')
     }
   }
@@ -125,7 +128,7 @@ export function AlertsManager() {
       setEditPrice('')
       toast.success('Target price updated')
     } catch (err) {
-      console.error('Failed to update alert:', err)
+      logger.error('Failed to update alert', {}, err)
       toast.error('Failed to update alert')
     }
   }

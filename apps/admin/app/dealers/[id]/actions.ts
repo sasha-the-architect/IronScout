@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { getAdminSession, logAdminAction } from '@/lib/auth';
 import { SignJWT } from 'jose';
 import Stripe from 'stripe';
+import { loggers } from '@/lib/logger';
 
 // Initialize Stripe
 const stripe = process.env.STRIPE_SECRET_KEY
@@ -116,13 +117,13 @@ export async function updateDealer(dealerId: string, data: UpdateDealerData) {
     revalidatePath(`/dealers/${dealerId}`);
     revalidatePath('/dealers');
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       dealer: updatedDealer,
       emailChanged,
     };
   } catch (error) {
-    console.error('Failed to update dealer:', error);
+    loggers.dealers.error('Failed to update dealer', { dealerId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to update dealer' };
   }
 }
@@ -188,7 +189,7 @@ export async function createDealerContact(dealerId: string, data: ContactData) {
 
     return { success: true, contact };
   } catch (error) {
-    console.error('Failed to create dealer contact:', error);
+    loggers.dealers.error('Failed to create dealer contact', { dealerId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to create contact' };
   }
 }
@@ -250,7 +251,7 @@ export async function updateDealerContact(contactId: string, dealerId: string, d
 
     return { success: true, contact };
   } catch (error) {
-    console.error('Failed to update dealer contact:', error);
+    loggers.dealers.error('Failed to update dealer contact', { dealerId, contactId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to update contact' };
   }
 }
@@ -291,7 +292,7 @@ export async function deleteDealerContact(contactId: string, dealerId: string) {
 
     return { success: true };
   } catch (error) {
-    console.error('Failed to delete dealer contact:', error);
+    loggers.dealers.error('Failed to delete dealer contact', { dealerId, contactId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to delete contact' };
   }
 }
@@ -366,7 +367,7 @@ export async function transferAccountOwnership(dealerId: string, newOwnerId: str
       newOwner: newOwnerAfter,
     };
   } catch (error) {
-    console.error('Failed to transfer account ownership:', error);
+    loggers.dealers.error('Failed to transfer account ownership', { dealerId, newOwnerId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to transfer account ownership' };
   }
 }
@@ -434,7 +435,7 @@ export async function setAccountOwner(dealerId: string, contactId: string) {
       newOwner,
     };
   } catch (error) {
-    console.error('Failed to set account owner:', error);
+    loggers.dealers.error('Failed to set account owner', { dealerId, contactId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to set account owner' };
   }
 }
@@ -481,7 +482,7 @@ export async function resendVerificationEmail(dealerId: string) {
     // Use Resend to send the email
     const resendApiKey = process.env.RESEND_API_KEY;
     if (!resendApiKey) {
-      console.error('RESEND_API_KEY not configured');
+      loggers.dealers.error('RESEND_API_KEY not configured', { dealerId });
       return { success: false, error: 'Email service not configured' };
     }
 
@@ -511,7 +512,7 @@ export async function resendVerificationEmail(dealerId: string) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('Failed to send verification email:', errorData);
+      loggers.dealers.error('Failed to send verification email', { dealerId, errorData });
       return { success: false, error: 'Failed to send email' };
     }
 
@@ -524,7 +525,7 @@ export async function resendVerificationEmail(dealerId: string) {
 
     return { success: true, email: dealerUser.email };
   } catch (error) {
-    console.error('Failed to resend verification email:', error);
+    loggers.dealers.error('Failed to resend verification email', { dealerId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to resend verification email' };
   }
 }
@@ -592,8 +593,8 @@ export async function impersonateDealer(dealerId: string) {
     // The dealer portal will exchange this token for a session cookie
     const baseUrl = getDealerPortalUrl();
     const redirectUrl = `${baseUrl}/api/auth/impersonate?token=${encodeURIComponent(token)}`;
-    
-    console.log('[Impersonate] URL construction:', {
+
+    loggers.dealers.debug('Impersonate URL construction', {
       baseUrl,
       redirectUrlStart: redirectUrl.substring(0, 60) + '...',
     });
@@ -604,7 +605,7 @@ export async function impersonateDealer(dealerId: string) {
       businessName: dealerUser.dealer.businessName,
     };
   } catch (error) {
-    console.error('Failed to impersonate dealer:', error);
+    loggers.dealers.error('Failed to impersonate dealer', { dealerId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to start impersonation' };
   }
 }
@@ -693,7 +694,7 @@ export async function triggerManualFeedRun(dealerId: string, feedId: string) {
       message: `Feed run queued successfully. The harvester will process it shortly.`,
     };
   } catch (error) {
-    console.error('Failed to trigger manual feed run:', error);
+    loggers.dealers.error('Failed to trigger manual feed run', { dealerId, feedId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to trigger feed run' };
   }
 }
@@ -777,7 +778,7 @@ export async function updateSubscription(dealerId: string, data: UpdateSubscript
       dealer: updatedDealer,
     };
   } catch (error) {
-    console.error('Failed to update subscription:', error);
+    loggers.dealers.error('Failed to update subscription', { dealerId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to update subscription' };
   }
 }
@@ -898,7 +899,7 @@ export async function updatePaymentDetails(dealerId: string, data: UpdatePayment
       dealer: updatedDealer,
     };
   } catch (error) {
-    console.error('Failed to update payment details:', error);
+    loggers.payments.error('Failed to update payment details', { dealerId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to update payment details' };
   }
 }
@@ -977,7 +978,7 @@ export async function searchStripeCustomers(query: string) {
       })),
     };
   } catch (error) {
-    console.error('Failed to search Stripe customers:', error);
+    loggers.payments.error('Failed to search Stripe customers', { query }, error instanceof Error ? error : new Error(String(error)));
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to search customers',
@@ -1022,7 +1023,7 @@ export async function validateStripeCustomer(customerId: string) {
       },
     };
   } catch (error) {
-    console.error('Failed to validate Stripe customer:', error);
+    loggers.payments.error('Failed to validate Stripe customer', { customerId }, error instanceof Error ? error : new Error(String(error)));
     return {
       success: false,
       error: 'Customer not found in Stripe',
@@ -1063,7 +1064,7 @@ export async function validateStripeSubscription(subscriptionId: string) {
       },
     };
   } catch (error) {
-    console.error('Failed to validate Stripe subscription:', error);
+    loggers.payments.error('Failed to validate Stripe subscription', { subscriptionId }, error instanceof Error ? error : new Error(String(error)));
     return {
       success: false,
       error: 'Subscription not found in Stripe',
@@ -1103,7 +1104,7 @@ export async function getStripeCustomerSubscriptions(customerId: string) {
       })),
     };
   } catch (error) {
-    console.error('Failed to get customer subscriptions:', error);
+    loggers.payments.error('Failed to get customer subscriptions', { customerId }, error instanceof Error ? error : new Error(String(error)));
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get subscriptions',
@@ -1170,7 +1171,7 @@ export async function getDealerFeeds(dealerId: string) {
       })),
     };
   } catch (error) {
-    console.error('Failed to get dealer feeds:', error);
+    loggers.dealers.error('Failed to get dealer feeds', { dealerId }, error instanceof Error ? error : new Error(String(error)));
     return { success: false, error: 'Failed to get feeds', feeds: [] };
   }
 }

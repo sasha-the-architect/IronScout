@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
+import { logger } from '../config/logger'
+
+const log = logger.child('sources')
 
 const router: any = Router()
 
@@ -35,7 +38,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     res.json(sources)
   } catch (error) {
-    console.error('Error fetching sources:', error)
+    log.error('Error fetching sources', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch sources' })
   }
 })
@@ -61,7 +64,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(source)
   } catch (error) {
-    console.error('Error fetching source:', error)
+    log.error('Error fetching source', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch source' })
   }
 })
@@ -80,7 +83,7 @@ router.post('/', async (req: Request, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors })
     }
-    console.error('Error creating source:', error)
+    log.error('Error creating source', { error }, error as Error)
     res.status(500).json({ error: 'Failed to create source' })
   }
 })
@@ -101,7 +104,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors })
     }
-    console.error('Error updating source:', error)
+    log.error('Error updating source', { error }, error as Error)
     res.status(500).json({ error: 'Failed to update source' })
   }
 })
@@ -117,7 +120,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     res.json({ success: true })
   } catch (error) {
-    console.error('Error deleting source:', error)
+    log.error('Error deleting source', { error }, error as Error)
     res.status(500).json({ error: 'Failed to delete source' })
   }
 })
@@ -142,7 +145,7 @@ router.post('/:id/toggle', async (req: Request, res: Response) => {
 
     res.json(updated)
   } catch (error) {
-    console.error('Error toggling source:', error)
+    log.error('Error toggling source', { error }, error as Error)
     res.status(500).json({ error: 'Failed to toggle source' })
   }
 })

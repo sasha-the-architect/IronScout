@@ -11,6 +11,9 @@ import {
   type SavedItemsResponse,
   type UpdateSavedItemPrefs,
 } from '@/lib/api'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('hooks:saved-items')
 
 /**
  * Result type for useSavedItems hook
@@ -76,7 +79,7 @@ export function useSavedItems(): UseSavedItemsResult {
       const response = await getSavedItems(token)
       setData(response)
     } catch (err) {
-      console.error('Failed to fetch saved items:', err)
+      logger.error('Failed to fetch saved items', {}, err)
       setError(err instanceof Error ? err.message : 'Failed to load saved items')
     } finally {
       setLoading(false)

@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('components:admin:recent-executions')
 
 interface Execution {
   id: string
@@ -34,7 +37,7 @@ export default function RecentExecutions() {
       const data = await response.json()
       setExecutions(data.executions)
     } catch (error) {
-      console.error('Error fetching executions:', error)
+      logger.error('Error fetching executions', {}, error)
     } finally {
       setLoading(false)
     }

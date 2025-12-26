@@ -12,6 +12,7 @@ import FacebookProvider from 'next-auth/providers/facebook'
 import GitHubProvider from 'next-auth/providers/github'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import { prisma } from '@ironscout/db'
+import { loggers } from './logger'
 
 // Admin emails list
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
@@ -136,15 +137,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       const email = user.email?.toLowerCase()
 
       if (!email || !ADMIN_EMAILS.includes(email)) {
-        console.warn(`[Admin Auth] Blocked login attempt for non-admin email: ${email}`)
+        loggers.auth.warn('Blocked login attempt for non-admin email', { email })
         return false
       }
 
-      console.log(`[Admin Auth] Approved login for admin: ${email}`)
+      loggers.auth.info('Approved login for admin', { email })
       return true
     },
     async redirect({ url, baseUrl }) {
-      console.log('[Admin Auth] Redirect callback:', { url, baseUrl })
+      loggers.auth.debug('Redirect callback', { url, baseUrl })
 
       // Allow relative URLs
       if (url.startsWith('/')) {
@@ -177,13 +178,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (allowedDomains.includes(urlObj.hostname) ||
             allowedRenderDomains.includes(urlObj.hostname) ||
             urlObj.hostname.endsWith('.ironscout.ai')) {
-          console.log('[Admin Auth] Allowing redirect to:', url)
+          loggers.auth.info('Allowing redirect', { url })
           return url
         }
 
-        console.log('[Admin Auth] Blocked redirect to:', url)
+        loggers.auth.warn('Blocked redirect', { url })
       } catch (e) {
-        console.error('[Admin Auth] Error parsing URL:', e)
+        loggers.auth.error('Error parsing URL', { url }, e instanceof Error ? e : new Error(String(e)))
       }
 
       return baseUrl

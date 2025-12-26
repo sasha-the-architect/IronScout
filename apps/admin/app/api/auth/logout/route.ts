@@ -10,7 +10,7 @@ const SESSION_COOKIE_NAME = process.env.NODE_ENV === 'production'
   : 'authjs.session-token';
 
 export async function GET() {
-  const reqLogger = logger.child({ endpoint: '/api/auth/logout' });
+  const reqLogger = logger.child('logout');
 
   try {
     reqLogger.info('Admin logout request');

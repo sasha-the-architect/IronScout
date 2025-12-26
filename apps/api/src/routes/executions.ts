@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
+import { logger } from '../config/logger'
+
+const log = logger.child('executions')
 
 const router: any = Router()
 
@@ -51,7 +54,7 @@ router.get('/', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('Error fetching executions:', error)
+    log.error('Error fetching executions', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch executions' })
   }
 })
@@ -91,7 +94,7 @@ router.get('/stats', async (req: Request, res: Response) => {
       totalItemsHarvested,
     })
   } catch (error) {
-    console.error('Error fetching execution stats:', error)
+    log.error('Error fetching execution stats', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch stats' })
   }
 })
@@ -117,7 +120,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(execution)
   } catch (error) {
-    console.error('Error fetching execution:', error)
+    log.error('Error fetching execution', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch execution' })
   }
 })
@@ -139,7 +142,7 @@ router.get('/:id/logs', async (req: Request, res: Response) => {
 
     res.json(logs)
   } catch (error) {
-    console.error('Error fetching execution logs:', error)
+    log.error('Error fetching execution logs', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch logs' })
   }
 })
@@ -155,7 +158,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     res.json({ success: true })
   } catch (error) {
-    console.error('Error deleting execution:', error)
+    log.error('Error deleting execution', { error }, error as Error)
     res.status(500).json({ error: 'Failed to delete execution' })
   }
 })

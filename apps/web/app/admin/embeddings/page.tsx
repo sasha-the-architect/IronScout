@@ -3,16 +3,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { 
-  Database, 
-  RefreshCw, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Database,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
   AlertCircle,
   Loader2,
   Sparkles,
   Search
 } from 'lucide-react'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('admin-embeddings')
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -142,7 +145,7 @@ export default function EmbeddingsAdminPage() {
         setTestResult(data)
       }
     } catch (err) {
-      console.error('Test search failed:', err)
+      logger.error('Test search failed', {}, err)
     } finally {
       setTestLoading(false)
     }

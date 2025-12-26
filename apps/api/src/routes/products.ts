@@ -3,6 +3,9 @@ import { z } from 'zod'
 import { prisma } from '@ironscout/db'
 import { getMaxSearchResults, hasPriceHistoryAccess, getPriceHistoryDays, shapePriceHistory, visibleDealerPriceWhere } from '../config/tiers'
 import { getUserTier } from '../middleware/auth'
+import { loggers } from '../config/logger'
+
+const log = loggers.products
 
 const router: any = Router()
 
@@ -247,7 +250,7 @@ router.get('/search', async (req: Request, res: Response) => {
       }
     })
   } catch (error) {
-    console.error('Search error:', error)
+    log.error('Search error', { error }, error as Error)
     res.status(400).json({ error: 'Invalid search parameters' })
   }
 })
@@ -303,7 +306,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     res.json(formattedProduct)
   } catch (error) {
-    console.error('Product fetch error:', error)
+    log.error('Product fetch error', { error }, error as Error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -396,7 +399,7 @@ router.get('/:id/prices', async (req: Request, res: Response) => {
       } : null
     })
   } catch (error) {
-    console.error('Price consolidation error:', error)
+    log.error('Price consolidation error', { error }, error as Error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -518,7 +521,7 @@ router.get('/:id/history', async (req: Request, res: Response) => {
       }
     })
   } catch (error) {
-    console.error('Price history error:', error)
+    log.error('Price history error', { error }, error as Error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })

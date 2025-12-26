@@ -9,6 +9,9 @@ import {
   updateWatchlistItem,
 } from '@/lib/api'
 import type { WatchlistResponse, UseWatchlistResult } from '@/types/dashboard'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('hooks:watchlist')
 
 /**
  * Hook for managing watchlist
@@ -34,7 +37,7 @@ export function useWatchlist(): UseWatchlistResult {
       const response = await getWatchlist(token)
       setData(response)
     } catch (err) {
-      console.error('Failed to fetch watchlist:', err)
+      logger.error('Failed to fetch watchlist', {}, err)
       setError(err instanceof Error ? err.message : 'Failed to load watchlist')
     } finally {
       setLoading(false)

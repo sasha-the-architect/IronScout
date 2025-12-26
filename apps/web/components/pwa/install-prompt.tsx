@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { X, Download, Smartphone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('components:pwa:install-prompt')
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -62,9 +65,9 @@ export function PWAInstallPrompt() {
     
     // Wait for the user's choice
     const { outcome } = await deferredPrompt.userChoice
-    
+
     if (outcome === 'accepted') {
-      console.log('User accepted the install prompt')
+      logger.info('User accepted the install prompt')
     }
     
     // Clear the prompt

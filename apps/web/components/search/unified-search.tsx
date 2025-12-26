@@ -1,13 +1,16 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Search, Sparkles, X, Loader2, SlidersHorizontal, ChevronDown, RotateCcw, Crown, TrendingUp, Bell, Bookmark } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getSearchSuggestions } from '@/lib/api'
 import { PremiumFilters } from '@/components/premium'
 import { cn } from '@/lib/utils'
 import { useSearchLoading } from './search-loading-context'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('unified-search')
 
 // Common calibers for the ammunition market
 const CALIBERS = [
@@ -68,9 +71,8 @@ interface UnifiedSearchProps {
 }
 
 export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedSearchProps) {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const { isSearching, startSearch } = useSearchLoading()
+  const { isSearching, navigateWithLoading } = useSearchLoading()
 
   // Search state
   const [query, setQuery] = useState(initialQuery)
@@ -144,11 +146,10 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
     const q = searchQuery || query
     if (q.trim()) {
       setShowSuggestions(false)
-      startSearch()
       const params = new URLSearchParams(searchParams.toString())
       params.set('q', q.trim())
       params.delete('page') // Reset to page 1
-      router.push(`/search?${params.toString()}`)
+      navigateWithLoading(`/search?${params.toString()}`)
     }
   }
 
@@ -169,7 +170,7 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
         const results = await getSearchSuggestions(query)
         setSuggestions(results.slice(0, 5))
       } catch (error) {
-        console.error('Failed to fetch suggestions:', error)
+        logger.error('Failed to fetch suggestions', {}, error)
       }
     }, 200)
 
@@ -195,7 +196,7 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
   // Filter methods
   const applyFilters = (newFilters: typeof filters) => {
     const params = new URLSearchParams(searchParams.toString())
-    
+
     Object.entries(newFilters).forEach(([key, value]) => {
       if (value === '' || value === false) {
         params.delete(key)
@@ -203,9 +204,9 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
         params.set(key, String(value))
       }
     })
-    
+
     params.delete('page')
-    router.push(`/search?${params.toString()}`)
+    navigateWithLoading(`/search?${params.toString()}`)
   }
 
   const clearFilters = () => {
@@ -220,14 +221,14 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
       inStock: false,
     }
     setFilters(clearedFilters)
-    
+
     const params = new URLSearchParams()
     const query = searchParams.get('q')
     const sortBy = searchParams.get('sortBy')
     if (query) params.set('q', query)
     if (sortBy) params.set('sortBy', sortBy)
-    
-    router.push(`/search?${params.toString()}`)
+
+    navigateWithLoading(`/search?${params.toString()}`)
   }
 
   const handleSelectChange = (key: keyof typeof filters, value: string) => {
@@ -325,10 +326,12 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
             </Button>
           </div>
 
-          {/* Confident AI helper */}
-          <p className="mt-2 text-xs text-muted-foreground text-center">
-            Describe what you need. I'll handle the filters.
-          </p>
+          {/* Confident AI helper - only show when no query */}
+          {!query && (
+            <p className="mt-2 text-xs text-muted-foreground text-center">
+              Describe what you need. I'll handle the filters.
+            </p>
+          )}
 
           {/* Suggestions dropdown */}
           {showSuggestions && suggestions.length > 0 && (
@@ -427,7 +430,7 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
 
       {/* Refine Toggle - Minimal, secondary action */}
       {query && (
-        <div className="max-w-4xl mx-auto mt-4 flex items-center justify-center">
+        <div className="max-w-4xl mx-auto mt-2 flex items-center justify-center">
           <button
             onClick={() => setFiltersOpen(!filtersOpen)}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-xs ${

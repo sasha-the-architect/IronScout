@@ -16,6 +16,7 @@ import FacebookProvider from 'next-auth/providers/facebook'
 import TwitterProvider from 'next-auth/providers/twitter'
 import GitHubProvider from 'next-auth/providers/github'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import { logger } from './logger'
 
 // API URL for auth endpoints
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -67,7 +68,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           if (!response.ok) {
             const error = await response.json()
-            console.error('[Auth] Signin failed:', error.error)
+            logger.auth.error('Signin failed', { error: error.error })
             return null
           }
 
@@ -84,7 +85,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             refreshToken: data.refreshToken,
           }
         } catch (error) {
-          console.error('[Auth] Signin error:', error)
+          logger.auth.error('Signin error', {}, error)
           return null
         }
       },
@@ -217,7 +218,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           if (!response.ok) {
             const errorText = await response.text()
-            console.error('[Auth] OAuth signin failed:', {
+            logger.auth.error('OAuth signin failed', {
               status: response.status,
               statusText: response.statusText,
               body: errorText,
@@ -239,7 +240,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           return true
         } catch (error) {
-          console.error('[Auth] OAuth signin error:', error)
+          logger.auth.error('OAuth signin error', {}, error)
           return false
         }
       }
@@ -248,7 +249,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
 
     async redirect({ url, baseUrl }) {
-      console.log('[Auth] Redirect callback:', { url, baseUrl })
+      logger.auth.debug('Redirect callback', { url, baseUrl })
 
       // Allow relative URLs
       if (url.startsWith('/')) {
@@ -278,13 +279,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           allowedRenderDomains.includes(urlObj.hostname) ||
           urlObj.hostname.endsWith('.ironscout.ai')
         ) {
-          console.log('[Auth] Allowing redirect to:', url)
+          logger.auth.debug('Allowing redirect to', { url })
           return url
         }
 
-        console.log('[Auth] Blocked redirect to:', url)
+        logger.auth.warn('Blocked redirect to', { url })
       } catch (e) {
-        console.error('[Auth] Error parsing URL:', e)
+        logger.auth.error('Error parsing URL', {}, e)
       }
 
       return baseUrl

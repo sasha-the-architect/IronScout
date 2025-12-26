@@ -1,12 +1,22 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Outfit, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { Toaster } from 'sonner'
 
-const inter = Inter({ subsets: ['latin'] })
+// Outfit: Modern geometric sans with personality - sharp but approachable
+const outfit = Outfit({
+  subsets: ['latin'],
+  variable: '--font-display',
+})
+
+// JetBrains Mono: Technical precision for data/numbers
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+})
 
 export const metadata: Metadata = {
   title: 'IronScout - AI-Powered Ammo Search',
@@ -56,7 +66,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${outfit.variable} ${jetbrainsMono.variable}`}>
       <head>
         {/* Google Analytics */}
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-1CDJQS6N90" />
@@ -109,7 +119,7 @@ export default function RootLayout({
           src="https://classic.avantlink.com/affiliate_app_confirm.php?mode=js&authResponse=83b35735960abca5c62924f3fbe01e4e919343a3"
         />
       </head>
-      <body className={inter.className}>
+      <body className="font-display antialiased">
         <Providers>
           <div className="min-h-screen flex flex-col safe-area-inset">
             <Header />

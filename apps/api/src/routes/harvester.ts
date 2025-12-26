@@ -3,6 +3,9 @@ import { z } from 'zod'
 import { prisma } from '@ironscout/db'
 import { Queue } from 'bullmq'
 import Redis from 'ioredis'
+import { logger } from '../config/logger'
+
+const log = logger.child('harvester')
 
 const router: any = Router()
 
@@ -85,7 +88,7 @@ router.post('/trigger', async (req: Request, res: Response) => {
         executionId: execution.id,
       })
 
-      console.log(`[API] Queued crawl job for source ${source.name} (execution: ${execution.id})`)
+      log.info('Queued crawl job', { sourceName: source.name, executionId: execution.id })
     }
 
     res.json({
@@ -96,7 +99,7 @@ router.post('/trigger', async (req: Request, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors })
     }
-    console.error('Error triggering crawl:', error)
+    log.error('Error triggering crawl', { error }, error as Error)
     res.status(500).json({ error: 'Failed to trigger crawl' })
   }
 })
@@ -135,7 +138,7 @@ router.get('/status', async (req: Request, res: Response) => {
         : null,
     })
   } catch (error) {
-    console.error('Error fetching harvester status:', error)
+    log.error('Error fetching harvester status', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch status' })
   }
 })

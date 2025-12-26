@@ -1,6 +1,9 @@
 import { Router, type Router as ExpressRouter } from 'express'
 import { prisma } from '@ironscout/db'
 import { z } from 'zod'
+import { logger } from '../config/logger'
+
+const log = logger.child('reports')
 
 const router: ExpressRouter = Router()
 
@@ -120,7 +123,7 @@ router.post('/', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid request data', details: error.errors })
     }
-    console.error('Error creating report:', error)
+    log.error('Error creating report', { error }, error as Error)
     res.status(500).json({ error: 'Failed to create report' })
   }
 })
@@ -196,7 +199,7 @@ router.get('/', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid query parameters', details: error.errors })
     }
-    console.error('Error listing reports:', error)
+    log.error('Error listing reports', { error }, error as Error)
     res.status(500).json({ error: 'Failed to list reports' })
   }
 })
@@ -249,7 +252,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(report)
   } catch (error) {
-    console.error('Error fetching report:', error)
+    log.error('Error fetching report', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch report' })
   }
 })
@@ -289,7 +292,7 @@ router.get('/product/:productId', async (req, res) => {
 
     res.json(reports)
   } catch (error) {
-    console.error('Error fetching product reports:', error)
+    log.error('Error fetching product reports', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch product reports' })
   }
 })
@@ -353,7 +356,7 @@ router.patch('/:id', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid request data', details: error.errors })
     }
-    console.error('Error updating report:', error)
+    log.error('Error updating report', { error }, error as Error)
     res.status(500).json({ error: 'Failed to update report' })
   }
 })
@@ -375,7 +378,7 @@ router.delete('/:id', async (req, res) => {
     if (error.code === 'P2025') {
       return res.status(404).json({ error: 'Report not found' })
     }
-    console.error('Error deleting report:', error)
+    log.error('Error deleting report', { error }, error as Error)
     res.status(500).json({ error: 'Failed to delete report' })
   }
 })
@@ -433,7 +436,7 @@ router.get('/stats/summary', async (req, res) => {
       recent: recentReports,
     })
   } catch (error) {
-    console.error('Error fetching report statistics:', error)
+    log.error('Error fetching report statistics', { error }, error as Error)
     res.status(500).json({ error: 'Failed to fetch statistics' })
   }
 })

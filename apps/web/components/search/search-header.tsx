@@ -2,7 +2,7 @@
 
 import { Sparkles, SlidersHorizontal, Crown, Info } from 'lucide-react'
 import { ExplicitFilters } from '@/lib/api'
-import { EnhancedSortSelect } from './sort-select'
+import { SearchControls } from './search-controls'
 import {
   Tooltip,
   TooltipContent,
@@ -137,36 +137,19 @@ export function SearchHeader({
     return colorMap[color] || colorMap.blue
   }
 
-  // Generate headline based on result count
-  const getHeadline = () => {
-    if (resultCount === undefined) return null
-    if (resultCount === 0) return 'There are no strong options for your search'
-    if (resultCount === 1) return 'We found a strong option for your search'
-    return 'We found strong options for your search'
-  }
-
-  const headline = getHeadline()
-
   return (
     <div className="pb-1">
-      {/* Headline */}
-      {headline && (
-        <p className="text-base font-medium text-foreground mb-1">
-          {headline}
-        </p>
-      )}
-
-      {/* Compact Control Bar */}
+      {/* Main Control Bar */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        {/* Left: Result count + AI confirmation chip */}
+        {/* Left: Result count + AI chip */}
         <div className="flex items-center gap-3">
           {resultCount !== undefined && (
-            <span className="text-sm text-muted-foreground">
+            <span className="text-base font-medium text-foreground">
               {resultCount.toLocaleString()} {resultCount === 1 ? 'result' : 'results'}
             </span>
           )}
 
-          {/* AI Confirmation - icon with tooltip, never louder than the decision */}
+          {/* AI Confirmation - icon with tooltip */}
           {hasIntent && (
             <TooltipProvider delayDuration={200}>
               <Tooltip>
@@ -205,8 +188,8 @@ export function SearchHeader({
           )}
         </div>
 
-        {/* Right: Sort Select */}
-        <EnhancedSortSelect isPremium={isPremium} />
+        {/* Right: View Toggle + Sort */}
+        <SearchControls isPremium={isPremium} />
       </div>
 
       {/* Active Explicit Filters */}

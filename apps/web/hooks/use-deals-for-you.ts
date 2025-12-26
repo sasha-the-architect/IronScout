@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { getDealsForYou } from '@/lib/api'
 import type { DealsResponse, UseDealsResult } from '@/types/dashboard'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('hooks:deals-for-you')
 
 /**
  * Hook for fetching personalized deals feed
@@ -31,7 +34,7 @@ export function useDealsForYou(): UseDealsResult {
       const response = await getDealsForYou(token)
       setData(response)
     } catch (err) {
-      console.error('Failed to fetch deals:', err)
+      logger.error('Failed to fetch deals', {}, err)
       setError(err instanceof Error ? err.message : 'Failed to load deals')
     } finally {
       setLoading(false)
