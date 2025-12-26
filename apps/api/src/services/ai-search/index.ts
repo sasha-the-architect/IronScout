@@ -1,27 +1,25 @@
 // AI-powered semantic search module
 
 // Intent parsing
-export { 
-  parseSearchIntent, 
-  SearchIntent, 
+export { parseSearchIntent } from './intent-parser'
+export type {
+  SearchIntent,
   PremiumSearchIntent,
   SafetyConstraint,
   ParseOptions
 } from './intent-parser'
 
 // Main search service
-export { 
-  aiSearch, 
-  getSearchSuggestions, 
-  AISearchResult, 
+export { aiSearch, getSearchSuggestions } from './search-service'
+export type {
+  AISearchResult,
   ExplicitFilters,
   AISearchOptions
 } from './search-service'
 
 // Premium ranking
-export {
-  applyPremiumRanking,
-  applyFreeRanking,
+export { applyPremiumRanking, applyFreeRanking } from './premium-ranking'
+export type {
   ProductForRanking,
   PremiumRankedProduct,
   PremiumRankingOptions
@@ -31,11 +29,13 @@ export {
 export {
   calculatePriceSignalIndex,
   batchCalculatePriceSignalIndex,
-  PriceSignalIndex,
-  ContextBand,
-  PriceContextMeta,
   clearPriceStatsCache,
   warmPriceStatsCache
+} from './price-signal-index'
+export type {
+  PriceSignalIndex,
+  ContextBand,
+  PriceContextMeta
 } from './price-signal-index'
 
 // Domain knowledge
