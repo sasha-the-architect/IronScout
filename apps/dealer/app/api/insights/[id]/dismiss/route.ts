@@ -8,11 +8,11 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
-    
+
     if (!session || session.type !== 'dealer') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -26,7 +26,7 @@ export async function POST(
       );
     }
 
-    const insightId = params.id;
+    const { id: insightId } = await params;
 
     // Verify ownership
     const insight = await prisma.dealerInsight.findFirst({

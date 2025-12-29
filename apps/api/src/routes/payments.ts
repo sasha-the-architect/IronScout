@@ -86,8 +86,13 @@ async function logConsumerSubscriptionChange(
 }
 
 const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-08-16' })
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-12-15.clover' })
   : null
+
+// Helper to get current_period_end from subscription (Stripe v20 moved this to items)
+function getSubscriptionPeriodEnd(subscription: Stripe.Subscription): number {
+  return subscription.items.data[0]?.current_period_end ?? 0
+}
 
 // =============================================================================
 // Logging Utilities
@@ -637,7 +642,11 @@ router.post('/webhook', async (req: Request, res: Response) => {
       // =======================================================================
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice
-        const subscriptionId = invoice.subscription as string
+        // Extract subscription ID from invoice (may be string, object, or null depending on Stripe API version)
+        const rawSubscription = (invoice as unknown as { subscription?: string | { id: string } | null }).subscription
+        const subscriptionId = typeof rawSubscription === 'string'
+          ? rawSubscription
+          : rawSubscription?.id || null
 
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId)
@@ -657,7 +666,11 @@ router.post('/webhook', async (req: Request, res: Response) => {
       // =======================================================================
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice
-        const subscriptionId = invoice.subscription as string
+        // Extract subscription ID from invoice (may be string, object, or null depending on Stripe API version)
+        const rawSubscription = (invoice as unknown as { subscription?: string | { id: string } | null }).subscription
+        const subscriptionId = typeof rawSubscription === 'string'
+          ? rawSubscription
+          : rawSubscription?.id || null
 
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId)
@@ -812,7 +825,7 @@ async function handleDealerCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   // Get subscription details
   const subscription = await stripe!.subscriptions.retrieve(subscriptionId)
-  const currentPeriodEnd = new Date(subscription.current_period_end * 1000)
+  const currentPeriodEnd = new Date(getSubscriptionPeriodEnd(subscription) * 1000)
 
   await prisma.dealer.update({
     where: { id: dealerId },
@@ -882,7 +895,7 @@ async function handleDealerInvoicePaid(invoice: Stripe.Invoice, subscription: St
     },
   })
 
-  const currentPeriodEnd = new Date(subscription.current_period_end * 1000)
+  const currentPeriodEnd = new Date(getSubscriptionPeriodEnd(subscription) * 1000)
 
   await prisma.dealer.update({
     where: { id: dealerId },
@@ -1009,7 +1022,7 @@ async function handleDealerSubscriptionUpdated(subscription: Stripe.Subscription
     },
   })
 
-  const currentPeriodEnd = new Date(subscription.current_period_end * 1000)
+  const currentPeriodEnd = new Date(getSubscriptionPeriodEnd(subscription) * 1000)
 
   // Map Stripe status to our status
   let subscriptionStatus: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED' | 'CANCELLED' = 'ACTIVE'
@@ -1199,7 +1212,7 @@ async function handleDealerSubscriptionResumed(subscription: Stripe.Subscription
     },
   })
 
-  const currentPeriodEnd = new Date(subscription.current_period_end * 1000)
+  const currentPeriodEnd = new Date(getSubscriptionPeriodEnd(subscription) * 1000)
 
   await prisma.dealer.update({
     where: { id: dealerId },
@@ -1309,7 +1322,7 @@ async function handleConsumerCheckoutCompleted(session: Stripe.Checkout.Session)
 
   // Get subscription details from Stripe
   const stripeSubscription = await stripe!.subscriptions.retrieve(subscriptionId)
-  const currentPeriodEnd = new Date(stripeSubscription.current_period_end * 1000)
+  const currentPeriodEnd = new Date(getSubscriptionPeriodEnd(stripeSubscription) * 1000)
   const amount = stripeSubscription.items.data[0]?.price?.unit_amount || 0
 
   // Use transaction for atomicity
@@ -1397,7 +1410,7 @@ async function handleConsumerInvoicePaid(invoice: Stripe.Invoice, subscription: 
     amount
   })
 
-  const currentPeriodEnd = new Date(subscription.current_period_end * 1000)
+  const currentPeriodEnd = new Date(getSubscriptionPeriodEnd(subscription) * 1000)
   const oldTier = user.tier
 
   // Update subscription and ensure user is PREMIUM
@@ -1523,7 +1536,7 @@ async function handleConsumerSubscriptionUpdated(subscription: Stripe.Subscripti
     cancelAtPeriodEnd: subscription.cancel_at_period_end
   })
 
-  const currentPeriodEnd = new Date(subscription.current_period_end * 1000)
+  const currentPeriodEnd = new Date(getSubscriptionPeriodEnd(subscription) * 1000)
   const subscriptionStatus = mapStripeStatusToSubscriptionStatus(subscription.status)
   const oldTier = user.tier
 

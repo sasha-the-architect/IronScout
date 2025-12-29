@@ -85,6 +85,25 @@ HARVESTER_SCHEDULER_ENABLED=false pnpm dev
 
 ---
 
+### Bull Board (Queue Monitor)
+
+Ops-only dashboard for monitoring BullMQ queues. Protected by HTTP Basic Auth.
+
+```bash
+cd apps/harvester
+BULLBOARD_USERNAME=admin BULLBOARD_PASSWORD=<strong-password> pnpm bullboard:dev
+```
+
+Access at: `http://localhost:3939/admin/queues`
+
+⚠️ **Security:**
+- Never expose to the public internet
+- Run behind firewall or VPN only
+- Use strong, unique credentials
+- See `context/02_monitoring_and_observability.md` for full documentation
+
+---
+
 ## Database
 
 ```bash

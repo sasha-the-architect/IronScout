@@ -14,6 +14,9 @@ export const QUEUE_NAMES = {
   DEALER_SKU_MATCH: 'dealer-sku-match',
   DEALER_BENCHMARK: 'dealer-benchmark',
   DEALER_INSIGHT: 'dealer-insight',
+  // Affiliate Feed queues
+  AFFILIATE_FEED: 'affiliate-feed',
+  AFFILIATE_FEED_SCHEDULER: 'affiliate-feed-scheduler',
 } as const
 
 // Job data interfaces
@@ -172,6 +175,50 @@ export const dealerInsightQueue = new Queue<DealerInsightJobData>(
   { connection: redisConnection }
 )
 
+// ============================================================================
+// AFFILIATE FEED QUEUES
+// ============================================================================
+
+export interface AffiliateFeedJobData {
+  feedId: string
+  trigger: 'SCHEDULED' | 'MANUAL' | 'MANUAL_PENDING' | 'ADMIN_TEST' | 'RETRY'
+  // Per spec §6.4.1: Set after first lock acquisition, reused on retry
+  runId?: string
+  // Cached to avoid re-query on retry
+  feedLockId?: bigint
+}
+
+export interface AffiliateFeedSchedulerJobData {
+  // Empty - scheduler tick job has no data
+}
+
+export const affiliateFeedQueue = new Queue<AffiliateFeedJobData>(
+  QUEUE_NAMES.AFFILIATE_FEED,
+  {
+    connection: redisConnection,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000, // 5s, 15s, 45s
+      },
+      removeOnComplete: 100,
+      removeOnFail: 500,
+    },
+  }
+)
+
+export const affiliateFeedSchedulerQueue = new Queue<AffiliateFeedSchedulerJobData>(
+  QUEUE_NAMES.AFFILIATE_FEED_SCHEDULER,
+  {
+    connection: redisConnection,
+    defaultJobOptions: {
+      removeOnComplete: 10,
+      removeOnFail: 10,
+    },
+  }
+)
+
 // Export all queues
 export const queues = {
   crawl: crawlQueue,
@@ -185,4 +232,7 @@ export const queues = {
   dealerSkuMatch: dealerSkuMatchQueue,
   dealerBenchmark: dealerBenchmarkQueue,
   dealerInsight: dealerInsightQueue,
+  // Affiliate queues
+  affiliateFeed: affiliateFeedQueue,
+  affiliateFeedScheduler: affiliateFeedSchedulerQueue,
 }

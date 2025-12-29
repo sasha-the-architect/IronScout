@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     const validation = feedSchema.safeParse(body);
     
     if (!validation.success) {
-      const errors = validation.error.errors.map(e => e.message);
+      const errors = validation.error.issues.map(e => e.message);
       reqLogger.warn('Feed validation failed', { errors });
       return NextResponse.json(
         { error: errors[0] },
@@ -170,7 +170,7 @@ export async function PUT(request: Request) {
     const validation = feedSchema.safeParse(body);
     
     if (!validation.success) {
-      const errors = validation.error.errors.map(e => e.message);
+      const errors = validation.error.issues.map(e => e.message);
       reqLogger.warn('Feed validation failed', { errors });
       return NextResponse.json(
         { error: errors[0] },

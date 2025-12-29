@@ -138,6 +138,21 @@ Safety:
 - `MAX_WRITE_BATCH_SIZE` (optional)
 - `MAX_SOURCE_CONCURRENCY` (optional)
 
+Affiliate Feeds:
+- `AFFILIATE_FEED_SCHEDULER_ENABLED=true|false` - Enable affiliate feed scheduling
+- `AFFILIATE_FEED_ALLOW_PLAIN_FTP=true|false` - Allow insecure FTP (default: false)
+- `CREDENTIAL_ENCRYPTION_KEY_B64` - Base64-encoded 32-byte key for credential encryption
+- `PRICE_HEARTBEAT_HOURS` - Hours before writing heartbeat price even if unchanged (default: 24)
+- `AFFILIATE_RUN_RETENTION_DAYS` - Days to retain completed runs before cleanup (default: 30)
+
+Bull Board (Queue Monitor):
+- `BULLBOARD_PORT` - Server port (default: 3939)
+- `BULLBOARD_USERNAME` - **Required** for auth. Basic auth username.
+- `BULLBOARD_PASSWORD` - **Required** for auth. Basic auth password.
+- `BULLBOARD_BASE_PATH` - URL path (default: /admin/queues)
+
+**Security:** Bull Board must never be exposed to public internet. Use SSH tunnel or VPN.
+
 ---
 
 ## Minimum Local Dev Set (Suggested)

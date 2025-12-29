@@ -9,8 +9,16 @@ import { loggers } from '@/lib/logger';
 
 // Initialize Stripe
 const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-08-16' })
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-12-15.clover' })
   : null;
+
+/**
+ * Get subscription current_period_end from items (Stripe SDK v20+)
+ * In Stripe SDK v20, current_period_end moved to subscription.items.data[0]
+ */
+function getSubscriptionPeriodEnd(subscription: Stripe.Subscription): number {
+  return subscription.items.data[0]?.current_period_end ?? 0;
+}
 
 /**
  * Get the dealer portal base URL with trailing slashes removed
@@ -1058,7 +1066,7 @@ export async function validateStripeSubscription(subscriptionId: string) {
       subscription: {
         id: subscription.id,
         status: subscription.status,
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        currentPeriodEnd: new Date(getSubscriptionPeriodEnd(subscription) * 1000),
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
         metadata: subscription.metadata,
       },
@@ -1098,7 +1106,7 @@ export async function getStripeCustomerSubscriptions(customerId: string) {
       subscriptions: subscriptions.data.map(s => ({
         id: s.id,
         status: s.status,
-        currentPeriodEnd: new Date(s.current_period_end * 1000),
+        currentPeriodEnd: new Date(getSubscriptionPeriodEnd(s) * 1000),
         cancelAtPeriodEnd: s.cancel_at_period_end,
         metadata: s.metadata,
       })),

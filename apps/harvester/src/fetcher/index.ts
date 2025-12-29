@@ -6,7 +6,7 @@ import { redisConnection } from '../config/redis'
 import { logger } from '../config/logger'
 import { extractQueue, normalizeQueue, FetchJobData } from '../config/queues'
 import { computeContentHash } from '../utils/hash'
-import { ImpactParser, AvantLinkParser, ShareASaleParser } from '../parsers'
+import { ImpactParser } from '../parsers' // v1 only supports IMPACT
 
 const log = logger.fetcher
 
@@ -359,19 +359,14 @@ export const fetcherWorker = new Worker<FetchJobData>(
         })
 
         // Select appropriate parser based on affiliate network
+        // v1 only supports IMPACT network
         let parser
         switch (source.affiliateNetwork) {
           case 'IMPACT':
             parser = new ImpactParser()
             break
-          case 'AVANTLINK':
-            parser = new AvantLinkParser()
-            break
-          case 'SHAREASALE':
-            parser = new ShareASaleParser()
-            break
           default:
-            throw new Error(`Unsupported affiliate network: ${source.affiliateNetwork}`)
+            throw new Error(`Unsupported affiliate network: ${source.affiliateNetwork}. Only IMPACT is supported in v1.`)
         }
 
         // Parse the feed content

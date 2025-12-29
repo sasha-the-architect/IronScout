@@ -121,7 +121,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(report)
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid request data', details: error.errors })
+      return res.status(400).json({ error: 'Invalid request data', details: error.issues })
     }
     log.error('Error creating report', { error }, error as Error)
     res.status(500).json({ error: 'Failed to create report' })
@@ -197,7 +197,7 @@ router.get('/', async (req, res) => {
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid query parameters', details: error.errors })
+      return res.status(400).json({ error: 'Invalid query parameters', details: error.issues })
     }
     log.error('Error listing reports', { error }, error as Error)
     res.status(500).json({ error: 'Failed to list reports' })
@@ -354,7 +354,7 @@ router.patch('/:id', async (req, res) => {
     res.json(report)
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid request data', details: error.errors })
+      return res.status(400).json({ error: 'Invalid request data', details: error.issues })
     }
     log.error('Error updating report', { error }, error as Error)
     res.status(500).json({ error: 'Failed to update report' })

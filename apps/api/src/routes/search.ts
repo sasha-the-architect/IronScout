@@ -153,9 +153,9 @@ router.post('/semantic', async (req: Request, res: Response) => {
     log.error('Semantic search error', {}, error)
 
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid request parameters',
-        details: error.errors 
+        details: error.issues
       })
     }
     
@@ -193,9 +193,9 @@ router.post('/parse', async (req: Request, res: Response) => {
     log.error('Parse error', {}, error)
 
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid request parameters',
-        details: error.errors 
+        details: error.issues
       })
     }
     
@@ -222,9 +222,9 @@ router.get('/suggestions', async (req: Request, res: Response) => {
     log.error('Suggestions error', {}, error)
 
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid request parameters',
-        details: error.errors 
+        details: error.issues
       })
     }
     

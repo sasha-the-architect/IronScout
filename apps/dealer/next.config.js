@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Externalize native Node.js modules that can't be bundled by Turbopack
+  serverExternalPackages: ['ssh2', 'cpu-features'],
   images: {
     remotePatterns: [
       {

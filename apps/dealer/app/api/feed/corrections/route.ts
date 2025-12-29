@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     const validation = createCorrectionSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
-        { error: validation.error.errors[0]?.message || 'Invalid data' },
+        { error: validation.error.issues[0]?.message || 'Invalid data' },
         { status: 400 }
       );
     }

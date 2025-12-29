@@ -31,6 +31,13 @@ import { dealerBenchmarkWorker } from './dealer/benchmark'
 import { dealerInsightWorker } from './dealer/insight'
 import { startDealerScheduler, stopDealerScheduler } from './dealer/scheduler'
 
+// Affiliate Feed Workers
+import { createAffiliateFeedWorker, createAffiliateFeedScheduler } from './affiliate'
+
+// Create affiliate workers (lazy initialization)
+let affiliateFeedWorker: ReturnType<typeof createAffiliateFeedWorker> | null = null
+let affiliateFeedScheduler: ReturnType<typeof createAffiliateFeedScheduler> | null = null
+
 /**
  * Check if scheduler is enabled via environment variable.
  *
@@ -87,6 +94,10 @@ log.info('Starting IronScout.ai Harvester Workers', {
     'benchmark',
     'insight',
   ],
+  affiliateWorkers: [
+    'affiliate-feed',
+    'affiliate-feed-scheduler',
+  ],
 })
 
 // Warm up Redis and database connections before starting workers
@@ -108,6 +119,11 @@ async function startup() {
   if (dbConnected) {
     log.info('Starting dealer scheduler')
     await startDealerScheduler()
+
+    // Start affiliate feed scheduler and worker
+    log.info('Starting affiliate feed workers')
+    affiliateFeedWorker = createAffiliateFeedWorker()
+    affiliateFeedScheduler = createAffiliateFeedScheduler()
   } else {
     log.error('Database not ready - scheduler will not start')
   }
@@ -150,6 +166,9 @@ const shutdown = async (signal: string) => {
       dealerSkuMatchWorker.close(),
       dealerBenchmarkWorker.close(),
       dealerInsightWorker.close(),
+      // Affiliate workers (if started)
+      affiliateFeedWorker?.close(),
+      affiliateFeedScheduler?.close(),
     ])
     log.info('All workers closed')
 

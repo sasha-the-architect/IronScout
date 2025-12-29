@@ -177,7 +177,7 @@ router.patch('/:productId', async (req: Request, res: Response) => {
     log.error('Update prefs error', { error }, error as Error)
 
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid data', details: error.errors })
+      return res.status(400).json({ error: 'Invalid data', details: error.issues })
     }
 
     if (error.message === 'Item not found') {

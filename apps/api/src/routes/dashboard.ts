@@ -260,26 +260,30 @@ router.get('/deals', async (req: Request, res: Response) => {
     const seenProducts = new Set<string>()
     const deals = prices
       .filter(p => {
+        // Skip prices without a productId or product
+        if (!p.productId || !p.product) return false
         if (seenProducts.has(p.productId)) return false
         seenProducts.add(p.productId)
         return true
       })
       .slice(0, maxDeals)
       .map(price => {
+        // price.product is guaranteed non-null by the filter above
+        const product = price.product!
         const pricePerRound =
-          price.product.roundCount && price.product.roundCount > 0
-            ? parseFloat(price.price.toString()) / price.product.roundCount
+          product.roundCount && product.roundCount > 0
+            ? parseFloat(price.price.toString()) / product.roundCount
             : null
 
         const deal: any = {
           id: price.id,
-          product: price.product,
+          product: product,
           retailer: price.retailer,
           price: parseFloat(price.price.toString()),
           pricePerRound: pricePerRound ? Math.round(pricePerRound * 1000) / 1000 : null,
           url: price.url,
           inStock: price.inStock,
-          isWatched: watchedProductIds.has(price.productId)
+          isWatched: price.productId ? watchedProductIds.has(price.productId) : false
         }
 
         // Premium features: Price Position Index
@@ -474,7 +478,7 @@ router.get('/price-history/:caliber', async (req: Request, res: Response) => {
   } catch (error) {
     log.error('Price history error', { error }, error as Error)
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid parameters', details: error.errors })
+      return res.status(400).json({ error: 'Invalid parameters', details: error.issues })
     }
     res.status(500).json({ error: 'Failed to fetch price history' })
   }

@@ -14,6 +14,7 @@ const createSourceSchema = z.object({
   type: z.enum(['RSS', 'HTML', 'JSON', 'JS_RENDERED']),
   enabled: z.boolean().default(true),
   interval: z.number().default(3600),
+  retailerId: z.string().min(1), // Required: all sources belong to a retailer
 })
 
 const updateSourceSchema = z.object({
@@ -81,7 +82,7 @@ router.post('/', async (req: Request, res: Response) => {
     res.status(201).json(source)
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid input', details: error.errors })
+      return res.status(400).json({ error: 'Invalid input', details: error.issues })
     }
     log.error('Error creating source', { error }, error as Error)
     res.status(500).json({ error: 'Failed to create source' })
@@ -102,7 +103,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     res.json(source)
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid input', details: error.errors })
+      return res.status(400).json({ error: 'Invalid input', details: error.issues })
     }
     log.error('Error updating source', { error }, error as Error)
     res.status(500).json({ error: 'Failed to update source' })

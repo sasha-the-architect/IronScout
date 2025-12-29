@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const validationResult = registerSchema.safeParse(body);
     
     if (!validationResult.success) {
-      const errors = validationResult.error.errors.map((e) => ({
+      const errors = validationResult.error.issues.map((e) => ({
         field: e.path.join('.'),
         message: e.message,
       }));

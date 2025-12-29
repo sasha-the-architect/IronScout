@@ -97,7 +97,7 @@ router.post('/trigger', async (req: Request, res: Response) => {
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid input', details: error.errors })
+      return res.status(400).json({ error: 'Invalid input', details: error.issues })
     }
     log.error('Error triggering crawl', { error }, error as Error)
     res.status(500).json({ error: 'Failed to trigger crawl' })

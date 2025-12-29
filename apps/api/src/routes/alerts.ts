@@ -59,7 +59,7 @@ router.post('/', async (req: Request, res: Response) => {
   } catch (error: any) {
     log.error('Create alert error (deprecated)', { error }, error as Error)
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Invalid alert data', details: error.errors })
+      return res.status(400).json({ error: 'Invalid alert data', details: error.issues })
     }
     if (error.message === 'Product not found') {
       return res.status(404).json({ error: 'Product not found' })

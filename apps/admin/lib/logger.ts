@@ -15,6 +15,7 @@ export const logger = rootLogger
 export const loggers = {
   auth: rootLogger.child('auth'),
   dealers: rootLogger.child('dealers'),
+  feeds: rootLogger.child('feeds'),
   payments: rootLogger.child('payments'),
   users: rootLogger.child('users'),
   sources: rootLogger.child('sources'),

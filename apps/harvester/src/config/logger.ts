@@ -21,6 +21,7 @@ export const logger = {
   writer: rootLogger.child('writer'),
   alerter: rootLogger.child('alerter'),
   dealer: rootLogger.child('dealer'),
+  affiliate: rootLogger.child('affiliate'),
 }
 
 // Export root logger for custom child creation

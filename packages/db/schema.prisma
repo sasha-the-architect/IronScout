@@ -146,13 +146,19 @@ model Retailer {
   dealer        Dealer?
   prices        Price[]
   subscriptions Subscription[]
+  sources       Source[]
 
   @@map("retailers")
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ PLATFORM INVARIANT: The `prices` table must NEVER gain additional unique
+// constraints. Doing so will silently drop inserts due to ON CONFLICT DO NOTHING
+// in affiliate feed ingest. This is enforced via migration test.
+// ═══════════════════════════════════════════════════════════════════════════
 model Price {
   id                  String          @id @default(cuid())
-  productId           String
+  productId           String?         // Nullable for v1 affiliate prices (use sourceProductId instead)
   retailerId          String
   price               Decimal         @db.Decimal(10, 2)
   currency            String          @default("USD")
@@ -162,7 +168,7 @@ model Price {
   freeShippingMinimum Decimal?        @db.Decimal(10, 2)
   shippingCost        Decimal?        @db.Decimal(10, 2)
   shippingNotes       String?
-  product             Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product             Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
   retailer            Retailer        @relation(fields: [retailerId], references: [id], onDelete: Cascade)
   reports             ProductReport[]
 
@@ -172,9 +178,22 @@ model Price {
   saleStartsAt  DateTime? // Informational only, not enforced
   saleEndsAt    DateTime? // Informational only, not enforced
 
+  // Link to SourceProduct for affiliate prices
+  sourceProductId String?
+  sourceProduct   SourceProduct? @relation(fields: [sourceProductId], references: [id])
+
+  // Affiliate price deduplication (nullable - only set for affiliate pipeline)
+  affiliateFeedRunId String?           // Run that created this price
+  priceSignatureHash String?           // SHA-256 of (amount|currency|promoJson) for dedupe
+  affiliateFeedRun   AffiliateFeedRun? @relation(fields: [affiliateFeedRunId], references: [id], onDelete: SetNull)
+
+  // Partial unique index for affiliate dedupe - see migration SQL
+  // Ensures at most one price per (sourceProductId, runId, signature) for retry safety
+
   @@index([productId])
   @@index([retailerId])
   @@index([inStock])
+  @@index([sourceProductId])
   @@map("prices")
 }
 
@@ -247,11 +266,23 @@ model Source {
   interval         Int               @default(3600)
   lastRunAt        DateTime?
   paginationConfig Json?
-  affiliateNetwork AffiliateNetwork?
   feedHash         String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   executions       Execution[]
+
+  // Required FK - all sources belong to a retailer
+  retailer   Retailer @relation(fields: [retailerId], references: [id])
+  retailerId String
+
+  // Display and kind
+  isDisplayPrimary Boolean    @default(false) // For multi-source retailer display
+  sourceKind       SourceKind @default(DIRECT)
+
+  // Affiliate metadata for v1 traceability
+  affiliateNetwork     AffiliateNetwork? // IMPACT only in v1
+  affiliateAccountId   String?           // e.g., Impact advertiser/partner ID
+  affiliateAccountName String?           // Copy for debugging/display
 
   // Affiliate configuration (for tracking URL generation at click time)
   affiliateProgramId        String? // Internal program identifier for this Source, if used
@@ -259,6 +290,11 @@ model Source {
   affiliateCampaignId       String? // Campaign identifier for attribution within the network
   affiliateTrackingTemplate String? @db.Text // URL template for generating tracking links at click time
 
+  // Relations
+  affiliateFeed  AffiliateFeed?
+  sourceProducts SourceProduct[]
+
+  @@index([retailerId], map: "sources_retailer_id_idx")
   @@map("sources")
 }
 
@@ -292,6 +328,213 @@ model ExecutionLog {
   @@index([level])
   @@index([event])
   @@map("execution_logs")
+}
+
+// ============================================================================
+// AFFILIATE FEED SYSTEM
+// ============================================================================
+
+model AffiliateFeed {
+  id       String   @id @default(cuid())
+  source   Source   @relation(fields: [sourceId], references: [id])
+  sourceId String   @unique
+
+  network AffiliateNetwork
+  status  AffiliateFeedStatus @default(DRAFT)
+
+  // Scheduling
+  scheduleFrequencyHours Int?      // null = manual only
+  nextRunAt              DateTime? // null = not scheduled, set by scheduler
+  expiryHours            Int       @default(48) // Valid range: 1-168
+  consecutiveFailures    Int       @default(0)
+  lastRunAt              DateTime? // for UI display only
+  manualRunPending       Boolean   @default(false)
+
+  // Transport
+  transport FeedTransport @default(SFTP)
+  host      String?
+  port      Int?
+  path      String? // Fixed path, e.g., /feeds/catalog.csv.gz
+  username  String?
+
+  // Encrypted credentials (AES-256-GCM)
+  secretCiphertext Bytes?
+  secretKeyId      String? // For future KMS migration
+  secretVersion    Int     @default(1)
+
+  // Format
+  format      FeedFormat      @default(CSV)
+  compression FeedCompression @default(NONE)
+
+  // Change detection
+  lastRemoteMtime DateTime?
+  lastRemoteSize  BigInt?
+  lastContentHash String?
+
+  // Safety limits
+  maxFileSizeBytes BigInt? // null = use default (500 MB)
+  maxRowCount      Int?    // null = use default (500,000)
+
+  // Advisory lock key (for PostgreSQL advisory locks)
+  feedLockId BigInt @default(autoincrement()) @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?  // Admin who created this feed
+
+  runs AffiliateFeedRun[]
+
+  @@index([status])
+  @@index([nextRunAt])
+  @@map("affiliate_feeds")
+}
+
+model AffiliateFeedRun {
+  id       String @id @default(cuid())
+  feed     AffiliateFeed @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  feedId   String
+  sourceId String // Denormalized for query convenience
+
+  trigger   AffiliateFeedRunTrigger @default(SCHEDULED)
+  status    AffiliateFeedRunStatus  @default(RUNNING)
+  startedAt DateTime                @default(now())
+  finishedAt DateTime?
+  durationMs Int?
+
+  // Metrics (null = not reached stage)
+  downloadBytes    BigInt?
+  rowsRead         Int?
+  rowsParsed       Int?
+  productsUpserted Int? // SourceProducts created/updated (Phase 1)
+  pricesWritten    Int? // Actual Price rows inserted (from DB rowCount)
+  productsPromoted Int? // Products with lastSeenSuccessAt updated (Phase 2, from DB rowCount)
+  errorCount       Int?
+
+  // Expiry metrics (post-circuit-breaker promotion)
+  productsExpired      Int? // lastSeenSuccessAt updated >= expiryHours ago
+  productsRejected     Int? // Failed validation/parsing
+  duplicateKeyCount    Int? // Same identity seen multiple times
+  urlHashFallbackCount Int? // URL_HASH used (no SKU/UPC)
+
+  // Circuit breaker metrics (computed pre-promotion)
+  activeCountBefore Int? // Count of active products before this run
+  seenSuccessCount  Int? // Products that would be marked "seen success"
+  wouldExpireCount  Int? // Products that WOULD be expired (before circuit breaker)
+
+  // Skip detection
+  skippedReason String? // e.g., "UNCHANGED_HASH", "UNCHANGED_MTIME"
+
+  // Failure classification (for retry decisions and UI display)
+  failureKind    String? // 'TRANSIENT' | 'PERMANENT' | 'CONFIG'
+  failureCode    String? // Error code (e.g., 'AUTH_FAILED', 'FILE_NOT_FOUND')
+  failureMessage String? // Human-readable error message
+
+  // Flags
+  isPartial        Boolean @default(false) // Derived: errorCount > 0 && productsUpserted > 0
+  expiryStepFailed Boolean @default(false)
+
+  // Expiry circuit breaker
+  // Semantics: expiryBlocked=true means "promotion was blocked by circuit breaker"
+  // It stays true even after approval. expiryApprovedAt IS NOT NULL is the approval signal.
+  expiryBlocked       Boolean   @default(false)
+  expiryBlockedReason String?   // 'SPIKE_THRESHOLD_EXCEEDED' | 'DATA_QUALITY_URL_HASH_SPIKE'
+  expiryApprovedAt    DateTime? // Non-null = admin approved and promotion succeeded
+  expiryApprovedBy    String?
+
+  // Artifact (future)
+  artifactUrl String?
+
+  errors       AffiliateFeedRunError[]
+  seenProducts SourceProductSeen[]
+  prices       Price[]
+
+  @@index([feedId, startedAt])
+  @@index([feedId, trigger, startedAt])
+  @@index([feedId, status, startedAt])
+  @@map("affiliate_feed_runs")
+}
+
+model AffiliateFeedRunError {
+  id    String @id @default(cuid())
+  run   AffiliateFeedRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String
+
+  code      String  // ERROR_CODE enum value
+  message   String
+  rowNumber Int?    // If row-specific
+  sample    Json?   // Sample data for debugging
+
+  createdAt DateTime @default(now())
+
+  @@index([runId])
+  @@map("affiliate_feed_run_errors")
+}
+
+model SourceProduct {
+  id       String @id @default(cuid())
+  source   Source @relation(fields: [sourceId], references: [id])
+  sourceId String
+
+  // Identity (one of these is the resolved key)
+  identityType  SourceProductIdentityType
+  identityValue String // The actual SKU, UPC, IMPACT_ITEM_ID, or URL hash
+
+  // Product display fields (required per spec Section 2.3)
+  title    String
+  url      String
+  imageUrl String?
+
+  // Secondary identifiers (stored but not used as key)
+  sku           String?
+  upc           String?
+  urlHash       String? // SHA-256 of normalized URL
+  normalizedUrl String?
+  impactItemId  String? // Impact network's unique item identifier
+
+  // Run attribution
+  createdByRunId     String?
+  lastUpdatedByRunId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  presence   SourceProductPresence?
+  seenInRuns SourceProductSeen[]
+  prices     Price[]
+
+  @@unique([sourceId, identityType, identityValue])
+  @@index([sourceId])
+  @@index([impactItemId])
+  @@index([sku])
+  @@map("source_products")
+}
+
+model SourceProductPresence {
+  id              String        @id @default(cuid())
+  sourceProduct   SourceProduct @relation(fields: [sourceProductId], references: [id], onDelete: Cascade)
+  sourceProductId String        @unique
+
+  lastSeenAt        DateTime  // Updated on every observation (Phase 1)
+  lastSeenSuccessAt DateTime? // Updated only after circuit breaker passes (Phase 2)
+
+  updatedAt DateTime @updatedAt
+
+  @@index([lastSeenSuccessAt])
+  @@map("source_product_presence")
+}
+
+model SourceProductSeen {
+  id              String   @id @default(cuid())
+  runId           String
+  sourceProductId String
+  createdAt       DateTime @default(now())
+
+  run           AffiliateFeedRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  sourceProduct SourceProduct    @relation(fields: [sourceProductId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sourceProductId])
+  @@index([runId])
+  @@map("source_product_seen")
 }
 
 model Subscription {
@@ -884,12 +1127,10 @@ enum SourceType {
   FEED_JSON
 }
 
+// v1 only supports Impact network
+// Additional networks (AvantLink, ShareASale, CJ, Rakuten) are post-v1
 enum AffiliateNetwork {
   IMPACT
-  AVANTLINK
-  SHAREASALE
-  CJ
-  RAKUTEN
 }
 
 enum ProductIssueType {
@@ -1088,4 +1329,59 @@ enum InsightType {
 enum InsightConfidence {
   HIGH
   MEDIUM
+}
+
+// ============================================================================
+// AFFILIATE FEED ENUMS
+// ============================================================================
+
+enum SourceKind {
+  DIRECT        // Direct retailer integration
+  AFFILIATE_FEED // Affiliate network feed
+  OTHER
+}
+
+enum AffiliateFeedStatus {
+  DRAFT     // Not yet configured/validated
+  ENABLED   // Scheduled or manual runs allowed
+  PAUSED    // Manually paused by admin
+  DISABLED  // Auto-paused after failures
+}
+
+enum FeedTransport {
+  FTP
+  SFTP
+}
+
+// v1 only supports CSV. TSV/XML/JSON are post-v1.
+enum FeedFormat {
+  CSV
+}
+
+enum FeedCompression {
+  NONE
+  GZIP
+}
+
+// Per spec Q8.2.3: No SKIPPED status - use SUCCEEDED + skippedReason instead
+enum AffiliateFeedRunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum AffiliateFeedRunTrigger {
+  SCHEDULED
+  MANUAL
+  MANUAL_PENDING  // Follow-up run from manualRunPending flag
+  ADMIN_TEST      // Test run from admin UI (if test runs create records)
+  RETRY
+}
+
+// Per spec: Identity priority is IMPACT_ITEM_ID > SKU > URL_HASH
+// UPC is stored on SourceProduct for reference but not used for identity in v1
+enum SourceProductIdentityType {
+  IMPACT_ITEM_ID // Impact network's unique item identifier (highest priority)
+  SKU            // Merchant/source-specific SKU
+  URL_HASH       // SHA-256 of normalized URL (fallback)
 }

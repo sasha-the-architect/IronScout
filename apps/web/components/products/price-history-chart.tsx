@@ -301,12 +301,12 @@ export function PriceHistoryChart({ productId, isPremium }: PriceHistoryProps) {
                 tick={{ fontSize: 12 }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `$${value}`}
+                tickFormatter={(value: number) => `$${value}`}
                 domain={['dataMin - 1', 'dataMax + 1']}
               />
               <Tooltip
-                formatter={(value: number) => [`$${value.toFixed(2)}`, 'Price']}
-                labelFormatter={(label) => `Date: ${label}`}
+                formatter={(value) => [`$${typeof value === 'number' ? value.toFixed(2) : value}`, 'Price']}
+                labelFormatter={(label: string) => `Date: ${label}`}
                 contentStyle={{
                   backgroundColor: 'hsl(var(--popover))',
                   border: '1px solid hsl(var(--border))',

@@ -90,6 +90,16 @@ export {
 } from './notifications/feed-alerts.js';
 
 export {
+  // Affiliate Feed Alerts
+  notifyAffiliateFeedRunFailed,
+  notifyCircuitBreakerTriggered,
+  notifyAffiliateFeedAutoDisabled,
+  notifyAffiliateFeedRecovered,
+  type AffiliateFeedAlertInfo,
+  type CircuitBreakerMetrics,
+} from './notifications/affiliate-feed-alerts.js';
+
+export {
   // Subscription Expired
   notifyDealerSubscriptionExpired,
   type SubscriptionExpiredInfo,

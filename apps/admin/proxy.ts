@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { loggers } from './lib/logger';
 
-export function middleware(request: NextRequest) {
-  // Debug: Log all cookies received by middleware
+export function proxy(request: NextRequest) {
+  // Debug: Log all cookies received by proxy
   const cookies = request.cookies.getAll();
-  loggers.auth.debug('Middleware request', {
+  loggers.auth.debug('Proxy request', {
     url: request.url,
     cookies: cookies.map(c => c.name)
   });
