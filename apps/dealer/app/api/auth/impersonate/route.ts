@@ -14,17 +14,17 @@ const DEALER_JWT_SECRET = new TextEncoder().encode(
 function getBaseUrl(request: NextRequest): string {
   // Always prefer explicit configuration
   const configuredUrl = process.env.NEXTAUTH_URL || process.env.DEALER_PORTAL_URL;
-  
+
   if (configuredUrl) {
     // Remove trailing slashes
     return configuredUrl.replace(/\/+$/, '');
   }
-  
+
   // In production without config, use the production URL
   if (process.env.NODE_ENV === 'production') {
     return 'https://dealer.ironscout.ai';
   }
-  
+
   // In development, use the request origin
   return request.nextUrl.origin;
 }
@@ -32,8 +32,19 @@ function getBaseUrl(request: NextRequest): string {
 // This endpoint receives a one-time impersonation token from admin
 // and exchanges it for a dealer session cookie
 export async function GET(request: NextRequest) {
-  const baseUrl = getBaseUrl(request);
-  
+  let baseUrl: string;
+
+  try {
+    baseUrl = getBaseUrl(request);
+  } catch {
+    baseUrl = 'http://localhost:3003';
+  }
+
+  loggers.auth.info('Impersonate route called', {
+    url: request.url.substring(0, 100) + '...',
+    method: request.method,
+  });
+
   loggers.auth.info('Impersonate route environment', {
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
@@ -41,9 +52,14 @@ export async function GET(request: NextRequest) {
     computedBaseUrl: baseUrl,
     requestOrigin: request.nextUrl.origin,
   });
-  
+
   const searchParams = request.nextUrl.searchParams;
   const token = searchParams.get('token');
+
+  loggers.auth.info('Impersonate token check', {
+    hasToken: !!token,
+    tokenLength: token?.length ?? 0,
+  });
 
   if (!token) {
     loggers.auth.error('Impersonation: No token provided');

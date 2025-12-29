@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 const feedSchema = z.object({
   id: z.string().optional(),
   accessType: z.enum(['URL', 'AUTH_URL', 'FTP', 'SFTP', 'UPLOAD']),
-  formatType: z.enum(['GENERIC', 'AMMOSEEK_V1', 'GUNENGINE_V2']).optional().default('GENERIC'),
+  formatType: z.enum(['GENERIC', 'AMMOSEEK_V1', 'GUNENGINE_V2', 'IMPACT']).optional().default('GENERIC'),
   url: z.string().url().optional().nullable(),
   username: z.string().optional().nullable(),
   password: z.string().optional().nullable(),

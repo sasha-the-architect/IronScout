@@ -23,13 +23,15 @@ const ACCESS_TYPE_OPTIONS: { value: FeedAccessType; label: string; description: 
   { value: 'AUTH_URL', label: 'Authenticated URL', description: 'URL requiring Basic Auth credentials' },
   { value: 'FTP', label: 'FTP', description: 'FTP server with credentials' },
   { value: 'SFTP', label: 'SFTP', description: 'Secure FTP server with credentials' },
-  { value: 'UPLOAD', label: 'Manual Upload', description: 'Upload CSV/XML files manually' },
+  // TODO: Manual upload feature - implement file upload handler
+  // { value: 'UPLOAD', label: 'Manual Upload', description: 'Upload CSV/XML files manually' },
 ];
 
 const FORMAT_TYPE_OPTIONS: { value: FeedFormatType; label: string; description: string }[] = [
-  { value: 'GENERIC', label: 'Auto-Detect', description: 'Automatically detect CSV, XML, or JSON format' },
   { value: 'AMMOSEEK_V1', label: 'AmmoSeek Compatible', description: 'AmmoSeek-compatible feed format' },
   { value: 'GUNENGINE_V2', label: 'GunEngine V2', description: 'GunEngine Offer Feed V2 format' },
+  // Note: GENERIC (auto-detect) reserved for admin use
+  // Note: IMPACT format is for IronScout affiliate feeds, configured in admin portal
 ];
 
 const SCHEDULE_OPTIONS = [
@@ -49,7 +51,7 @@ export function FeedConfigForm({ initialData, onSuccess }: FeedConfigFormProps) 
   
   const [formData, setFormData] = useState<FeedFormData>({
     accessType: initialData?.accessType || 'URL',
-    formatType: initialData?.formatType || 'GENERIC',
+    formatType: initialData?.formatType || 'AMMOSEEK_V1',
     url: initialData?.url || '',
     username: initialData?.username || '',
     password: initialData?.password || '',
@@ -57,7 +59,6 @@ export function FeedConfigForm({ initialData, onSuccess }: FeedConfigFormProps) 
   });
 
   const needsAuth = ['AUTH_URL', 'FTP', 'SFTP'].includes(formData.accessType);
-  const isManualUpload = formData.accessType === 'UPLOAD';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -70,8 +71,6 @@ export function FeedConfigForm({ initialData, onSuccess }: FeedConfigFormProps) 
   };
 
   const handleTest = async () => {
-    if (isManualUpload) return;
-    
     setIsTesting(true);
     setTestResult(null);
     setError(null);
@@ -214,27 +213,25 @@ export function FeedConfigForm({ initialData, onSuccess }: FeedConfigFormProps) 
       </div>
 
       {/* URL */}
-      {!isManualUpload && (
-        <div>
-          <label htmlFor="url" className="block text-sm font-medium text-gray-700">
-            Feed URL
-          </label>
-          <input
-            type="url"
-            id="url"
-            name="url"
-            required={!isManualUpload}
-            value={formData.url}
-            onChange={handleChange}
-            placeholder={
-              formData.accessType === 'FTP' || formData.accessType === 'SFTP'
-                ? 'ftp://example.com/feeds/products.csv'
-                : 'https://example.com/feed.csv'
-            }
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
-          />
-        </div>
-      )}
+      <div>
+        <label htmlFor="url" className="block text-sm font-medium text-gray-700">
+          Feed URL
+        </label>
+        <input
+          type="url"
+          id="url"
+          name="url"
+          required
+          value={formData.url}
+          onChange={handleChange}
+          placeholder={
+            formData.accessType === 'FTP' || formData.accessType === 'SFTP'
+              ? 'ftp://example.com/feeds/products.csv'
+              : 'https://example.com/feed.csv'
+          }
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+        />
+      </div>
 
       {/* Auth Fields */}
       {needsAuth && (
@@ -269,61 +266,27 @@ export function FeedConfigForm({ initialData, onSuccess }: FeedConfigFormProps) 
       )}
 
       {/* Schedule */}
-      {!isManualUpload && (
-        <div>
-          <label htmlFor="scheduleMinutes" className="block text-sm font-medium text-gray-700">
-            Update Schedule
-          </label>
-          <select
-            id="scheduleMinutes"
-            name="scheduleMinutes"
-            value={formData.scheduleMinutes}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
-          >
-            {SCHEDULE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-gray-500">
-            How often we should fetch your product feed
-          </p>
-        </div>
-      )}
-
-      {/* Manual Upload */}
-      {isManualUpload && (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 p-6">
-          <div className="text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            <div className="mt-4">
-              <label
-                htmlFor="file-upload"
-                className="cursor-pointer rounded-md bg-white font-medium text-gray-900 hover:text-gray-700"
-              >
-                <span>Upload a file</span>
-                <input id="file-upload" name="file-upload" type="file" className="sr-only" accept=".csv,.xml,.json" />
-              </label>
-              <p className="pl-1 text-gray-500">or drag and drop</p>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">CSV, XML, or JSON up to 50MB</p>
-          </div>
-        </div>
-      )}
+      <div>
+        <label htmlFor="scheduleMinutes" className="block text-sm font-medium text-gray-700">
+          Update Schedule
+        </label>
+        <select
+          id="scheduleMinutes"
+          name="scheduleMinutes"
+          value={formData.scheduleMinutes}
+          onChange={handleChange}
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900"
+        >
+          {SCHEDULE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-gray-500">
+          How often we should fetch your product feed
+        </p>
+      </div>
 
       {/* Test Result */}
       {testResult && (
@@ -336,17 +299,15 @@ export function FeedConfigForm({ initialData, onSuccess }: FeedConfigFormProps) 
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-4 border-t">
-        {!isManualUpload && (
-          <button
-            type="button"
-            onClick={handleTest}
-            disabled={isTesting || !formData.url}
-            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isTesting ? 'Testing...' : 'Test Connection'}
-          </button>
-        )}
-        
+        <button
+          type="button"
+          onClick={handleTest}
+          disabled={isTesting || !formData.url}
+          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isTesting ? 'Testing...' : 'Test Connection'}
+        </button>
+
         <button
           type="submit"
           disabled={isLoading}

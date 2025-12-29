@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { SidebarNav } from '@/components/layout/sidebar-nav'
+import { SearchLoadingProvider } from '@/components/search/search-loading-context'
 
 export default async function DashboardLayout({
   children,
@@ -18,7 +19,7 @@ export default async function DashboardLayout({
   const userName = session.user?.name || session.user?.email || 'User'
 
   return (
-    <>
+    <SearchLoadingProvider>
       {/* Hide parent header/footer and take over the full viewport */}
       <style>{`
         body > div > header,
@@ -43,6 +44,6 @@ export default async function DashboardLayout({
           </main>
         </div>
       </div>
-    </>
+    </SearchLoadingProvider>
   )
 }

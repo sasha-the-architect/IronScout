@@ -27,7 +27,12 @@ export interface ILogger {
     warn(message: string, meta?: LogContext, error?: unknown): void;
     error(message: string, meta?: LogContext, error?: unknown): void;
     fatal(message: string, meta?: LogContext, error?: unknown): void;
-    child(component: string, defaultContext?: LogContext): ILogger;
+    /**
+     * Create a child logger
+     * @param componentOrContext - Component name (string) or context object for backwards compatibility
+     * @param defaultContext - Optional default context (only used when first arg is a string)
+     */
+    child(componentOrContext: string | LogContext, defaultContext?: LogContext): ILogger;
 }
 export declare class Logger implements ILogger {
     private service;
@@ -40,7 +45,7 @@ export declare class Logger implements ILogger {
     warn(message: string, meta?: LogContext, error?: unknown): void;
     error(message: string, meta?: LogContext, error?: unknown): void;
     fatal(message: string, meta?: LogContext, error?: unknown): void;
-    child(component: string, defaultContext?: LogContext): ILogger;
+    child(componentOrContext: string | LogContext, defaultContext?: LogContext): ILogger;
 }
 /**
  * Create a logger for a service

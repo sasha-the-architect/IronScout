@@ -265,7 +265,11 @@ export default async function DealersPage() {
                     {dealer._count.skus.toLocaleString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <DealerActions dealer={dealer} />
+                    <DealerActions dealer={{
+                      id: dealer.id,
+                      businessName: dealer.businessName,
+                      status: dealer.status,
+                    }} />
                   </td>
                 </tr>
               );

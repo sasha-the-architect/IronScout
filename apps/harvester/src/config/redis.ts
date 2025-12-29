@@ -12,6 +12,10 @@ export const redisConnection = {
   port: redisPort,
   password: redisPassword,
   maxRetriesPerRequest: null,
+  // Keepalive to prevent idle connection drops (ECONNRESET)
+  keepAlive: 30000,
+  // Queue commands while reconnecting
+  enableOfflineQueue: true,
   // Reconnection settings for dropped connections
   retryStrategy(times: number) {
     const delay = Math.min(times * 500, 30000)

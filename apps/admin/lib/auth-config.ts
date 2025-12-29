@@ -175,9 +175,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           'ironscout-web.onrender.com',
         ]
 
+        // Allow localhost in development
+        const isLocalhost = urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1'
+
         if (allowedDomains.includes(urlObj.hostname) ||
             allowedRenderDomains.includes(urlObj.hostname) ||
-            urlObj.hostname.endsWith('.ironscout.ai')) {
+            urlObj.hostname.endsWith('.ironscout.ai') ||
+            (process.env.NODE_ENV !== 'production' && isLocalhost)) {
           loggers.auth.info('Allowing redirect', { url })
           return url
         }

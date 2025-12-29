@@ -10,6 +10,7 @@ import type { FeedConnector } from './types'
 import { GenericConnector } from './generic-connector'
 import { AmmoSeekConnector } from './ammoseek-connector'
 import { GunEngineConnector } from './gunengine-connector'
+import { ImpactConnector } from './impact-connector'
 
 // Export types
 export * from './types'
@@ -18,6 +19,7 @@ export * from './types'
 export { GenericConnector } from './generic-connector'
 export { AmmoSeekConnector } from './ammoseek-connector'
 export { GunEngineConnector } from './gunengine-connector'
+export { ImpactConnector } from './impact-connector'
 
 // Export utilities
 export {
@@ -39,6 +41,7 @@ const connectorRegistry: Map<FeedFormatType, FeedConnector> = new Map()
 connectorRegistry.set('GENERIC', new GenericConnector())
 connectorRegistry.set('AMMOSEEK_V1', new AmmoSeekConnector())
 connectorRegistry.set('GUNENGINE_V2', new GunEngineConnector())
+connectorRegistry.set('IMPACT', new ImpactConnector())
 
 /**
  * Get connector for a specific format type
@@ -61,6 +64,7 @@ export function detectConnector(content: string): FeedConnector {
   const specificConnectors: FeedConnector[] = [
     connectorRegistry.get('GUNENGINE_V2')!,
     connectorRegistry.get('AMMOSEEK_V1')!,
+    connectorRegistry.get('IMPACT')!,
   ]
 
   for (const connector of specificConnectors) {
@@ -107,6 +111,11 @@ export function getConnectorOptions(): Array<{ value: FeedFormatType; label: str
       value: 'GUNENGINE_V2',
       label: 'GunEngine V2',
       description: 'GunEngine Offer Feed V2 format',
+    },
+    {
+      value: 'IMPACT',
+      label: 'Impact Affiliate',
+      description: 'Impact Radius affiliate feed format',
     },
   ]
 }

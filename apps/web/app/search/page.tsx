@@ -45,9 +45,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      {/* Unified Search Interface */}
+      {/* Unified Search Interface - Suspense required for useSearchParams */}
       <div className="mb-4">
-        <UnifiedSearch initialQuery={query} isPremium={isPremium} />
+        <Suspense fallback={
+          <div className="h-16 animate-pulse bg-muted rounded-2xl" />
+        }>
+          <UnifiedSearch initialQuery={query} isPremium={isPremium} />
+        </Suspense>
       </div>
 
       {/* Results */}

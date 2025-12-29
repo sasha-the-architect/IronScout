@@ -34,6 +34,7 @@ import {
   checkDealerSubscription,
   sendSubscriptionExpiryNotification,
 } from './subscription'
+import { fetchFeedViaFtp } from './ftp-fetcher'
 import { logger } from '../config/logger'
 
 const log = logger.dealer
@@ -134,6 +135,12 @@ async function fetchFeed(
   username?: string,
   password?: string
 ): Promise<string> {
+  // Handle FTP/SFTP access types
+  if (accessType === 'FTP' || accessType === 'SFTP') {
+    return fetchFeedViaFtp(url, accessType, username, password)
+  }
+
+  // Handle HTTP/HTTPS access types
   const headers: Record<string, string> = {}
 
   if (accessType === 'AUTH_URL' && username && password) {

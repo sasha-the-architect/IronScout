@@ -2,6 +2,7 @@
   "name": "@ironscout/api",
   "version": "1.0.0",
   "description": "Backend API for IronScout.ai platform",
+  "type": "module",
   "main": "src/index.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",

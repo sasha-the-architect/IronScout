@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Dealer } from '@ironscout/db';
 
 interface DealerActionsProps {
-  dealer: Dealer;
+  dealer: {
+    id: string;
+    businessName: string;
+    status: string;
+  };
 }
 
 export function DealerActions({ dealer }: DealerActionsProps) {

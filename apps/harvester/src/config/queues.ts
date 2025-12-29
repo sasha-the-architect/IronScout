@@ -116,7 +116,7 @@ export interface DealerFeedIngestJobData {
   feedId: string
   feedRunId: string
   accessType: 'URL' | 'AUTH_URL' | 'FTP' | 'SFTP' | 'UPLOAD'
-  formatType: 'GENERIC' | 'AMMOSEEK_V1' | 'GUNENGINE_V2'
+  formatType: 'GENERIC' | 'AMMOSEEK_V1' | 'GUNENGINE_V2' | 'IMPACT'
   url?: string
   username?: string
   password?: string

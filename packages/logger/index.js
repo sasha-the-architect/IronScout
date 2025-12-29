@@ -148,10 +148,18 @@ export class Logger {
     fatal(message, meta, error) {
         this.log('fatal', message, meta, error);
     }
-    child(component, defaultContext = {}) {
+    child(componentOrContext, defaultContext = {}) {
+        // Backwards compatibility: if first arg is object, treat as context
+        if (typeof componentOrContext === 'object') {
+            return new Logger(this.service, this.component, {
+                ...this.defaultContext,
+                ...componentOrContext,
+            });
+        }
+        // New signature: first arg is component name string
         const newComponent = this.component
-            ? `${this.component}:${component}`
-            : component;
+            ? `${this.component}:${componentOrContext}`
+            : componentOrContext;
         return new Logger(this.service, newComponent, {
             ...this.defaultContext,
             ...defaultContext,

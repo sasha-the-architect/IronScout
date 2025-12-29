@@ -53,16 +53,22 @@ export default async function DashboardSearchPage({ searchParams }: SearchPagePr
         </p>
       </div>
 
-      {/* Unified Search Interface */}
+      {/* Unified Search Interface - Suspense required for useSearchParams */}
       <div className="mb-8">
-        <UnifiedSearch initialQuery={query} isPremium={isPremium} />
+        <Suspense fallback={
+          <div className="h-16 animate-pulse bg-muted rounded-2xl" />
+        }>
+          <UnifiedSearch initialQuery={query} isPremium={isPremium} />
+        </Suspense>
       </div>
 
       {/* Sort & Results */}
       <div className="flex flex-col">
         {query && (
           <div className="flex justify-end mb-4">
-            <EnhancedSortSelect isPremium={isPremium} />
+            <Suspense fallback={<div className="h-10 w-40 animate-pulse bg-muted rounded" />}>
+              <EnhancedSortSelect isPremium={isPremium} />
+            </Suspense>
           </div>
         )}
         <Suspense fallback={
