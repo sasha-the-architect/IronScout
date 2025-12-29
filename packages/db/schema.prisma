@@ -201,19 +201,19 @@ model Price {
 // Answers only: "Does this user want this rule type for this item?"
 // All preferences and state live on WatchlistItem
 model Alert {
-  id              String        @id @default(cuid())
+  id              String         @id @default(cuid())
   userId          String
   productId       String
-  watchlistItemId String
-  ruleType        AlertRuleType
-  isEnabled       Boolean       @default(true)
+  watchlistItemId String?
+  ruleType        AlertRuleType?
+  isEnabled       Boolean        @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  watchlistItem WatchlistItem @relation(fields: [watchlistItemId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  watchlistItem WatchlistItem? @relation(fields: [watchlistItemId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId, ruleType])
   @@index([userId])
