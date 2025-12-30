@@ -35,7 +35,6 @@ router.get('/pulse', async (req: Request, res: Response) => {
 
     const userTier = await getUserTier(req)
     const maxCalibers = getMaxMarketPulseCalibers(userTier)
-    const showPriceTimingSignal = hasFeature(userTier, 'priceTimingSignal')
 
     // Get user's calibers from saved items (watchlist)
     const watchlistItems = await prisma.watchlistItem.findMany({
@@ -59,6 +58,9 @@ router.get('/pulse', async (req: Request, res: Response) => {
     if (maxCalibers !== -1 && calibers.length > maxCalibers) {
       calibers = calibers.slice(0, maxCalibers)
     }
+
+    // Check feature availability
+    const showPriceTimingSignal = hasFeature(userTier, 'priceTimingSignal')
 
     // Calculate market pulse for each caliber
     const pulseData = await Promise.all(
@@ -111,7 +113,6 @@ router.get('/pulse', async (req: Request, res: Response) => {
 
         let trend: 'UP' | 'DOWN' | 'STABLE' = 'STABLE'
         let trendPercent = 0
-        let priceTimingSignal: number | null = null
 
         if (historicalPrices.length > 0) {
           const historicalAvg =
@@ -126,34 +127,19 @@ router.get('/pulse', async (req: Request, res: Response) => {
             trend = 'UP'
           }
 
-          // Calculate price timing signal (Premium only)
-          if (showPriceTimingSignal) {
-            // Score: 100 = favorable pricing, 0 = unfavorable
-            // Based on how current price compares to historical
-            const ratio = currentAvg / historicalAvg
-            priceTimingSignal = Math.max(0, Math.min(100, Math.round((1.5 - ratio) * 100)))
-          }
         }
 
         // Determine price context (ADR-006: descriptive, not prescriptive)
         // Uses 30th/70th percentile thresholds
         let priceContext: 'LOWER_THAN_RECENT' | 'WITHIN_RECENT_RANGE' | 'HIGHER_THAN_RECENT' = 'WITHIN_RECENT_RANGE'
-        if (priceTimingSignal !== null) {
-          // priceTimingSignal: 100 = low price, 0 = high price
-          if (priceTimingSignal >= 70) priceContext = 'LOWER_THAN_RECENT'
-          else if (priceTimingSignal <= 30) priceContext = 'HIGHER_THAN_RECENT'
-        } else {
-          // Free tier: use simple trend
-          if (trend === 'DOWN') priceContext = 'LOWER_THAN_RECENT'
-          else if (trend === 'UP') priceContext = 'HIGHER_THAN_RECENT'
-        }
+        if (trend === 'DOWN') priceContext = 'LOWER_THAN_RECENT'
+        else if (trend === 'UP') priceContext = 'HIGHER_THAN_RECENT'
 
         return {
           caliber,
           currentAvg: Math.round(currentAvg * 100) / 100,
           trend,
           trendPercent: Math.round(trendPercent * 10) / 10,
-          ...(showPriceTimingSignal && { priceTimingSignal }),
           priceContext,
           // Context metadata for transparency
           contextMeta: {
@@ -170,8 +156,7 @@ router.get('/pulse', async (req: Request, res: Response) => {
       _meta: {
         tier: userTier,
         calibersShown: calibers.length,
-        calibersLimit: maxCalibers,
-        hasPriceTimingSignal: showPriceTimingSignal
+        calibersLimit: maxCalibers
       }
     })
   } catch (error) {

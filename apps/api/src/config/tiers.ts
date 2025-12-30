@@ -73,7 +73,8 @@ export const TIER_CONFIG = {
   },
   PREMIUM: {
     // Alerts
-    maxActiveAlerts: -1, // Unlimited
+    // Premium improves speed only; volume and scope stay aligned with Free
+    maxActiveAlerts: 3, // Same cap as Free
     alertDelayMinutes: 0, // Real-time notifications
 
     // Search
@@ -121,10 +122,10 @@ export const TIER_CONFIG = {
       productLevelAlerts: true,         // Can alert on specific SKUs
 
       // Dashboard
-      priceTimingSignal: true,          // 1-100 score
-      flashDeals: true,                 // Time-sensitive deals
-      stockIndicators: true,            // "Only X left"
-      collections: true,                // Organize watchlist into loadouts
+      priceTimingSignal: false,         // Disabled per UX/ADR (no scores)
+      flashDeals: false,                // Disabled (no urgency)
+      stockIndicators: false,           // Disabled (no urgency)
+      collections: false,               // Deferred
     }
   },
 } as const
@@ -164,8 +165,9 @@ export function getTierConfig(tier: UserTier) {
  */
 export function hasReachedAlertLimit(tier: UserTier, currentAlertCount: number): boolean {
   const config = getTierConfig(tier)
-  if (config.maxActiveAlerts === -1) return false
-  return currentAlertCount >= config.maxActiveAlerts
+  const maxAlerts: number = config.maxActiveAlerts
+  if (maxAlerts === -1) return false
+  return currentAlertCount >= maxAlerts
 }
 
 /**
