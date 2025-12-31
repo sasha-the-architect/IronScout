@@ -7,7 +7,7 @@ import { loggers } from '@/lib/logger';
 import {
   validateExpiryHours,
   validateScheduleFrequencyHours,
-  validateTransport,
+  validateTransportAsync,
   validatePort,
   validateHost,
   validatePath,
@@ -69,7 +69,7 @@ export async function createAffiliateFeed(data: CreateFeedInput) {
   try {
     // Validate inputs
     validateNetwork(data.network);
-    validateTransport(data.transport);
+    await validateTransportAsync(data.transport);
     validateHost(data.host);
     validatePort(data.port ?? null, data.transport);
     validatePath(data.path);

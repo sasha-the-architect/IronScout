@@ -14,15 +14,16 @@
 // Load environment variables first, before any other imports
 import 'dotenv/config'
 
-import { prisma } from '@ironscout/db'
+import { prisma, isHarvesterSchedulerEnabled, isAffiliateSchedulerEnabled } from '@ironscout/db'
 import { warmupRedis } from './config/redis'
+import { initQueueSettings } from './config/queues'
 import { logger } from './config/logger'
 import { schedulerWorker } from './scheduler'
 import { fetcherWorker } from './fetcher'
 import { extractorWorker } from './extractor'
 import { normalizerWorker } from './normalizer'
 import { writerWorker } from './writer'
-import { alerterWorker } from './alerter'
+import { alerterWorker, delayedNotificationWorker } from './alerter'
 
 // Dealer Portal Workers
 import { dealerFeedIngestWorker } from './dealer/feed-ingest'
@@ -39,15 +40,16 @@ let affiliateFeedWorker: ReturnType<typeof createAffiliateFeedWorker> | null = n
 let affiliateFeedScheduler: ReturnType<typeof createAffiliateFeedScheduler> | null = null
 
 /**
- * Check if scheduler is enabled via environment variable.
+ * Scheduler enabled flags (set during startup from database/env)
  *
  * IMPORTANT (ADR-001): Only ONE harvester instance should run schedulers.
- * Set HARVESTER_SCHEDULER_ENABLED=true on exactly one instance in production.
- * All other instances should omit this variable or set it to false.
+ * Enable via admin settings or HARVESTER_SCHEDULER_ENABLED env var on exactly one instance.
+ * All other instances should leave disabled or omit the variable.
  *
  * Running multiple schedulers causes duplicate ingestion and data corruption.
  */
-const SCHEDULER_ENABLED = process.env.HARVESTER_SCHEDULER_ENABLED === 'true'
+let harvesterSchedulerEnabled = false
+let affiliateSchedulerEnabled = false
 
 const log = logger.worker
 const dbLog = logger.database
@@ -79,7 +81,6 @@ async function warmupDatabase(maxAttempts = 5): Promise<boolean> {
 }
 
 log.info('Starting IronScout.ai Harvester Workers', {
-  schedulerEnabled: SCHEDULER_ENABLED,
   workers: [
     'scheduler',
     'fetcher',
@@ -109,23 +110,42 @@ async function startup() {
     process.exit(1)
   }
 
-  if (!SCHEDULER_ENABLED) {
-    log.info('Scheduler disabled - this instance will only process jobs, not create them')
+  // Database is required to check scheduler settings
+  const dbConnected = await warmupDatabase()
+  if (!dbConnected) {
+    log.error('Database not ready - scheduler settings cannot be checked')
+    log.info('This instance will only process jobs, not create them')
     return
   }
 
-  // Database is only required for scheduler
-  const dbConnected = await warmupDatabase()
-  if (dbConnected) {
+  // Initialize queue history settings from database
+  await initQueueSettings()
+
+  // Check scheduler settings from database (with env var fallback)
+  harvesterSchedulerEnabled = await isHarvesterSchedulerEnabled()
+  affiliateSchedulerEnabled = await isAffiliateSchedulerEnabled()
+
+  log.info('Scheduler settings loaded', {
+    harvesterSchedulerEnabled,
+    affiliateSchedulerEnabled,
+  })
+
+  if (!harvesterSchedulerEnabled && !affiliateSchedulerEnabled) {
+    log.info('All schedulers disabled - this instance will only process jobs, not create them')
+    return
+  }
+
+  // Start harvester/dealer scheduler if enabled
+  if (harvesterSchedulerEnabled) {
     log.info('Starting dealer scheduler')
     await startDealerScheduler()
+  }
 
-    // Start affiliate feed scheduler and worker
+  // Start affiliate feed scheduler and worker if enabled
+  if (affiliateSchedulerEnabled) {
     log.info('Starting affiliate feed workers')
     affiliateFeedWorker = createAffiliateFeedWorker()
     affiliateFeedScheduler = createAffiliateFeedScheduler()
-  } else {
-    log.error('Database not ready - scheduler will not start')
   }
 }
 
@@ -147,8 +167,8 @@ const shutdown = async (signal: string) => {
 
   try {
     // 1. Stop scheduling new jobs (if scheduler was enabled)
-    if (SCHEDULER_ENABLED) {
-      log.info('Stopping scheduler')
+    if (harvesterSchedulerEnabled) {
+      log.info('Stopping dealer scheduler')
       stopDealerScheduler()
     }
 
@@ -161,6 +181,7 @@ const shutdown = async (signal: string) => {
       normalizerWorker.close(),
       writerWorker.close(),
       alerterWorker.close(),
+      delayedNotificationWorker.close(),
       // Dealer workers
       dealerFeedIngestWorker.close(),
       dealerSkuMatchWorker.close(),

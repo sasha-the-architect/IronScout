@@ -16,7 +16,7 @@
 
 import { Router, Request, Response } from 'express'
 import type { Router as RouterType } from 'express'
-import { prisma } from '@ironscout/db'
+import { prisma, isRegistrationEnabled } from '@ironscout/db'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { z } from 'zod'
@@ -108,6 +108,16 @@ function verifyToken(token: string): { sub: string; email: string; type: string 
 
 router.post('/signup', authRateLimits.signup, async (req: Request, res: Response) => {
   try {
+    // Check if registration is enabled
+    const registrationEnabled = await isRegistrationEnabled()
+    if (!registrationEnabled) {
+      log.info('Signup blocked - registration disabled via admin settings')
+      return res.status(503).json({
+        error: 'Registration is currently disabled',
+        code: 'REGISTRATION_DISABLED'
+      })
+    }
+
     const parsed = signupSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({
@@ -384,6 +394,16 @@ router.post('/oauth/signin', authRateLimits.oauth, async (req: Request, res: Res
         pendingDeletion: user.status === 'PENDING_DELETION' ? {
           scheduledFor: user.deletionScheduledFor?.toISOString()
         } : null,
+      })
+    }
+
+    // Check if registration is enabled before creating new user
+    const registrationEnabled = await isRegistrationEnabled()
+    if (!registrationEnabled) {
+      log.info('OAuth signup blocked - registration disabled via admin settings', { email: emailLower })
+      return res.status(503).json({
+        error: 'Registration is currently disabled',
+        code: 'REGISTRATION_DISABLED'
       })
     }
 

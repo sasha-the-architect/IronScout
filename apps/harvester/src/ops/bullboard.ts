@@ -60,11 +60,10 @@ const config = {
 
 // Validate required credentials
 if (!config.username || !config.password) {
-  log.fatal('BULLBOARD_USERNAME and BULLBOARD_PASSWORD environment variables are required')
-  console.error('\n[FATAL] Bull Board requires authentication credentials.')
-  console.error('Set the following environment variables:')
-  console.error('  BULLBOARD_USERNAME=<admin-username>')
-  console.error('  BULLBOARD_PASSWORD=<strong-password>\n')
+  log.fatal('Bull Board requires authentication credentials', {
+    required: ['BULLBOARD_USERNAME', 'BULLBOARD_PASSWORD'],
+    hint: 'Set these environment variables before starting',
+  })
   process.exit(1)
 }
 
@@ -163,19 +162,13 @@ const server = app.listen(config.port, () => {
     port: config.port,
     basePath: config.basePath,
     url: `http://localhost:${config.port}${config.basePath}`,
+    queues: [
+      'crawl', 'fetch', 'extract', 'normalize', 'write', 'alert',
+      'dealer-feed-ingest', 'dealer-sku-match', 'dealer-benchmark', 'dealer-insight',
+      'affiliate-feed', 'affiliate-feed-scheduler',
+    ],
+    warning: 'DO NOT EXPOSE TO PUBLIC INTERNET',
   })
-
-  console.log('\n' + '='.repeat(60))
-  console.log(' Bull Board - BullMQ Queue Monitor')
-  console.log('='.repeat(60))
-  console.log(`\n  URL:  http://localhost:${config.port}${config.basePath}`)
-  console.log(`  Auth: Basic (credentials from env vars)`)
-  console.log('\n  Queues monitored:')
-  console.log('    - crawl, fetch, extract, normalize, write, alert')
-  console.log('    - dealer-feed-ingest, dealer-sku-match, dealer-benchmark, dealer-insight')
-  console.log('    - affiliate-feed, affiliate-feed-scheduler')
-  console.log('\n  [!] DO NOT EXPOSE THIS SERVER TO THE PUBLIC INTERNET')
-  console.log('='.repeat(60) + '\n')
 })
 
 // =============================================================================

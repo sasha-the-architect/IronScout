@@ -28,6 +28,7 @@ export interface AffiliateFeedAlertInfo {
   retailerName?: string;
   network: string;
   runId?: string;
+  correlationId?: string; // UUID for log correlation (failures only)
 }
 
 export interface CircuitBreakerMetrics {
@@ -68,7 +69,8 @@ export async function notifyAffiliateFeedRunFailed(
         slackActions(slackButton('View Feed', adminDetailUrl, 'danger')),
         slackContext(
           `Feed ID: ${feed.feedId}`,
-          feed.runId ? `Run ID: ${feed.runId}` : ''
+          feed.runId ? `Run ID: ${feed.runId}` : '',
+          feed.correlationId ? `Correlation ID: ${feed.correlationId}` : ''
         ),
       ],
     },
@@ -160,6 +162,7 @@ export async function notifyAffiliateFeedAutoDisabled(
         ),
         slackContext(
           `Feed ID: ${feed.feedId}`,
+          feed.correlationId ? `Correlation ID: ${feed.correlationId}` : '',
           'Feed requires manual re-enablement after investigation'
         ),
       ],

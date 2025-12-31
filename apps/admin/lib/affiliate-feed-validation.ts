@@ -24,13 +24,33 @@ export function validateScheduleFrequencyHours(value: number | null): void {
 }
 
 export function validateTransport(transport: string): void {
-  if (transport === 'FTP') {
-    if (process.env.AFFILIATE_FEED_ALLOW_PLAIN_FTP !== 'true') {
-      throw new ValidationError('Plain FTP is disabled in this environment. Use SFTP instead.');
-    }
-  }
   if (!['FTP', 'SFTP'].includes(transport)) {
     throw new ValidationError('Transport must be FTP or SFTP');
+  }
+}
+
+/**
+ * Async validation for transport - checks database setting for plain FTP
+ * Call this separately since it's async
+ */
+export async function validateTransportAsync(transport: string): Promise<void> {
+  validateTransport(transport); // Basic validation first
+
+  if (transport === 'FTP') {
+    // Check env var first (for local dev override)
+    if (process.env.AFFILIATE_FEED_ALLOW_PLAIN_FTP === 'true') {
+      return;
+    }
+
+    // Check database setting
+    const { prisma } = await import('@ironscout/db');
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: 'AFFILIATE_FEED_ALLOW_PLAIN_FTP' },
+    });
+
+    if (!setting || setting.value !== true) {
+      throw new ValidationError('Plain FTP is disabled in this environment. Use SFTP instead.');
+    }
   }
 }
 

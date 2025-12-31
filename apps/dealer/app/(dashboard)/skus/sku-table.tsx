@@ -3,22 +3,24 @@
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import type { DealerSku, CanonicalSku } from '@ironscout/db';
-import { 
-  Package, 
-  CheckCircle, 
-  AlertTriangle, 
+import {
+  Package,
+  CheckCircle,
+  AlertTriangle,
   HelpCircle,
   ExternalLink,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
 
-interface SkuWithCanonical extends DealerSku {
+// Serialized version of DealerSku with Decimal converted to number
+interface SerializedSku extends Omit<DealerSku, 'rawPrice'> {
+  rawPrice: number | null;
   canonicalSku: CanonicalSku | null;
 }
 
 interface SkuTableProps {
-  skus: SkuWithCanonical[];
+  skus: SerializedSku[];
   page: number;
   totalPages: number;
   totalCount: number;

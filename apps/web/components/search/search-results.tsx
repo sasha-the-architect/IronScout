@@ -254,15 +254,12 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
 
           {/* Soft closing nudge - captures hesitant users without pressure */}
           <div className="mt-10 text-center">
-            <p className="text-sm text-muted-foreground mb-3">
+            <p className="text-sm font-medium text-foreground mb-1">
               Not ready to buy?
             </p>
-            <p className="text-xs text-muted-foreground/70">
-              We'll watch this for you and alert you if prices drop.
+            <p className="text-sm text-muted-foreground">
+              Save items and IronScout will alert you if prices drop.
             </p>
-            <button className="mt-2 text-xs text-primary hover:text-primary/80 underline underline-offset-2">
-              Track "{query}"
-            </button>
           </div>
         </div>
       </>

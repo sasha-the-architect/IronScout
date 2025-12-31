@@ -235,3 +235,49 @@ export async function PUT(request: Request) {
     );
   }
 }
+
+export async function DELETE() {
+  const requestId = crypto.randomUUID().slice(0, 8);
+  const reqLogger = logger.child({ requestId, endpoint: '/api/feed', method: 'DELETE' });
+
+  reqLogger.info('Feed delete request received');
+
+  try {
+    const session = await getSession();
+
+    if (!session || session.type !== 'dealer') {
+      reqLogger.warn('Unauthorized feed delete attempt');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const dealerId = session.dealerId;
+    reqLogger.debug('Session verified', { dealerId });
+
+    // Find and verify ownership
+    const feed = await prisma.dealerFeed.findFirst({
+      where: { dealerId },
+    });
+
+    if (!feed) {
+      reqLogger.warn('Feed not found for deletion', { dealerId });
+      return NextResponse.json({ error: 'Feed not found' }, { status: 404 });
+    }
+
+    reqLogger.info('Deleting feed', { feedId: feed.id, dealerId });
+
+    // Delete the feed (cascade will handle related records)
+    await prisma.dealerFeed.delete({
+      where: { id: feed.id },
+    });
+
+    reqLogger.info('Feed deleted successfully', { feedId: feed.id, dealerId });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    reqLogger.error('Failed to delete feed', {}, error);
+    return NextResponse.json(
+      { error: 'An unexpected error occurred' },
+      { status: 500 }
+    );
+  }
+}

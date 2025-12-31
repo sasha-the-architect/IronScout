@@ -1,14 +1,15 @@
 // Load environment variables first, before any other imports
 import 'dotenv/config'
 
-import express, { Express } from 'express'
+import express, { Express, Request, Response, NextFunction } from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
-import { prisma } from '@ironscout/db'
+import { prisma, isMaintenanceMode } from '@ironscout/db'
 import { loggers } from './config/logger'
 
 const log = loggers.server
 
+import { requestContextMiddleware } from './middleware/request-context'
 import { productsRouter } from './routes/products'
 import { adsRouter } from './routes/ads'
 import { alertsRouter } from './routes/alerts'
@@ -32,6 +33,10 @@ const PORT = process.env.PORT || 8000
 
 app.use(helmet())
 
+// Request context middleware - provides requestId correlation for logging
+// Must be early in the chain to capture all request processing
+app.use(requestContextMiddleware)
+
 // CORS configuration to support multiple domains
 const allowedOrigins = [
   'http://localhost:3000',
@@ -54,11 +59,48 @@ app.use(cors({
   },
   credentials: true
 }))
+
+// Store raw body for Stripe webhook signature verification
+// Must be before express.json() middleware
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }))
+
+// JSON body parsing for all other routes
 app.use(express.json())
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
+
+// Maintenance mode middleware - allows health check and admin routes through
+const maintenanceMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+  // Always allow health check and admin routes
+  if (req.path === '/health' || req.path.startsWith('/api/admin')) {
+    return next()
+  }
+
+  try {
+    const inMaintenance = await isMaintenanceMode()
+    if (inMaintenance) {
+      log.info('Request blocked due to maintenance mode', { path: req.path })
+      return res.status(503).json({
+        error: 'Service temporarily unavailable for maintenance',
+        code: 'MAINTENANCE_MODE'
+      })
+    }
+  } catch (error) {
+    // Per ADR-009: Fail closed on eligibility or trust ambiguity
+    // If we can't check maintenance mode, block the request
+    log.error('Failed to check maintenance mode, blocking request (fail-closed)', {}, error as Error)
+    return res.status(503).json({
+      error: 'Service temporarily unavailable',
+      code: 'MAINTENANCE_CHECK_FAILED'
+    })
+  }
+
+  next()
+}
+
+app.use(maintenanceMiddleware)
 
 app.use('/api/products', productsRouter)
 app.use('/api/ads', adsRouter)

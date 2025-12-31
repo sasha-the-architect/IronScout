@@ -10,7 +10,7 @@ import {
 const features = [
   {
     icon: Brain,
-    text: 'AI-powered search that understands ammo specs, not just keywords',
+    text: 'Search that understands ammo specs, not just keywords',
   },
   {
     icon: Layers,

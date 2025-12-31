@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { aiSearch, getSearchSuggestions, parseSearchIntent, backfillProductEmbeddings, updateProductEmbedding, ParseOptions } from '../services/ai-search'
-import { prisma } from '@ironscout/db'
+import { prisma, isAiSearchEnabled, isVectorSearchEnabled } from '@ironscout/db'
 import { requireAdmin, rateLimit, getUserTier } from '../middleware/auth'
 import { getMaxSearchResults, hasPriceHistoryAccess } from '../config/tiers'
 import { loggers } from '../config/logger'
@@ -72,10 +72,20 @@ router.post('/semantic', async (req: Request, res: Response) => {
   try {
     log.debug('Semantic search request', { body: req.body })
 
+    // Check if AI search is enabled
+    const aiEnabled = await isAiSearchEnabled()
+    if (!aiEnabled) {
+      log.info('AI search disabled via admin settings')
+      return res.status(503).json({
+        error: 'AI search is temporarily disabled',
+        code: 'AI_SEARCH_DISABLED'
+      })
+    }
+
     const { query, page, limit, sortBy, filters } = semanticSearchSchema.parse(req.body)
 
     log.debug('Parsed filters', { filters })
-    
+
     // Get user tier
     const userTier = await getUserTier(req)
     const maxResults = getMaxSearchResults(userTier)
@@ -104,11 +114,15 @@ router.post('/semantic', async (req: Request, res: Response) => {
     
     // Prevent FREE users from using price_context sort
     const effectiveSortBy = (!isPremium && sortBy === 'price_context') ? 'relevance' : sortBy
-    
-    const result = await aiSearch(query, { 
-      page, 
-      limit: tierLimitedLimit, 
+
+    // Check if vector search is enabled
+    const vectorEnabled = await isVectorSearchEnabled()
+
+    const result = await aiSearch(query, {
+      page,
+      limit: tierLimitedLimit,
       sortBy: effectiveSortBy,
+      useVectorSearch: vectorEnabled, // Controlled via admin settings
       explicitFilters: effectiveFilters,
       userTier, // Pass user tier to enable Premium features
     })
@@ -175,12 +189,21 @@ const parseSchema = z.object({
 
 router.post('/parse', async (req: Request, res: Response) => {
   try {
+    // Check if AI search is enabled
+    const aiEnabled = await isAiSearchEnabled()
+    if (!aiEnabled) {
+      return res.status(503).json({
+        error: 'AI search is temporarily disabled',
+        code: 'AI_SEARCH_DISABLED'
+      })
+    }
+
     const { query } = parseSchema.parse(req.body)
-    
+
     // Get user tier for Premium parsing
     const userTier = await getUserTier(req)
     const parseOptions: ParseOptions = { userTier }
-    
+
     const intent = await parseSearchIntent(query, parseOptions)
     
     res.json({ 
@@ -240,12 +263,21 @@ router.get('/suggestions', async (req: Request, res: Response) => {
  */
 router.post('/nl-to-filters', async (req: Request, res: Response) => {
   try {
+    // Check if AI search is enabled
+    const aiEnabled = await isAiSearchEnabled()
+    if (!aiEnabled) {
+      return res.status(503).json({
+        error: 'AI search is temporarily disabled',
+        code: 'AI_SEARCH_DISABLED'
+      })
+    }
+
     const { query } = parseSchema.parse(req.body)
-    
+
     // Get user tier for Premium parsing
     const userTier = await getUserTier(req)
     const parseOptions: ParseOptions = { userTier }
-    
+
     const intent = await parseSearchIntent(query, parseOptions)
     
     // Convert intent to filter format matching existing search API

@@ -1,7 +1,7 @@
 {
   "name": "IronScout - AI Ammo Search",
   "short_name": "IronScout",
-  "description": "AI-powered ammunition search and price comparison. Find the best deals on ammo with natural language search.",
+  "description": "Intent-aware ammunition search and price comparison. Find the best deals on ammo with natural language search.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#121418",
@@ -90,7 +90,7 @@
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "AI-powered ammo search"
+      "label": "Intent-aware ammo search"
     },
     {
       "src": "/screenshots/results-mobile.png",

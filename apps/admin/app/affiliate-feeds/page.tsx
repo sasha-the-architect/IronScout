@@ -15,7 +15,7 @@ import { FeedActions } from './feed-actions';
 export const dynamic = 'force-dynamic';
 
 const statusConfig = {
-  DRAFT: { label: 'Draft', color: 'bg-gray-100 text-gray-700', icon: FileText },
+  DRAFT: { label: 'Draft', color: 'bg-amber-100 text-amber-800 ring-1 ring-amber-400', icon: FileText },
   ENABLED: { label: 'Enabled', color: 'bg-green-100 text-green-700', icon: CheckCircle },
   PAUSED: { label: 'Paused', color: 'bg-yellow-100 text-yellow-700', icon: PauseCircle },
   DISABLED: { label: 'Disabled', color: 'bg-red-100 text-red-700', icon: XCircle },
@@ -135,6 +135,23 @@ export default async function AffiliateFeedsPage() {
         </div>
       </div>
 
+      {/* Draft feeds alert */}
+      {draftCount > 0 && (
+        <div className="rounded-md bg-amber-50 border border-amber-200 p-4">
+          <div className="flex">
+            <FileText className="h-5 w-5 text-amber-500" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-amber-800">
+                {draftCount} feed{draftCount !== 1 ? 's' : ''} in draft mode
+              </h3>
+              <p className="mt-1 text-sm text-amber-700">
+                Draft feeds won't run until enabled. Test the connection, then click "Enable" to activate.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Disabled feeds alert */}
       {disabledCount > 0 && (
         <div className="rounded-md bg-red-50 p-4">
@@ -187,8 +204,14 @@ export default async function AffiliateFeedsPage() {
               const lastRun = feed.runs[0];
               const lastRunStatus = lastRun ? runStatusConfig[lastRun.status] : null;
 
+              const rowBgClass = feed.status === 'DISABLED'
+                ? 'bg-red-50'
+                : feed.status === 'DRAFT'
+                  ? 'bg-amber-50/50'
+                  : '';
+
               return (
-                <tr key={feed.id} className={feed.status === 'DISABLED' ? 'bg-red-50' : ''}>
+                <tr key={feed.id} className={rowBgClass}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Link href={`/affiliate-feeds/${feed.id}`} className="hover:underline">
                       <div className="text-sm font-medium text-gray-900">

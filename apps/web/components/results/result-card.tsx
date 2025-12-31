@@ -4,7 +4,8 @@ import { useState, useCallback, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Bell, ChevronDown, ArrowUpRight, Circle } from 'lucide-react'
+import { Bell, ChevronDown, ArrowUpRight } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { trackAffiliateClick, trackTrackToggle } from '@/lib/analytics'
 import { toast } from 'sonner'
 import {
@@ -155,15 +156,21 @@ export function ResultCard({
     displayBadges.unshift({ type: 'lowest_price', label: 'Current Lowest Price' })
   }
 
-  // Stock indicator helper
-  const getStockIndicator = () => {
+  // Stock badge configuration
+  const getStockBadge = () => {
     if (inStock === undefined) return null
     if (inStock) {
-      return { color: 'text-emerald-500', fill: 'fill-emerald-500', label: 'In stock' }
+      return {
+        label: 'In Stock',
+        className: 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30'
+      }
     }
-    return { color: 'text-red-400', fill: '', label: 'Out of stock' }
+    return {
+      label: 'Out of Stock',
+      className: 'border-red-400 text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/30'
+    }
   }
-  const stockIndicator = getStockIndicator()
+  const stockBadge = getStockBadge()
 
   const handlePrimaryClick = useCallback(() => {
     trackAffiliateClick(id, retailerName, pricePerRound, placement)
@@ -179,9 +186,22 @@ export function ResultCard({
     const nextState = !trackingOptimistic
     setTrackingOptimistic(nextState)
     trackTrackToggle(id, nextState)
-    toast.success(nextState ? 'Alert created for price changes' : 'Alert removed', {
-      duration: 2000,
-    })
+
+    if (nextState) {
+      toast.success('Item saved', {
+        description: 'Notifications enabled by default.',
+        action: {
+          label: 'Edit Alerts',
+          onClick: () => window.location.href = '/dashboard/saved',
+        },
+        duration: 4000,
+      })
+    } else {
+      toast.success('Item removed', {
+        duration: 2000,
+      })
+    }
+
     onTrackToggle(id)
   }, [id, trackingOptimistic, onTrackToggle])
 
@@ -216,7 +236,7 @@ export function ResultCard({
                     ? 'text-primary bg-primary/10 hover:bg-primary/20'
                     : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted'
                 )}
-                aria-label={trackingOptimistic ? 'Remove price alert' : 'Create price alert'}
+                aria-label={trackingOptimistic ? 'Remove from saved items' : 'Save item'}
               >
                 <Bell
                   className={cn(
@@ -228,7 +248,7 @@ export function ResultCard({
             </TooltipTrigger>
             <TooltipContent side="left">
               <p className="text-xs">
-                {trackingOptimistic ? 'Alert active · Click to remove' : 'Alert me on price changes'}
+                {trackingOptimistic ? 'Saved · Click to remove' : 'Save item'}
               </p>
             </TooltipContent>
           </Tooltip>
@@ -241,29 +261,28 @@ export function ResultCard({
 
         {/* 2. Pricing Block - fixed height for alignment */}
         <div className="mb-3">
-          <div className="flex items-center gap-2">
-            <div className="font-bold font-mono tracking-tight text-2xl text-foreground">
+          {/* Primary: $/rd - emphasized */}
+          <div className="flex items-baseline gap-1">
+            <span className="font-bold font-mono tracking-tight text-3xl text-foreground">
               {formatPricePerRound(pricePerRound)}
-              <span className="text-base font-normal text-muted-foreground ml-1">/ rd</span>
-            </div>
-            {stockIndicator && (
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex" aria-label={stockIndicator.label}>
-                      <Circle className={cn('h-3 w-3', stockIndicator.color, stockIndicator.fill)} />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p className="text-xs">{stockIndicator.label}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+            </span>
+            <span className="text-sm font-normal text-muted-foreground">/rd</span>
           </div>
-          <p className="text-sm text-muted-foreground">
+
+          {/* Secondary: Total - de-emphasized */}
+          <p className="text-xs text-muted-foreground/70 mt-1">
             {formatTotalPrice(displayTotal, roundCount)}
           </p>
+
+          {/* Stock Badge - clear status */}
+          {stockBadge && (
+            <Badge
+              variant="outline"
+              className={cn('text-xs font-medium mt-2', stockBadge.className)}
+            >
+              {stockBadge.label}
+            </Badge>
+          )}
         </div>
 
         {/* 3. Badges - below pricing for alignment */}

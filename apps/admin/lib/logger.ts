@@ -13,10 +13,12 @@ const rootLogger = createLogger('admin')
 // Pre-configured child loggers for admin components
 export const logger = rootLogger
 export const loggers = {
+  admin: rootLogger.child('admin'),
   auth: rootLogger.child('auth'),
   dealers: rootLogger.child('dealers'),
   feeds: rootLogger.child('feeds'),
   payments: rootLogger.child('payments'),
+  settings: rootLogger.child('settings'),
   users: rootLogger.child('users'),
   sources: rootLogger.child('sources'),
 }

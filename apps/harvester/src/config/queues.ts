@@ -1,5 +1,6 @@
 import { Queue } from 'bullmq'
 import { redisConnection } from './redis'
+import { getQueueHistorySettings } from '@ironscout/db'
 
 // Queue names
 export const QUEUE_NAMES = {
@@ -85,29 +86,97 @@ export interface NormalizedProduct {
   roundCount?: number   // Rounds per box/case
 }
 
-// Create queues
+// =============================================================================
+// Queue History Settings (loaded from DB at startup)
+// =============================================================================
+
+let queueHistorySettings: { retentionCount: number; queues: Record<string, boolean> } | null = null
+
+/**
+ * Get job options for a queue based on settings
+ */
+function getJobOptions(queueName: string) {
+  if (!queueHistorySettings) {
+    // Fallback before settings are loaded
+    return { removeOnComplete: 100, removeOnFail: 500 }
+  }
+
+  const historyEnabled = queueHistorySettings.queues[queueName] ?? true
+  const count = queueHistorySettings.retentionCount
+
+  return {
+    removeOnComplete: historyEnabled ? count : true,
+    removeOnFail: historyEnabled ? count * 5 : true, // Keep more failed jobs for debugging
+  }
+}
+
+/**
+ * Initialize queue history settings from database
+ * Call this once at harvester startup
+ */
+export async function initQueueSettings(): Promise<void> {
+  try {
+    queueHistorySettings = await getQueueHistorySettings()
+    console.log('[Queues] Loaded history settings:', {
+      retentionCount: queueHistorySettings.retentionCount,
+      enabledQueues: Object.entries(queueHistorySettings.queues)
+        .filter(([, v]) => v)
+        .map(([k]) => k),
+    })
+  } catch (error) {
+    console.error('[Queues] Failed to load history settings, using defaults:', error)
+    queueHistorySettings = {
+      retentionCount: 100,
+      queues: {
+        crawl: true,
+        fetch: true,
+        extract: true,
+        normalize: true,
+        write: true,
+        alert: true,
+        'dealer-feed-ingest': true,
+        'dealer-sku-match': true,
+        'dealer-benchmark': true,
+        'dealer-insight': true,
+        'affiliate-feed': true,
+        'affiliate-feed-scheduler': true,
+      },
+    }
+  }
+}
+
+// =============================================================================
+// Create queues (with dynamic job options based on settings)
+// =============================================================================
+
 export const crawlQueue = new Queue<CrawlJobData>(QUEUE_NAMES.CRAWL, {
   connection: redisConnection,
+  defaultJobOptions: getJobOptions('crawl'),
 })
 
 export const fetchQueue = new Queue<FetchJobData>(QUEUE_NAMES.FETCH, {
   connection: redisConnection,
+  defaultJobOptions: getJobOptions('fetch'),
 })
 
 export const extractQueue = new Queue<ExtractJobData>(QUEUE_NAMES.EXTRACT, {
   connection: redisConnection,
+  defaultJobOptions: getJobOptions('extract'),
 })
 
 export const normalizeQueue = new Queue<NormalizeJobData>(QUEUE_NAMES.NORMALIZE, {
   connection: redisConnection,
+  defaultJobOptions: getJobOptions('normalize'),
 })
 
 export const writeQueue = new Queue<WriteJobData>(QUEUE_NAMES.WRITE, {
   connection: redisConnection,
+  defaultJobOptions: getJobOptions('write'),
 })
 
 export const alertQueue = new Queue<AlertJobData>(QUEUE_NAMES.ALERT, {
   connection: redisConnection,
+  defaultJobOptions: getJobOptions('alert'),
 })
 
 // ============================================================================
@@ -146,12 +215,12 @@ export interface DealerInsightJobData {
 
 export const dealerFeedIngestQueue = new Queue<DealerFeedIngestJobData>(
   QUEUE_NAMES.DEALER_FEED_INGEST,
-  { connection: redisConnection }
+  { connection: redisConnection, defaultJobOptions: getJobOptions('dealer-feed-ingest') }
 )
 
 export const dealerSkuMatchQueue = new Queue<DealerSkuMatchJobData>(
   QUEUE_NAMES.DEALER_SKU_MATCH,
-  { connection: redisConnection }
+  { connection: redisConnection, defaultJobOptions: getJobOptions('dealer-sku-match') }
 )
 
 export const dealerBenchmarkQueue = new Queue<DealerBenchmarkJobData>(
@@ -164,15 +233,14 @@ export const dealerBenchmarkQueue = new Queue<DealerBenchmarkJobData>(
         type: 'exponential',
         delay: 5000, // 5s, 15s, 45s
       },
-      removeOnComplete: 100, // Keep last 100 completed jobs
-      removeOnFail: 500, // Keep last 500 failed jobs for debugging
+      ...getJobOptions('dealer-benchmark'),
     },
   }
 )
 
 export const dealerInsightQueue = new Queue<DealerInsightJobData>(
   QUEUE_NAMES.DEALER_INSIGHT,
-  { connection: redisConnection }
+  { connection: redisConnection, defaultJobOptions: getJobOptions('dealer-insight') }
 )
 
 // ============================================================================
@@ -202,8 +270,7 @@ export const affiliateFeedQueue = new Queue<AffiliateFeedJobData>(
         type: 'exponential',
         delay: 5000, // 5s, 15s, 45s
       },
-      removeOnComplete: 100,
-      removeOnFail: 500,
+      ...getJobOptions('affiliate-feed'),
     },
   }
 )
@@ -212,10 +279,7 @@ export const affiliateFeedSchedulerQueue = new Queue<AffiliateFeedSchedulerJobDa
   QUEUE_NAMES.AFFILIATE_FEED_SCHEDULER,
   {
     connection: redisConnection,
-    defaultJobOptions: {
-      removeOnComplete: 10,
-      removeOnFail: 10,
-    },
+    defaultJobOptions: getJobOptions('affiliate-feed-scheduler'),
   }
 )
 

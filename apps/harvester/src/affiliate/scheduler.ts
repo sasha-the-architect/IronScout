@@ -12,7 +12,7 @@
  */
 
 import { Worker, Job } from 'bullmq'
-import { prisma } from '@ironscout/db'
+import { prisma, isAffiliateSchedulerEnabled } from '@ironscout/db'
 import { redisConnection } from '../config/redis'
 import {
   QUEUE_NAMES,
@@ -24,10 +24,6 @@ import { logger } from '../config/logger'
 
 const log = logger.affiliate
 
-// Environment variable to enable/disable scheduler
-// Default to false in development to prevent accidental runs
-const SCHEDULER_ENABLED = process.env.AFFILIATE_FEED_SCHEDULER_ENABLED === 'true'
-
 // Run retention configuration (default 30 days)
 const RUN_RETENTION_DAYS = Number(process.env.AFFILIATE_RUN_RETENTION_DAYS ?? 30)
 const RUN_RETENTION_MS = RUN_RETENTION_DAYS * 24 * 60 * 60 * 1000
@@ -37,13 +33,12 @@ const CLEANUP_BATCH_SIZE = 1000
 
 /**
  * Create and start the affiliate feed scheduler worker
+ *
+ * NOTE: The caller (worker.ts) is responsible for checking if the scheduler
+ * should be enabled via isAffiliateSchedulerEnabled() from the database.
+ * This function assumes it should run when called.
  */
 export function createAffiliateFeedScheduler() {
-  if (!SCHEDULER_ENABLED) {
-    log.info('Affiliate feed scheduler is disabled (set AFFILIATE_FEED_SCHEDULER_ENABLED=true to enable)')
-    return null
-  }
-
   const worker = new Worker<AffiliateFeedSchedulerJobData>(
     QUEUE_NAMES.AFFILIATE_FEED_SCHEDULER,
     async (job: Job<AffiliateFeedSchedulerJobData>) => {
@@ -267,6 +262,9 @@ export async function getSchedulerStatus(): Promise<{
 }> {
   const now = new Date()
 
+  // Check if scheduler is enabled from database setting
+  const enabled = await isAffiliateSchedulerEnabled()
+
   const dueFeeds = await prisma.affiliateFeed.count({
     where: {
       status: 'ENABLED',
@@ -280,7 +278,7 @@ export async function getSchedulerStatus(): Promise<{
 
   // Get next repeatable job
   let nextTickAt: Date | null = null
-  if (SCHEDULER_ENABLED) {
+  if (enabled) {
     const repeatableJobs = await affiliateFeedSchedulerQueue.getRepeatableJobs()
     if (repeatableJobs.length > 0 && repeatableJobs[0].next != null) {
       nextTickAt = new Date(repeatableJobs[0].next)
@@ -288,7 +286,7 @@ export async function getSchedulerStatus(): Promise<{
   }
 
   return {
-    enabled: SCHEDULER_ENABLED,
+    enabled,
     nextTickAt,
     dueFeeds,
     pendingManualRuns,

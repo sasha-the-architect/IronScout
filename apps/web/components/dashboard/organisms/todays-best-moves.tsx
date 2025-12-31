@@ -1,3 +1,11 @@
+/**
+ * @deprecated This component has been replaced by GoodDealHero in Dashboard v3.
+ * @see apps/web/components/dashboard/organisms/good-deal-hero.tsx
+ * @see ADR-012 Dashboard v3 Action-Oriented Deal Surface
+ *
+ * This file is kept for backwards compatibility during migration.
+ * Do not use in new code.
+ */
 'use client'
 
 import { Card, CardContent } from '@/components/ui/card'

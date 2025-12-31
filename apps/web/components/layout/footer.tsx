@@ -19,7 +19,7 @@ export function Footer() {
               <span className="text-xl font-bold">IronScout.ai</span>
             </Link>
             <p className="text-sm text-muted-foreground">
-              AI-powered ammunition search and price comparison. Find the best deals with intelligent insights and real-time alerts.
+              Intent-aware ammunition search and price comparison. Find the best deals with helpful context and real-time alerts.
             </p>
           </div>
 

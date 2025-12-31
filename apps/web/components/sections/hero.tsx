@@ -39,7 +39,7 @@ export function Hero() {
         <div className="max-w-4xl mx-auto text-center">
           {/* Headline */}
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
-            AI-powered ammo search
+            Intent-aware ammo search
             <span className="block mt-2 text-muted-foreground font-normal text-3xl md:text-4xl lg:text-5xl">
               with real price history
             </span>

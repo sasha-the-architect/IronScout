@@ -280,7 +280,7 @@ export async function sendApprovalEmail(
     <h3 style="color: #111; font-size: 16px; margin: 0 0 15px 0;">What's included:</h3>
     <ul style="margin: 0; padding-left: 20px; color: #374151;">
       <li style="margin-bottom: 8px;">Automated product feed ingestion</li>
-      <li style="margin-bottom: 8px;">AI-powered SKU matching</li>
+      <li style="margin-bottom: 8px;">Accurate SKU matching</li>
       <li style="margin-bottom: 8px;">Market pricing insights</li>
       <li style="margin-bottom: 8px;">Click & conversion tracking</li>
       <li style="margin-bottom: 8px;">Priority listing on IronScout</li>
@@ -310,7 +310,7 @@ Your IronScout Dealer account has been approved.
 
 What's included:
 - Automated product feed ingestion
-- AI-powered SKU matching
+- Accurate SKU matching
 - Market pricing insights
 - Click & conversion tracking
 - Priority listing on IronScout

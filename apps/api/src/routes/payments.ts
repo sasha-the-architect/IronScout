@@ -1667,29 +1667,28 @@ router.get('/plans', async (req: Request, res: Response) => {
         price: 0,
         currency: 'USD',
         interval: 'month',
-        features: [
-          'Search, filter, and compare prices across hundreds of dealers',
-          'Price-per-round breakdowns',
-          'Purpose badges (range, defense, hunting)',
-          'Up to 3 delayed price alerts',
-          'Basic AI assistance'
-        ]
-      },
+      features: [
+        'Search, filter, and compare prices across hundreds of dealers',
+        'Price-per-round breakdowns',
+        'Purpose badges (range, defense, hunting)',
+        'Up to 3 delayed price alerts (Saved Items only)',
+        'Intent-aware search assistance'
+      ]
+    },
       {
         id: process.env.STRIPE_PRICE_ID_PREMIUM_MONTHLY || 'price_premium_monthly',
         name: 'Premium Monthly',
         price: 4.99,
         currency: 'USD',
         interval: 'month',
-        features: [
-          'Everything in Free',
-          'Full price history charts (30, 90, 365 days)',
-          'Faster alert notifications',
-          'More active alerts',
-          'Advanced filters (subsonic, +P, match-grade, low-recoil)',
-          'AI-assisted search explanations'
-        ]
-      },
+      features: [
+        'Everything in Free',
+        'Full price history charts (30, 90, 365 days)',
+        'Faster alert notifications (same caps as Free)',
+        'Advanced filters (subsonic, +P, match-grade, low-recoil)',
+        'Intent-aware search explanations'
+      ]
+    },
       {
         id: process.env.STRIPE_PRICE_ID_PREMIUM_ANNUALLY || 'price_premium_annual',
         name: 'Premium Annual',
@@ -1699,16 +1698,15 @@ router.get('/plans', async (req: Request, res: Response) => {
         monthlyEquivalent: 4.17,
         savings: '17% savings',
         recommended: true,
-        features: [
-          'Everything in Free',
-          'Full price history charts (30, 90, 365 days)',
-          'Faster alert notifications',
-          'More active alerts',
-          'Advanced filters (subsonic, +P, match-grade, low-recoil)',
-          'AI-assisted search explanations'
-        ]
-      }
-    ]
+      features: [
+        'Everything in Free',
+        'Full price history charts (30, 90, 365 days)',
+        'Faster alert notifications (same caps as Free)',
+        'Advanced filters (subsonic, +P, match-grade, low-recoil)',
+        'Intent-aware search explanations'
+      ]
+    }
+  ]
 
     res.json(plans)
   } catch (error) {
@@ -1765,3 +1763,4 @@ router.get('/dealer/plans', async (req: Request, res: Response) => {
 })
 
 export { router as paymentsRouter }
+

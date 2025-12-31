@@ -1,3 +1,12 @@
+/**
+ * @deprecated This component is no longer used in Dashboard v3.
+ * ADR-012 prohibits charts, graphs, and analytical displays on the Dashboard.
+ * The Dashboard shows outcomes, not reasoning.
+ * @see ADR-012 Dashboard v3 Action-Oriented Deal Surface
+ *
+ * This file is kept for backwards compatibility during migration.
+ * Do not use in new code.
+ */
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'

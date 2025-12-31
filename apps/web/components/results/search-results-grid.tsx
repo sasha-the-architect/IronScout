@@ -25,8 +25,14 @@ interface SearchResultsGridProps {
 
 /**
  * Helper to get price data from a product
+ * Returns null if product has no prices
  */
 function getProductPriceData(product: Product) {
+  // Guard against empty prices array to prevent reduce crashes
+  if (!product.prices || product.prices.length === 0) {
+    return null
+  }
+
   const lowestPrice = product.prices.reduce(
     (min, price) => (price.price < min.price ? price : min),
     product.prices[0]
@@ -257,35 +263,58 @@ export function SearchResultsGrid({
           ))}
         </div>
       ) : (
-        // Grid View - Execution mode (dense table, no ads)
-        <div className="border border-border rounded-lg overflow-hidden overflow-x-auto">
-          <table className="w-full min-w-[700px]">
-            <ResultTableHeader
-              currentSort={currentSort}
-              gridSort={gridSort}
-              onSortChange={handleSortChange}
-              onGridSortChange={handleGridSortChange}
-            />
-            <tbody>
-              {gridProducts.length > 0 ? (
-                gridProducts.map((product) => (
-                  <SearchResultRow
-                    key={product.id}
-                    product={product}
-                    isTracked={trackedIds.has(product.id)}
-                    onTrackChange={handleTrackChange}
-                  />
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                    {hideOutOfStock ? 'No in-stock items found' : 'No results'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        // Grid View - Execution mode
+        // On mobile: render as cards (table is unusable on small screens)
+        // On desktop: render as dense table for fast scanning
+        <>
+          {/* Mobile: Card layout (hidden on md+) */}
+          <div className="md:hidden grid grid-cols-1 gap-4">
+            {gridProducts.length > 0 ? (
+              gridProducts.map((product) => (
+                <SearchResultCard
+                  key={product.id}
+                  product={product}
+                  isTracked={trackedIds.has(product.id)}
+                  onTrackChange={handleTrackChange}
+                />
+              ))
+            ) : (
+              <div className="py-8 text-center text-muted-foreground">
+                {hideOutOfStock ? 'No in-stock items found' : 'No results'}
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: Table layout (hidden on mobile) */}
+          <div className="hidden md:block border border-border rounded-lg overflow-hidden">
+            <table className="w-full">
+              <ResultTableHeader
+                currentSort={currentSort}
+                gridSort={gridSort}
+                onSortChange={handleSortChange}
+                onGridSortChange={handleGridSortChange}
+              />
+              <tbody>
+                {gridProducts.length > 0 ? (
+                  gridProducts.map((product) => (
+                    <SearchResultRow
+                      key={product.id}
+                      product={product}
+                      isTracked={trackedIds.has(product.id)}
+                      onTrackChange={handleTrackChange}
+                    />
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                      {hideOutOfStock ? 'No in-stock items found' : 'No results'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )

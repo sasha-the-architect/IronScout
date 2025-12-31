@@ -2,8 +2,19 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
+// JWT secret for dealer portal tokens
+// CRITICAL: At least one of these must be set in production
+const jwtSecretString = process.env.DEALER_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+if (!jwtSecretString && process.env.NODE_ENV === 'production') {
+  throw new Error('CRITICAL: No JWT secret configured for dealer proxy.');
+}
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.DEALER_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dealer-secret-change-me'
+  jwtSecretString || 'dev-only-dealer-secret-not-for-production'
+);
+
+// Admin impersonation token secret (same as main app)
+const ADMIN_IMPERSONATION_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-only-admin-secret'
 );
 
 // Routes that don't require authentication
@@ -16,7 +27,7 @@ const publicPaths = [
   '/api/auth',
 ];
 
-export async function proxy(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Allow public paths
@@ -31,10 +42,12 @@ export async function proxy(request: NextRequest) {
   
   // Check for dealer session
   const dealerToken = request.cookies.get('dealer-session')?.value;
-  const isImpersonating = request.cookies.has('dealer-impersonation');
+  const impersonationToken = request.cookies.get('dealer-impersonation-token')?.value;
   let isDealerAuthenticated = false;
+  let isValidImpersonation = false;
   let dealerSession: { dealerId: string; email: string; status: string } | null = null;
-  
+
+  // Verify dealer token
   if (dealerToken) {
     try {
       const { payload } = await jwtVerify(dealerToken, JWT_SECRET);
@@ -48,11 +61,28 @@ export async function proxy(request: NextRequest) {
       // Invalid token
     }
   }
-  
-  
-  // All routes require a dealer session (real or impersonated)
-  // If an admin is impersonating (marker cookie), allow through even if token verification fails
-  if (!isDealerAuthenticated && !isImpersonating) {
+
+  // Verify admin impersonation token (MUST validate, not just check existence)
+  if (!isDealerAuthenticated && impersonationToken) {
+    try {
+      const { payload } = await jwtVerify(impersonationToken, ADMIN_IMPERSONATION_SECRET);
+      // Verify this is an impersonation token with required claims
+      if (payload.dealerId && payload.impersonatedBy) {
+        isValidImpersonation = true;
+        dealerSession = {
+          dealerId: payload.dealerId as string,
+          email: payload.email as string || 'impersonated@admin',
+          status: payload.status as string || 'ACTIVE',
+        };
+      }
+    } catch {
+      // Invalid impersonation token - do not allow access
+    }
+  }
+
+  // All routes require a valid dealer session OR valid admin impersonation
+  // SECURITY: Must verify token validity, not just cookie existence
+  if (!isDealerAuthenticated && !isValidImpersonation) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);

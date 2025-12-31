@@ -151,6 +151,13 @@ $services = @(
         DevCommand = "pnpm --filter @ironscout/harvester worker:dev"
         ProdCommand = "pnpm --filter @ironscout/harvester worker"
         HealthCheck = $null
+    },
+    @{
+        Name = "bullboard"
+        Port = 3939
+        DevCommand = "pnpm --filter @ironscout/harvester bullboard:dev"
+        ProdCommand = "pnpm --filter @ironscout/harvester bullboard"
+        HealthCheck = "http://localhost:3939/health"
     }
 )
 
@@ -285,6 +292,9 @@ foreach ($svc in $jobs) {
     Write-Host " $url"
 }
 
+Write-Host ""
+Write-Info "Bull Board (Queue Monitor): http://localhost:3939/admin/queues"
+Write-Host "  Auth: admin / ironscout2024" -ForegroundColor Gray
 Write-Host ""
 Write-Info "Press Ctrl+C to stop all services"
 Write-Host ""

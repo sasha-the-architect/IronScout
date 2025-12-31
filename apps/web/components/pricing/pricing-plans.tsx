@@ -24,7 +24,7 @@ const PRICING = {
 // Feature comparison data
 const featureComparison = [
   {
-    name: 'AI-powered search',
+    name: 'Intent-aware search',
     free: true,
     premium: true,
   },

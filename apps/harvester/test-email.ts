@@ -1,7 +1,22 @@
+/**
+ * Test script for email sending functionality
+ *
+ * Usage:
+ *   npx tsx test-email.ts
+ *
+ * Environment variables:
+ *   RESEND_API_KEY - Required for sending emails
+ *   FROM_EMAIL - Sender email address (default: alerts@ironscout.ai)
+ *   LOG_FORMAT - Set to 'pretty' for colored output (default in dev)
+ */
+
 // Load environment variables first, before any other imports
 import 'dotenv/config'
 
 import { Resend } from 'resend'
+import { createLogger } from '@ironscout/logger'
+
+const log = createLogger('harvester:test-email')
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM_EMAIL = process.env.FROM_EMAIL || 'alerts@ironscout.ai'
@@ -24,7 +39,7 @@ async function sendPriceDropTestEmail() {
               <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                 <tr>
                   <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; text-align: center;">
-                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">🎉 Price Drop Alert!</h1>
+                    <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">Price Drop Alert!</h1>
                     <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 16px; opacity: 0.9;">Great news!</p>
                   </td>
                 </tr>
@@ -51,7 +66,7 @@ async function sendPriceDropTestEmail() {
                       </tr>
                     </table>
                     <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                      This is a <strong>test email</strong> from IronScout.ai. Your alert system is working correctly! 🎊
+                      This is a <strong>test email</strong> from IronScout.ai. Your alert system is working correctly!
                     </p>
                     <table width="100%" cellpadding="0" cellspacing="0">
                       <tr>
@@ -76,35 +91,29 @@ async function sendPriceDropTestEmail() {
     </html>
   `
 
-  try {
-    console.log(`Sending test email to: ${TEST_EMAIL}`)
-    console.log(`From: IronScout.ai Alerts <${FROM_EMAIL}>`)
+  log.info('Sending test email', { to: TEST_EMAIL, from: FROM_EMAIL })
 
+  try {
     const result = await resend.emails.send({
       from: `IronScout.ai Alerts <${FROM_EMAIL}>`,
       to: [TEST_EMAIL],
-      subject: '🎉 Test: Price Drop Alert',
+      subject: 'Test: Price Drop Alert',
       html
     })
 
-    console.log('✅ Email sent successfully!')
-    console.log('Result:', result)
-    console.log('\nCheck your inbox!')
+    log.info('Email sent successfully', { result })
   } catch (error) {
-    console.error('❌ Failed to send email:', error)
-
-    if (error instanceof Error) {
-      console.error('Error message:', error.message)
-    }
-
-    console.log('\nTroubleshooting tips:')
-    console.log('1. Check that RESEND_API_KEY is set in .env')
-    console.log('2. Update TEST_EMAIL constant to your email')
-    console.log('3. Verify domain in Resend dashboard for production')
-    console.log('4. For testing, use the email you signed up with on Resend')
+    log.error('Failed to send email', {
+      troubleshooting: [
+        'Check that RESEND_API_KEY is set in .env',
+        'Update TEST_EMAIL constant to your email',
+        'Verify domain in Resend dashboard for production',
+        'For testing, use the email you signed up with on Resend',
+      ],
+    }, error)
   }
 }
 
 // Run the test
-console.log('🧪 Testing IronScout.ai Email System...\n')
+log.info('Testing IronScout.ai Email System')
 sendPriceDropTestEmail()

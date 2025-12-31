@@ -139,6 +139,19 @@ Workers log startup and heartbeat messages. Check logs for:
 2. Check `DATABASE_URL` environment variable
 3. Test connection: `psql $DATABASE_URL -c "SELECT 1"`
 
+---
+
+## FAQ: Monitoring, Silence, and Alerts
+
+- **Why didn’t I get an alert?**  
+  Alerts fire only for explicitly saved items when a meaningful price drop or back-in-stock event occurs. Caps apply: max 1 per item per 24h, max 1 per user per 6h, max 3 per user per day. If caps are reached or signals are minor, the alert is suppressed. Free users also receive delayed delivery.
+
+- **Why does my dashboard look empty?**  
+  Silence is expected. The dashboard shows at most one hero when confidence is high; otherwise it shows a calm “nothing urgent” state and your saved items. No filler or trends are shown when nothing qualifies.
+
+- **Why did I get this alert?**  
+  Every alert maps to a saved item and one of two triggers: meaningful price drop vs recent baseline, or back-in-stock. Alert payloads include product, retailer, and current price so support can trace the source without AI reasoning.
+
 #### Multiple Scheduler Instances
 
 **Symptom:** Duplicate job creation, data corruption

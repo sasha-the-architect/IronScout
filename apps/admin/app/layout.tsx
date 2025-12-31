@@ -2,8 +2,8 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { redirect } from 'next/navigation';
-import { getAdminSession } from '@/lib/auth';
-import { Users, BarChart3, Settings, LogOut, Loader2 } from 'lucide-react';
+import { getAdminSession, type AdminSession } from '@/lib/auth';
+import { Users, Settings, LogOut, Loader2, Rss } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -17,13 +17,11 @@ export const metadata: Metadata = {
   description: 'IronScout Administration Portal',
 };
 
-async function AdminNav() {
-  const session = await getAdminSession();
-  
-  if (!session) {
-    return null;
-  }
-  
+interface AdminNavProps {
+  session: AdminSession;
+}
+
+function AdminNav({ session }: AdminNavProps) {
   return (
     <nav className="bg-gray-900 text-white">
       <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
@@ -39,7 +37,7 @@ async function AdminNav() {
               />
               IronScout Admin
             </Link>
-            
+
             <div className="hidden md:flex items-center gap-1">
               <Link
                 href="/dealers"
@@ -49,11 +47,11 @@ async function AdminNav() {
                 Dealers
               </Link>
               <Link
-                href="/analytics"
+                href="/affiliate-feeds"
                 className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-800 flex items-center gap-2"
               >
-                <BarChart3 className="h-4 w-4" />
-                Analytics
+                <Rss className="h-4 w-4" />
+                Affiliate Feeds
               </Link>
               <Link
                 href="/settings"
@@ -64,9 +62,9 @@ async function AdminNav() {
               </Link>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-300">{session.email}</span>
+            <span className="text-sm text-gray-300">{session.email ?? 'Admin'}</span>
             <a
               href="/api/auth/logout"
               className="text-sm text-gray-400 hover:text-white flex items-center gap-1"
@@ -138,7 +136,7 @@ export default async function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <div className="min-h-screen bg-gray-100">
-          <AdminNav />
+          <AdminNav session={session} />
           <main className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-8">
             {children}
           </main>

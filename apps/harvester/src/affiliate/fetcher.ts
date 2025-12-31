@@ -10,6 +10,7 @@ import { Client as SftpClient, SFTPWrapper, FileEntry } from 'ssh2'
 import { createHash } from 'crypto'
 import { gunzipSync } from 'zlib'
 import { decryptSecret } from '@ironscout/crypto'
+import { isPlainFtpAllowed } from '@ironscout/db'
 import { logger } from '../config/logger'
 import type { AffiliateFeed, DownloadResult } from './types'
 
@@ -23,14 +24,29 @@ const DEFAULT_MAX_FILE_SIZE = 500 * 1024 * 1024 // 500 MB
  */
 export async function downloadFeed(feed: AffiliateFeed): Promise<DownloadResult> {
   // Decrypt credentials
-  if (!feed.secretCiphertext || !feed.secretKeyId) {
-    throw new Error('Feed credentials not configured')
+  if (!feed.secretCiphertext) {
+    log.error('Feed credentials not configured', {
+      feedId: feed.id,
+      hasSecretCiphertext: !!feed.secretCiphertext,
+      hint: 'Was CREDENTIAL_ENCRYPTION_KEY_B64 set in admin .env when feed was created?',
+    })
+    throw new Error('Feed credentials not configured - re-save the feed credentials in admin.')
   }
 
-  const password = decryptSecret(
-    Buffer.from(feed.secretCiphertext),
-    feed.secretKeyId || undefined  // AAD (Additional Authenticated Data)
-  )
+  let password: string
+  try {
+    password = decryptSecret(
+      Buffer.from(feed.secretCiphertext),
+      feed.secretKeyId || undefined  // AAD (for future KMS migration)
+    )
+  } catch (err) {
+    log.error('Failed to decrypt feed credentials', {
+      feedId: feed.id,
+      error: err instanceof Error ? err.message : String(err),
+      hint: 'Is CREDENTIAL_ENCRYPTION_KEY_B64 the same in admin and harvester?',
+    })
+    throw new Error(`Failed to decrypt feed credentials: ${err instanceof Error ? err.message : String(err)}`)
+  }
 
   const maxFileSize = feed.maxFileSizeBytes
     ? Number(feed.maxFileSizeBytes)
@@ -231,9 +247,10 @@ async function downloadViaFtp(
   password: string,
   maxFileSize: number
 ): Promise<DownloadResult> {
-  // Check if FTP is allowed
-  if (process.env.AFFILIATE_FEED_ALLOW_PLAIN_FTP !== 'true') {
-    throw new Error('Plain FTP is disabled. Use SFTP instead.')
+  // Check if FTP is allowed (database setting with env var fallback)
+  const ftpAllowed = await isPlainFtpAllowed()
+  if (!ftpAllowed) {
+    throw new Error('Plain FTP is disabled. Use SFTP instead or enable via admin settings.')
   }
 
   const client = new ftp.Client()
@@ -342,13 +359,13 @@ export async function testConnection(feed: AffiliateFeed): Promise<{
   fileName?: string
 }> {
   try {
-    if (!feed.secretCiphertext || !feed.secretKeyId) {
-      return { success: false, error: 'Feed credentials not configured' }
+    if (!feed.secretCiphertext) {
+      return { success: false, error: 'Feed credentials not configured - re-save credentials in admin' }
     }
 
     const password = decryptSecret(
       Buffer.from(feed.secretCiphertext),
-      feed.secretKeyId || undefined  // AAD (Additional Authenticated Data)
+      feed.secretKeyId || undefined  // AAD (for future KMS migration)
     )
 
     if (feed.transport === 'SFTP') {
@@ -421,8 +438,9 @@ async function testFtpConnection(
   feed: AffiliateFeed,
   password: string
 ): Promise<{ success: boolean; error?: string; fileSize?: number; fileName?: string }> {
-  if (process.env.AFFILIATE_FEED_ALLOW_PLAIN_FTP !== 'true') {
-    return { success: false, error: 'Plain FTP is disabled' }
+  const ftpAllowed = await isPlainFtpAllowed()
+  if (!ftpAllowed) {
+    return { success: false, error: 'Plain FTP is disabled. Enable via admin settings.' }
   }
 
   const client = new ftp.Client()

@@ -65,7 +65,7 @@ export function SavingsCard({ savings, isPremium = false }: SavingsCardProps) {
             {!isPremium && (
               <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Lock className="h-3 w-3" />
-                <span>Premium unlocks more alerts and price history</span>
+                <span>Premium processes alerts faster and adds price history</span>
               </div>
             )}
           </div>

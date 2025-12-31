@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -30,6 +30,18 @@ interface FeedActionsProps {
 export function FeedActions({ feed }: FeedActionsProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + 4,
+        left: rect.right - 192, // 192px = w-48
+      });
+    }
+  }, [isOpen]);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAction = async (action: () => Promise<{ success: boolean; error?: string }>) => {
@@ -58,6 +70,7 @@ export function FeedActions({ feed }: FeedActionsProps) {
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         disabled={isLoading}
         className="p-1 rounded hover:bg-gray-100 disabled:opacity-50"
@@ -68,10 +81,13 @@ export function FeedActions({ feed }: FeedActionsProps) {
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-10"
+            className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 z-20 mt-2 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+          <div
+            className="fixed z-50 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5"
+            style={{ top: menuPosition.top, left: menuPosition.left }}
+          >
             <div className="py-1">
               <Link
                 href={`/affiliate-feeds/${feed.id}`}

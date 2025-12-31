@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { saveItem, type Product } from '@/lib/api'
-import { X, Bell, TrendingDown, Package } from 'lucide-react'
+import { X, Bookmark, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface SaveItemDialogProps {
@@ -16,10 +16,12 @@ interface SaveItemDialogProps {
 }
 
 /**
- * Save Item Dialog (ADR-011)
+ * Save Item Dialog
  *
- * Simplified save flow - just save the item with default notifications.
- * Users can customize notification preferences in the Saved Items Manager.
+ * Per UX Charter and 05_alerting_and_notifications.md:
+ * - Saving is the only user action
+ * - Alerts are an implicit side effect, not a feature to configure
+ * - No alert setup language in save flow
  */
 export function SaveItemDialog({ product, open, onOpenChange }: SaveItemDialogProps) {
   const { data: session } = useSession()
@@ -49,10 +51,10 @@ export function SaveItemDialog({ product, open, onOpenChange }: SaveItemDialogPr
           },
         })
       } else {
-        toast.success('Item saved!', {
-          description: 'You\'ll be notified when the price drops or it comes back in stock.',
+        toast.success('Item saved', {
+          description: 'IronScout will watch this item for you.',
           action: {
-            label: 'Manage Alerts',
+            label: 'View Saved',
             onClick: () => router.push('/dashboard/saved'),
           },
         })
@@ -101,34 +103,13 @@ export function SaveItemDialog({ product, open, onOpenChange }: SaveItemDialogPr
             </div>
           )}
 
-          {/* What you'll get */}
-          <div className="space-y-3">
-            <p className="text-sm font-medium">You'll be notified when:</p>
-
-            <div className="flex items-start gap-3 p-3 border rounded-lg">
-              <TrendingDown className="h-5 w-5 text-blue-600 mt-0.5" />
-              <div>
-                <p className="font-medium">Price Drops</p>
-                <p className="text-sm text-muted-foreground">
-                  Alert when price drops by 5% or more
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 p-3 border rounded-lg">
-              <Package className="h-5 w-5 text-green-600 mt-0.5" />
-              <div>
-                <p className="font-medium">Back in Stock</p>
-                <p className="text-sm text-muted-foreground">
-                  Alert when this item is available again
-                </p>
-              </div>
-            </div>
+          {/* Delegation language - alerts as side effect */}
+          <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+            <Eye className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-muted-foreground">
+              Save this item and IronScout will watch prices and availability for you.
+            </p>
           </div>
-
-          <p className="text-xs text-muted-foreground">
-            You can customize notification preferences in your Saved Items.
-          </p>
         </CardContent>
 
         <CardFooter className="flex gap-2">
@@ -142,8 +123,8 @@ export function SaveItemDialog({ product, open, onOpenChange }: SaveItemDialogPr
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={loading} className="flex-1">
-            <Bell className="h-4 w-4 mr-2" />
-            {loading ? 'Saving...' : 'Save & Track'}
+            <Bookmark className="h-4 w-4 mr-2" />
+            {loading ? 'Saving...' : 'Save Item'}
           </Button>
         </CardFooter>
       </Card>

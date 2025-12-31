@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CheckCircle,
@@ -30,6 +30,11 @@ interface Run {
   expiryBlockedReason: string | null;
   expiryApprovedAt: Date | null;
   expiryApprovedBy: string | null;
+  // Failure details
+  failureKind: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  correlationId: string | null;
   _count: { errors: number };
 }
 
@@ -125,8 +130,8 @@ export function RunsTable({ runs, feedId }: RunsTableProps) {
             const isExpanded = expandedRun === run.id;
 
             return (
-              <>
-                <tr key={run.id} className={run.status === 'FAILED' ? 'bg-red-50' : ''}>
+              <Fragment key={run.id}>
+                <tr className={run.status === 'FAILED' ? 'bg-red-50' : ''}>
                   <td className="px-3 py-4">
                     <button
                       onClick={() => setExpandedRun(isExpanded ? null : run.id)}
@@ -242,10 +247,54 @@ export function RunsTable({ runs, feedId }: RunsTableProps) {
                           </>
                         )}
                       </div>
+                      {/* Failure details for failed runs */}
+                      {run.status === 'FAILED' && (
+                        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                          <h4 className="text-sm font-medium text-red-800 mb-2">Failure Details</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            {run.correlationId && (
+                              <div className="md:col-span-2">
+                                <dt className="font-medium text-red-700">Correlation ID</dt>
+                                <dd className="mt-1 flex items-center gap-2">
+                                  <code className="font-mono text-xs bg-red-100 px-2 py-1 rounded text-red-800 select-all">
+                                    {run.correlationId}
+                                  </code>
+                                  <button
+                                    onClick={() => navigator.clipboard.writeText(run.correlationId!)}
+                                    className="text-xs text-red-600 hover:text-red-800 underline"
+                                  >
+                                    Copy
+                                  </button>
+                                </dd>
+                              </div>
+                            )}
+                            {run.failureCode && (
+                              <div>
+                                <dt className="font-medium text-red-700">Error Code</dt>
+                                <dd className="mt-1 font-mono text-xs text-red-800">{run.failureCode}</dd>
+                              </div>
+                            )}
+                            {run.failureKind && (
+                              <div>
+                                <dt className="font-medium text-red-700">Failure Type</dt>
+                                <dd className="mt-1 text-red-800">{run.failureKind}</dd>
+                              </div>
+                            )}
+                          </div>
+                          {run.failureMessage && (
+                            <div className="mt-2">
+                              <dt className="font-medium text-red-700">Error Message</dt>
+                              <dd className="mt-1 text-sm text-red-800 font-mono bg-red-100 p-2 rounded overflow-x-auto">
+                                {run.failureMessage}
+                              </dd>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             );
           })}
         </tbody>

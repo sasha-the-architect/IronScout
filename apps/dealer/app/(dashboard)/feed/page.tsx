@@ -9,11 +9,13 @@ import {
   XCircle,
   Clock,
   RefreshCw,
-  AlertOctagon
+  AlertOctagon,
+  Pause,
 } from 'lucide-react';
 import { FeedConfigForm } from './feed-config-form';
 import { FeedRunsTable } from './feed-runs-table';
 import { RefreshFeedButton } from './refresh-feed-button';
+import { FeedActions } from './feed-actions';
 
 export default async function FeedPage() {
   const session = await getSession();
@@ -63,7 +65,10 @@ export default async function FeedPage() {
         </div>
         
         {feed && (
-          <RefreshFeedButton feedId={feed.id} />
+          <div className="flex items-center gap-2">
+            <RefreshFeedButton feedId={feed.id} />
+            <FeedActions feedId={feed.id} enabled={feed.enabled} />
+          </div>
         )}
       </div>
 
@@ -73,12 +78,25 @@ export default async function FeedPage() {
           <div className="px-4 py-5 sm:p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`rounded-full p-2 ${status.bg}`}>
-                  <status.icon className={`h-5 w-5 ${status.color}`} />
+                <div className={`rounded-full p-2 ${feed.enabled ? status.bg : 'bg-gray-100'}`}>
+                  {feed.enabled ? (
+                    <status.icon className={`h-5 w-5 ${status.color}`} />
+                  ) : (
+                    <Pause className="h-5 w-5 text-gray-500" />
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900">Feed Status</h3>
-                  <p className="text-sm text-gray-500">{status.label}</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-medium text-gray-900">Feed Status</h3>
+                    {!feed.enabled && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                        Paused
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    {feed.enabled ? status.label : 'Feed is paused and will not run'}
+                  </p>
                 </div>
               </div>
 

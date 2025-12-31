@@ -54,3 +54,6 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Re-export all types from the generated client
 export * from './generated/prisma/client.js'
+
+// Re-export system settings utilities
+export * from './system-settings.js'

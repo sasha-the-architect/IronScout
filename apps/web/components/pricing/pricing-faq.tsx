@@ -9,12 +9,12 @@ import {
 
 const faqs = [
   {
-    question: 'What does "AI-powered search" mean?',
+  question: 'What does your search do?',
     answer: 'IronScout uses AI to understand ammo listings and normalize messy product data across retailers. This helps you search by intent (like "9mm for home defense" or "bulk .223 brass case") rather than relying solely on exact keywords or filters.'
   },
   {
     question: 'What\'s the difference between Free and Premium?',
-    answer: 'Free gives you full AI-powered search, current prices, and basic alerts. Premium adds historical price charts, faster alerts, advanced filters, AI-assisted explanations for why deals stand out, and expanded watchlist limits. Premium provides more context — not guarantees.'
+  answer: 'Free gives you full intent-aware search, current prices, and basic alerts. Premium adds historical price charts, faster alerts, advanced filters, clear explanations for why deals stand out, and expanded watchlist limits. Premium provides more context — not guarantees.'
   },
   {
     question: 'What do price history charts show?',

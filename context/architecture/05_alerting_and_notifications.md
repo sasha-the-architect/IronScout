@@ -30,10 +30,12 @@ Silence is expected. Alerts are rare by design.
 
 In v1, alerts are limited to **explicitly Saved Items only**.
 
-- Saved Items → alert-eligible  
-- Saved Searches → **not alert-eligible in v1**
+- Explicitly Saved Items → alert-eligible  
+- Inferred or implicit intent → **never alert-eligible**
 
-Saved Searches influence Dashboard visibility only.
+Inferred intent (e.g., search history or repeated queries):
+- May influence Dashboard visibility
+- Must never trigger alerts
 
 This constraint is intentional and must not be bypassed by tier logic.
 
@@ -72,9 +74,10 @@ This alert type is always interruption-worthy.
 The system must not send alerts for:
 - Minor price movement
 - Typical day-to-day fluctuation
-- Category-level or Saved Search matches
+- Inferred or implicit intent
+- Category-level interest
 - Popularity or demand signals
-- “Good deal right now” without prior user intent
+- “Good deal right now” without explicit save
 - Marketing or promotional messaging
 
 If an alert resembles advertising, it violates this policy.
@@ -154,7 +157,7 @@ All alerts must be traceable to:
 Support and operations must be able to answer:
 > “Why did this alert fire?”
 
-Without referencing AI or internal heuristics.
+Without referencing AI or inferred intent.
 
 ---
 
@@ -172,7 +175,7 @@ The Dashboard is the confirmation.
 ## Explicit Non-Goals (v1)
 
 In v1, alerts do not:
-- Use Saved Searches
+- Use inferred or implicit intent
 - Support user-defined thresholds
 - Provide AI explanations
 - Predict outcomes

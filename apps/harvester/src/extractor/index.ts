@@ -15,9 +15,17 @@ export const extractorWorker = new Worker<ExtractJobData>(
     const stageStart = Date.now()
     const contentBytes = typeof content === 'string' ? content.length : JSON.stringify(content).length
 
-    log.info('Extracting data', { executionId, sourceId, sourceType, contentBytes })
-
     try {
+      // Get source name for logging context
+      const source = await prisma.source.findUnique({
+        where: { id: sourceId },
+        select: { name: true, retailer: { select: { name: true } } },
+      })
+      const sourceName = source?.name
+      const retailerName = source?.retailer?.name
+
+      log.info('Extracting data', { executionId, sourceId, sourceName, retailerName, sourceType, contentBytes })
+
       await prisma.executionLog.create({
         data: {
           executionId,

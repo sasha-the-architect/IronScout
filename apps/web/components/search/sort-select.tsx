@@ -21,7 +21,7 @@ const SORT_OPTIONS = [
     value: 'relevance',
     label: 'Relevance',
     icon: Sparkles,
-    description: 'AI-powered relevance ranking',
+    description: 'Relevance ranking tuned for ammo',
   },
   {
     value: 'price_asc',

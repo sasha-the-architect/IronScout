@@ -99,17 +99,21 @@ export const fetcherWorker = new Worker<FetchJobData>(
     const { sourceId, executionId, url, type } = job.data
     const stageStart = Date.now()
 
-    log.info('Fetching URL', { sourceId, executionId, url, type })
-
     try {
       // Get source to check pagination config
       const source = await prisma.source.findUnique({
         where: { id: sourceId },
+        include: { retailer: { select: { name: true } } },
       })
 
       if (!source) {
         throw new Error(`Source ${sourceId} not found`)
       }
+
+      const sourceName = source.name
+      const retailerName = source.retailer?.name
+
+      log.info('Fetching URL', { sourceId, sourceName, retailerName, executionId, url, type })
 
       const paginationConfig = source.paginationConfig as PaginationConfig | null
 
@@ -251,7 +255,7 @@ export const fetcherWorker = new Worker<FetchJobData>(
         currentPage += increment
       }
 
-      log.info('Fetch complete', { pagesFetched, itemCount: allContent.length, totalContentSize })
+      log.info('Fetch complete', { sourceId, sourceName, retailerName, executionId, pagesFetched, itemCount: allContent.length, totalContentSize })
 
       // Serialize content based on type with size limits
       let content: string

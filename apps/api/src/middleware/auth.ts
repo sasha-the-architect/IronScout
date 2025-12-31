@@ -161,8 +161,39 @@ export function requireApiKey(req: Request, res: Response, next: NextFunction) {
 /**
  * Rate limiting middleware (simple in-memory implementation)
  * For production, use Redis-based rate limiting
+ *
+ * Includes automatic cleanup of expired entries to prevent memory leaks.
  */
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
+
+// Cleanup expired entries periodically (every 5 minutes)
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000
+
+function cleanupExpiredEntries(): void {
+  const now = Date.now()
+  let cleaned = 0
+
+  for (const [key, record] of rateLimitStore.entries()) {
+    if (now > record.resetTime) {
+      rateLimitStore.delete(key)
+      cleaned++
+    }
+  }
+
+  if (cleaned > 0) {
+    log.debug('Rate limit store cleanup', { cleaned, remaining: rateLimitStore.size })
+  }
+}
+
+// Start cleanup interval (only runs if this module is loaded)
+const cleanupInterval = setInterval(cleanupExpiredEntries, CLEANUP_INTERVAL_MS)
+
+// Allow graceful shutdown to clear the interval
+if (typeof process !== 'undefined') {
+  process.on('beforeExit', () => {
+    clearInterval(cleanupInterval)
+  })
+}
 
 export function rateLimit(options: {
   windowMs?: number

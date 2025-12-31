@@ -159,13 +159,9 @@ export async function aiSearch(
       // Try vector-enhanced search (only when no explicit filters)
       products = await vectorEnhancedSearch(query, mergedIntent, explicitFilters, { skip, limit: limit * 2 }, isPremium)
       vectorSearchUsed = true
-      // For vector search, count products with embeddings matching the intent filters
-      // Use a simplified count that matches vector search conditions
-      const vectorCountWhere = {
-        ...where,
-        embedding: { not: null }
-      }
-      total = await prisma.product.count({ where: vectorCountWhere })
+      // For vector search, count using base where clause
+      // Note: Can't filter on embedding field since it's Unsupported("vector") in Prisma
+      total = await prisma.product.count({ where })
       log.debug('Vector search returned', { productsCount: products.length, total })
     } catch (error) {
       log.warn('Vector search failed, falling back to standard search', { error })

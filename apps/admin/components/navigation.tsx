@@ -8,6 +8,7 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  Rss,
 } from 'lucide-react';
 import type { AdminSession } from '@/lib/auth';
 
@@ -17,6 +18,7 @@ interface NavigationProps {
 
 const navItems = [
   { name: 'Dealers', href: '/dealers', icon: Users },
+  { name: 'Affiliate Feeds', href: '/affiliate-feeds', icon: Rss },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

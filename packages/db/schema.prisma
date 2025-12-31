@@ -428,6 +428,7 @@ model AffiliateFeedRun {
   failureKind    String? // 'TRANSIENT' | 'PERMANENT' | 'CONFIG'
   failureCode    String? // Error code (e.g., 'AUTH_FAILED', 'FILE_NOT_FOUND')
   failureMessage String? // Human-readable error message
+  correlationId  String? // UUID for log correlation (set on failure)
 
   // Flags
   isPartial        Boolean @default(false) // Derived: errorCount > 0 && productsUpserted > 0
@@ -1058,6 +1059,21 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// ============================================================================
+// SYSTEM SETTINGS
+// Key-value store for platform configuration that can be changed at runtime
+// ============================================================================
+
+model SystemSetting {
+  key         String   @id
+  value       Json     // Stored as JSON for flexibility
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?  // Admin email who last changed it
+
+  @@map("system_settings")
 }
 
 enum UserTier {

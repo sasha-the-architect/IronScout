@@ -96,7 +96,7 @@ export function DashboardHeroSearch({
           <div className="relative">
             {/* AI indicator */}
             <div className="absolute left-4 md:left-5 top-1/2 -translate-y-1/2 flex items-center gap-2">
-              <Sparkles className="h-5 w-5 md:h-6 md:w-6 text-[#00C2CB]" aria-label="AI-powered search" />
+              <Sparkles className="h-5 w-5 md:h-6 md:w-6 text-[#00C2CB]" aria-label="intent-aware search" />
             </div>
 
             <input

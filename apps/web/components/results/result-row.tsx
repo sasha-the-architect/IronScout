@@ -3,7 +3,8 @@
 import { useCallback, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Bell, ArrowUpRight, Circle, ChevronUp, ChevronDown } from 'lucide-react'
+import { Bookmark, ArrowUpRight, ChevronUp, ChevronDown } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { trackAffiliateClick, trackTrackToggle } from '@/lib/analytics'
 import { toast } from 'sonner'
 import {
@@ -93,9 +94,22 @@ export function ResultRow({
     const nextState = !trackingOptimistic
     setTrackingOptimistic(nextState)
     trackTrackToggle(id, nextState)
-    toast.success(nextState ? 'Alert created' : 'Alert removed', {
-      duration: 2000,
-    })
+
+    if (nextState) {
+      toast.success('Item saved', {
+        description: 'Notifications enabled by default.',
+        action: {
+          label: 'Edit Alerts',
+          onClick: () => window.location.href = '/dashboard/saved',
+        },
+        duration: 4000,
+      })
+    } else {
+      toast.success('Item removed', {
+        duration: 2000,
+      })
+    }
+
     onTrackToggle(id)
   }, [id, trackingOptimistic, onTrackToggle])
 
@@ -124,43 +138,38 @@ export function ResultRow({
         {truncate(retailerName, 20)}
       </td>
 
-      {/* $/rd */}
-      <td className="py-3 px-4 font-mono font-semibold text-foreground">
-        {formatPrice(pricePerRound)}
+      {/* $/rd - Primary price metric, emphasized */}
+      <td className="py-3 px-4">
+        <span className="font-mono font-bold text-lg text-foreground">
+          {formatPrice(pricePerRound)}
+        </span>
+        <span className="text-xs text-muted-foreground ml-0.5">/rd</span>
       </td>
 
-      {/* Total */}
-      <td className="py-3 px-4 text-sm text-muted-foreground">
+      {/* Total - De-emphasized secondary info */}
+      <td className="py-3 px-4 text-xs text-muted-foreground/70">
         {formatPrice(displayTotal)}
-        {roundCount && <span className="text-xs ml-1">({roundCount.toLocaleString()})</span>}
+        {roundCount && <span className="ml-1">({roundCount.toLocaleString()})</span>}
       </td>
 
-      {/* In Stock */}
+      {/* In Stock - Badge instead of dot */}
       <td className="py-3 px-4 text-center">
         {inStock !== undefined && (
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex" aria-label={inStock ? 'In stock' : 'Out of stock'}>
-                  <Circle
-                    className={cn(
-                      'h-3 w-3 mx-auto',
-                      inStock
-                        ? 'text-emerald-500 fill-emerald-500'
-                        : 'text-red-400'
-                    )}
-                  />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs">{inStock ? 'In stock' : 'Out of stock'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Badge
+            variant="outline"
+            className={cn(
+              'text-xs font-medium',
+              inStock
+                ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                : 'border-red-400 text-red-500 dark:text-red-400'
+            )}
+          >
+            {inStock ? 'In Stock' : 'Out'}
+          </Badge>
         )}
       </td>
 
-      {/* Alert */}
+      {/* Save */}
       <td className="py-3 px-4 text-center">
         <TooltipProvider delayDuration={200}>
           <Tooltip>
@@ -173,14 +182,14 @@ export function ResultRow({
                     ? 'text-primary'
                     : 'text-muted-foreground/50 hover:text-muted-foreground'
                 )}
-                aria-label={trackingOptimistic ? 'Remove alert' : 'Create alert'}
+                aria-label={trackingOptimistic ? 'Unsave item' : 'Save item'}
               >
-                <Bell className={cn('h-4 w-4', trackingOptimistic && 'fill-current')} />
+                <Bookmark className={cn('h-4 w-4', trackingOptimistic && 'fill-current')} />
               </button>
             </TooltipTrigger>
             <TooltipContent side="left">
               <p className="text-xs">
-                {trackingOptimistic ? 'Alert active' : 'Create alert'}
+                {trackingOptimistic ? 'Saved' : 'Save'}
               </p>
             </TooltipContent>
           </Tooltip>
@@ -366,7 +375,7 @@ export function ResultTableHeader({
         >
           Stock
         </SortableHeader>
-        <th className="py-3 px-4 text-center">Alert</th>
+        <th className="py-3 px-4 text-center">Save</th>
         <th className="py-3 px-4">Action</th>
       </tr>
     </thead>

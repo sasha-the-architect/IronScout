@@ -1,3 +1,11 @@
+/**
+ * @deprecated This component is no longer used in Dashboard v3.
+ * ADR-012 prohibits analytical displays and savings claims on the Dashboard.
+ * @see ADR-012 Dashboard v3 Action-Oriented Deal Surface
+ *
+ * This file is kept for backwards compatibility during migration.
+ * Do not use in new code.
+ */
 'use client'
 
 import { SavingsCard, SavingsCardSkeleton } from '../molecules/savings-card'

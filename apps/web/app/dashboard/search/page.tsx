@@ -49,7 +49,7 @@ export default async function DashboardSearchPage({ searchParams }: SearchPagePr
       <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-bold">Search</h1>
         <p className="text-muted-foreground mt-1">
-          AI-powered search to find the best ammo deals
+          Search built for ammo to find the right deals
         </p>
       </div>
 

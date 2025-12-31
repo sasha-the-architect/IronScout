@@ -200,6 +200,13 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
   const startTime = Date.now()
   let parseResult: FeedParseResult | null = null
 
+  // Fetch dealer name for readable logs
+  const dealerInfo = await prisma.dealer.findUnique({
+    where: { id: dealerId },
+    select: { businessName: true },
+  })
+  const dealerName = dealerInfo?.businessName || 'Unknown'
+
   try {
     // =========================================================================
     // SUBSCRIPTION CHECK
@@ -211,6 +218,7 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
       if (!subscriptionResult.isActive) {
         log.info('Skipping feed - subscription inactive', {
           dealerId,
+          dealerName,
           subscriptionStatus: subscriptionResult.status,
           reason: subscriptionResult.reason,
         })
@@ -244,7 +252,7 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
         }
       }
     } else {
-      log.info('Admin override active', { dealerId, adminId: adminId || 'unknown' })
+      log.info('Admin override active', { dealerId, dealerName, adminId: adminId || 'unknown' })
     }
 
     // Update feed run status
@@ -258,7 +266,7 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
       throw new Error('Feed URL is required')
     }
 
-    log.info('Fetching feed', { dealerId })
+    log.info('Fetching feed', { dealerId, dealerName })
     const content = await fetchFeed(url, accessType, username, password)
 
     // Calculate content hash for change detection
@@ -270,7 +278,7 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
     })
 
     if (feed?.feedHash === contentHash) {
-      log.debug('No changes detected', { dealerId })
+      log.debug('No changes detected', { dealerId, dealerName })
       await prisma.dealerFeedRun.update({
         where: { id: feedRunId },
         data: {
@@ -292,13 +300,15 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
         ? detectConnector(content)
         : getConnector(formatType as FeedFormatType)
 
-    log.info('Using connector', { connectorName: connector.name, dealerId })
+    log.info('Using connector', { connectorName: connector.name, dealerId, dealerName })
 
     // Parse feed using connector
-    log.info('Parsing feed', { dealerId })
+    log.info('Parsing feed', { dealerId, dealerName })
     parseResult = await connector.parse(content)
 
     log.info('Feed parsed', {
+      dealerId,
+      dealerName,
       totalRows: parseResult.totalRows,
       indexableCount: parseResult.indexableCount,
       quarantineCount: parseResult.quarantineCount,
@@ -378,13 +388,16 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
     // Get previous feed status for notification logic
     const previousStatus = feed?.status
 
-    // Update feed status
+    // Update feed status and timing
+    const completedAt = new Date()
     await prisma.dealerFeed.update({
       where: { id: feedId },
       data: {
         feedHash: contentHash,
-        lastSuccessAt: feedStatus !== 'FAILED' ? new Date() : undefined,
-        lastFailureAt: feedStatus === 'FAILED' ? new Date() : undefined,
+        // Update lastRunAt to actual completion time for accurate next run calculation
+        lastRunAt: completedAt,
+        lastSuccessAt: feedStatus !== 'FAILED' ? completedAt : undefined,
+        lastFailureAt: feedStatus === 'FAILED' ? completedAt : undefined,
         lastError: feedStatus === 'FAILED' ? `High rejection rate: ${(rejectRatio * 100).toFixed(1)}%` : null,
         primaryErrorCode,
         status: feedStatus,
@@ -446,6 +459,8 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
     }
 
     log.info('Feed ingestion completed', {
+      dealerId,
+      dealerName,
       indexedCount: dealerSkuIds.length,
       quarantinedCount: quarantinedIds.length,
       rejectedCount: errors.length,
@@ -460,7 +475,7 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
       status: feedStatus,
     }
   } catch (error) {
-    log.error('Feed ingestion error', { dealerId, error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined)
+    log.error('Feed ingestion error', { dealerId, dealerName, error: error instanceof Error ? error.message : String(error) }, error instanceof Error ? error : undefined)
 
     // Determine error code
     const errorMessage = String(error)
@@ -471,11 +486,14 @@ async function processFeedIngest(job: Job<DealerFeedIngestJobData>) {
       primaryErrorCode = ERROR_CODES.TIMEOUT_ERROR
     }
 
-    // Update feed status
+    // Update feed status and timing
+    const failedAt = new Date()
     await prisma.dealerFeed.update({
       where: { id: feedId },
       data: {
-        lastFailureAt: new Date(),
+        // Update lastRunAt so next run calculation is accurate even after failure
+        lastRunAt: failedAt,
+        lastFailureAt: failedAt,
         lastError: String(error),
         primaryErrorCode,
         status: 'FAILED',

@@ -69,6 +69,16 @@ export default async function SkusPage({ searchParams }: { searchParams: SearchP
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
+  // Serialize SKUs to plain objects (convert Decimal to number)
+  const serializedSkus = skus.map(sku => ({
+    ...sku,
+    rawPrice: sku.rawPrice ? Number(sku.rawPrice) : null,
+    canonicalSku: sku.canonicalSku ? {
+      ...sku.canonicalSku,
+      // Convert any Decimal fields in canonicalSku if needed
+    } : null,
+  }));
+
   // Calculate stats
   const needsReviewCount = stats
     .filter(s => s.needsReview)
@@ -147,10 +157,10 @@ export default async function SkusPage({ searchParams }: { searchParams: SearchP
       {/* SKU Table */}
       <div className="rounded-lg bg-white shadow">
         <div className="px-4 py-5 sm:p-6">
-          <SkuTable 
-            skus={skus} 
-            page={page} 
-            totalPages={totalPages} 
+          <SkuTable
+            skus={serializedSkus}
+            page={page}
+            totalPages={totalPages}
             totalCount={totalCount}
           />
         </div>

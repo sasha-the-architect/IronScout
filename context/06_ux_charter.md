@@ -5,7 +5,7 @@
 **Purpose:**  
 Ensure IronScout presents as one coherent system — not a collection of features — by locking how we speak, what we show, and where decisions are made.
 
-This charter applies to **Homepage, Search, Dashboard, Saved Items, and Saved Searches**.
+This charter applies to **Homepage, Search, Dashboard, and Saved Items**.
 
 If a change conflicts with this document, it must not ship without an ADR amendment.
 
@@ -64,6 +64,7 @@ Must not:
 ### Dashboard (Action)
 - Makes one clear call when confidence exists.
 - Drives retailer clicks.
+- Dashboard elements must represent **change**, not static state or complete lists.
 
 May:
 - Show at most one recommendation.
@@ -78,29 +79,30 @@ Must not:
 
 ### Saved Items
 - Represent explicit user interest.
-- Power repeat engagement.
+- Power repeat engagement and alerts.
 
 Must:
 - Show simple directional signals.
 - Stay action-oriented.
+- Serve as the sole source of alert eligibility.
 
 Must not:
 - Become analytical or configurable.
+- Be duplicated wholesale on the Dashboard.
 
 ---
 
-### Saved Searches
-- Capture intent silently.
-- Power alerts and dashboard signals.
+### Implicit Intent (Internal Only)
 
-Must:
-- Feel automatic.
-- Stay mostly invisible.
+The system may infer interest from recent or repeated searches.
 
-Must not:
-- Appear as lists on the dashboard.
-- Expose query syntax or configuration.
-- Be framed as a power feature.
+Implicit intent:
+- Influences Dashboard surfacing only
+- Is never exposed as a user-managed feature
+- Does not create Saved Items
+- Does not trigger alerts
+
+Implicit intent exists to reduce friction, not to introduce automation control.
 
 ---
 
@@ -166,10 +168,10 @@ IronScout must not:
 
 This charter consolidates and enforces the following architectural decisions:
 
-- [ADR-006](decisions/ADR-006-no-purchase-recommendations.md) – No purchase recommendations
-- [ADR-011](decisions/ADR-011-unified-saved-items.md) – Unified Saved Items
-- [ADR-012](decisions/ADR-012-dashboard-v3-action-oriented-deal-surface.md) – Dashboard v3: Action-oriented deal surface
-- [ADR-013](decisions/ADR-013-homepage-positioning-guardrails.md) – Homepage positioning guardrails
-- [ADR-014](decisions/ADR-014-search-positioning-guardrails.md) – Search positioning guardrails
+- ADR-006 – No purchase recommendations
+- ADR-011 – Unified Saved Items
+- ADR-012 – Dashboard v3: Action-oriented deal surface
+- ADR-013 – Homepage positioning guardrails
+- ADR-014 – Search positioning guardrails
 
 Any conflict between this charter and an ADR must be resolved via ADR amendment.

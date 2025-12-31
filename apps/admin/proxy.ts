@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { loggers } from './lib/logger';
 
-export function proxy(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   // Debug: Log all cookies received by proxy
   const cookies = request.cookies.getAll();
   loggers.auth.debug('Proxy request', {

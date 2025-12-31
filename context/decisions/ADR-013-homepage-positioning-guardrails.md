@@ -88,8 +88,20 @@ The homepage hero must:
 - Avoid technical or marketing-driven claims.
 
 Example patterns:
-- “Ammo prices, watched for you.”
-- “Track prices over time. Buy with context.”
+- "Ammo prices, watched for you."
+- "Track prices over time. Buy with context."
+
+### Homepage Hero Copy (Locked)
+
+Use these hero/value lines as defaults:
+- "We watch prices so you don’t have to."
+- "We surface deals when they matter."
+- "Quiet until something changes."
+
+Do not use:
+- "Find the best deals"
+- "AI-powered recommendations"
+- "Never miss the lowest price"
 
 ---
 

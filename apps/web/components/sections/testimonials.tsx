@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Check, ArrowRight } from 'lucide-react'
 
 const freeTier = [
-  'Full AI-powered search',
+  'Full intent-aware ammo search',
   'Current best prices',
   'Limited price history',
   'Basic alerts',

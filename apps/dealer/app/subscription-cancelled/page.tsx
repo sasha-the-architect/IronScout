@@ -61,7 +61,7 @@ export default async function SubscriptionCancelledPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-green-500">✓</span>
-              AI-powered pricing insights
+              Pricing insights for your catalog
             </li>
             <li className="flex items-start gap-2">
               <span className="text-green-500">✓</span>

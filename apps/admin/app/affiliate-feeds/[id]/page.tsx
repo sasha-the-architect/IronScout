@@ -16,11 +16,12 @@ import {
 } from 'lucide-react';
 import { FeedStatusActions } from './feed-status-actions';
 import { RunsTable } from './runs-table';
+import { EditFeedSettings } from './edit-feed-settings';
 
 export const dynamic = 'force-dynamic';
 
 const statusConfig = {
-  DRAFT: { label: 'Draft', color: 'bg-gray-100 text-gray-700', icon: FileText },
+  DRAFT: { label: 'Draft', color: 'bg-amber-100 text-amber-800 ring-1 ring-amber-400', icon: FileText },
   ENABLED: { label: 'Enabled', color: 'bg-green-100 text-green-700', icon: CheckCircle },
   PAUSED: { label: 'Paused', color: 'bg-yellow-100 text-yellow-700', icon: PauseCircle },
   DISABLED: { label: 'Disabled', color: 'bg-red-100 text-red-700', icon: XCircle },
@@ -73,20 +74,40 @@ export default async function AffiliateFeedDetailPage({
             <ArrowLeft className="h-5 w-5 text-gray-500" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{feed.source.name}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">{feed.source.name}</h1>
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-base font-medium ${status.color}`}>
+                <StatusIcon className="h-5 w-5" />
+                {status.label}
+              </span>
+            </div>
             <p className="mt-1 text-sm text-gray-500">
               {feed.source.retailer?.name || 'No retailer'} &middot; {feed.network}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${status.color}`}>
-            <StatusIcon className="h-4 w-4" />
-            {status.label}
-          </span>
+          <EditFeedSettings feed={feed} />
           <FeedStatusActions feed={feed} />
         </div>
       </div>
+
+      {/* Draft mode alert */}
+      {feed.status === 'DRAFT' && (
+        <div className="rounded-md bg-amber-50 border border-amber-200 p-4">
+          <div className="flex">
+            <FileText className="h-5 w-5 text-amber-500" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-amber-800">
+                This feed is in draft mode
+              </h3>
+              <p className="mt-1 text-sm text-amber-700">
+                It won't run on schedule until enabled. Test the connection first, then click "Enable" to activate.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Consecutive failures alert */}
       {feed.consecutiveFailures >= 2 && feed.status !== 'DISABLED' && (

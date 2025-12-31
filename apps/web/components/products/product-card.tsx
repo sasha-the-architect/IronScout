@@ -46,10 +46,16 @@ const getPurposeBadge = (purpose?: string) => {
 }
 
 export function ProductCard({ product, showRelevance = false, showPremiumFeatures = false }: ProductCardProps) {
-  const [showAlertDialog, setShowAlertDialog] = useState(false)
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+
+  // Guard against empty prices array to prevent crashes
+  if (!product.prices || product.prices.length === 0) {
+    return null
+  }
 
   const lowestPrice = product.prices.reduce((min, price) =>
-    price.price < min.price ? price : min
+    price.price < min.price ? price : min,
+    product.prices[0]
   )
 
   const isPremiumRetailer = lowestPrice.retailer.tier === 'PREMIUM'
@@ -152,7 +158,7 @@ export function ProductCard({ product, showRelevance = false, showPremiumFeature
             size="sm"
             variant="secondary"
             className="h-8 w-8 p-0 backdrop-blur-sm bg-background/80 hover:bg-background shadow-lg"
-            onClick={() => setShowAlertDialog(true)}
+            onClick={() => setShowSaveDialog(true)}
             aria-label="Save item"
           >
             <Bookmark className="h-4 w-4" />
@@ -282,7 +288,7 @@ export function ProductCard({ product, showRelevance = false, showPremiumFeature
             size="sm"
             variant="outline"
             className="flex-1"
-            onClick={() => setShowAlertDialog(true)}
+            onClick={() => setShowSaveDialog(true)}
           >
             <Bookmark className="h-3 w-3 mr-1" />
             Save
@@ -296,8 +302,8 @@ export function ProductCard({ product, showRelevance = false, showPremiumFeature
 
       <CreateAlertDialog
         product={product}
-        open={showAlertDialog}
-        onOpenChange={setShowAlertDialog}
+        open={showSaveDialog}
+        onOpenChange={setShowSaveDialog}
       />
     </Card>
   )

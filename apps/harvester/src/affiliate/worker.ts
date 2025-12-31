@@ -8,6 +8,7 @@
  */
 
 import { Worker, Job } from 'bullmq'
+import { randomUUID } from 'crypto'
 import { prisma, Prisma } from '@ironscout/db'
 import { redisConnection } from '../config/redis'
 import {
@@ -105,12 +106,12 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
 
   // Check eligibility
   if (feed.status === 'DRAFT') {
-    log.warn('Skipping draft feed', { feedId })
+    log.warn('Skipping draft feed', { feedId, sourceName: feed.source.name, retailerName: feed.source.retailer?.name })
     return
   }
 
   if (feed.status === 'DISABLED' && trigger !== 'MANUAL' && trigger !== 'ADMIN_TEST') {
-    log.warn('Skipping disabled feed', { feedId })
+    log.warn('Skipping disabled feed', { feedId, sourceName: feed.source.name, retailerName: feed.source.retailer?.name })
     return
   }
 
@@ -204,6 +205,8 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
     log.info('RUN_START', {
       runId: run.id,
       feedId,
+      sourceName: feed.source.name,
+      retailerName: feed.source.retailer?.name,
       trigger,
       workerPid: process.pid,
     })
@@ -242,18 +245,24 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
       })
     }
   } catch (error) {
+    // Generate correlation ID for this failure (for log correlation)
+    const correlationId = randomUUID()
+
     // Classify error for retry decisions
     const feedError = classifyError(error)
 
     log.error('Affiliate feed processing failed', {
+      correlationId,
       feedId,
       runId: run.id,
       failureKind: feedError.kind,
       failureCode: feedError.code,
       retryable: feedError.retryable,
+      errorMessage: feedError.message,
     }, error as Error)
 
     await finalizeRun(context, 'FAILED', {
+      correlationId,
       errorMessage: feedError.message,
       failureKind: feedError.kind,
       failureCode: feedError.code,
@@ -262,6 +271,7 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
     // Discard non-retryable errors to prevent wasted retry attempts
     if (!feedError.retryable) {
       log.warn('Discarding non-retryable job', {
+        correlationId,
         feedId,
         runId: run.id,
         failureKind: feedError.kind,
@@ -340,9 +350,11 @@ interface Phase1Result {
  */
 async function executePhase1(context: FeedRunContext): Promise<Phase1Result> {
   const { feed, run } = context
+  const sourceName = feed.source.name
+  const retailerName = feed.source.retailer?.name
 
   // Download
-  log.info('Phase 1: Downloading feed', { feedId: feed.id })
+  log.info('Phase 1: Downloading feed', { feedId: feed.id, runId: run.id, sourceName, retailerName })
   const downloadResult = await downloadFeed(feed)
 
   // Check if skipped due to unchanged content
@@ -375,7 +387,7 @@ async function executePhase1(context: FeedRunContext): Promise<Phase1Result> {
   })
 
   // Parse (v1 only supports CSV)
-  log.info('Phase 1: Parsing feed', { feedId: feed.id, bytes: downloadResult.content.length })
+  log.info('Phase 1: Parsing feed', { feedId: feed.id, runId: run.id, sourceName, bytes: downloadResult.content.length })
   if (feed.format !== 'CSV') {
     throw new Error(`Unsupported format: ${feed.format}. Only CSV is supported in v1.`)
   }
@@ -399,7 +411,7 @@ async function executePhase1(context: FeedRunContext): Promise<Phase1Result> {
   }
 
   // Process products (Phase 1: update lastSeenAt)
-  log.info('Phase 1: Processing products', { feedId: feed.id, count: parseResult.products.length })
+  log.info('Phase 1: Processing products', { feedId: feed.id, runId: run.id, sourceName, count: parseResult.products.length })
   const processResult = await processProducts(context, parseResult.products)
 
   // Log processing errors
@@ -446,9 +458,11 @@ async function executePhase2(
   phase1Result: Phase1Result
 ): Promise<Phase2Result> {
   const { feed, run, t0 } = context
+  const sourceName = feed.source.name
+  const retailerName = feed.source.retailer?.name
 
   // Evaluate circuit breaker
-  log.info('Phase 2: Evaluating circuit breaker', { feedId: feed.id })
+  log.info('Phase 2: Evaluating circuit breaker', { feedId: feed.id, runId: run.id, sourceName, retailerName })
   const cbResult = await evaluateCircuitBreaker(
     run.id,
     feed.id,
@@ -473,6 +487,9 @@ async function executePhase2(
     // Circuit breaker triggered - block promotion
     log.warn('Circuit breaker triggered', {
       feedId: feed.id,
+      runId: run.id,
+      sourceName,
+      retailerName,
       reason: cbResult.reason,
       metrics: cbResult.metrics,
     })
@@ -505,12 +522,14 @@ async function executePhase2(
 
   // Promote products (update lastSeenSuccessAt)
   // Per spec: Capture actual DB rowCount for accurate metrics
-  log.info('Phase 2: Promoting products', { feedId: feed.id })
+  log.info('Phase 2: Promoting products', { feedId: feed.id, runId: run.id, sourceName, retailerName })
   const productsPromoted = await promoteProducts(run.id, t0)
 
   log.info('Phase 2: Promotion complete', {
     feedId: feed.id,
     runId: run.id,
+    sourceName,
+    retailerName,
     productsPromoted,
   })
 
@@ -552,6 +571,7 @@ async function finalizeRun(
       failureKind: metrics.failureKind as string | undefined,
       failureCode: metrics.failureCode as string | undefined,
       failureMessage: metrics.errorMessage as string | undefined,
+      correlationId: metrics.correlationId as string | undefined,
       isPartial:
         (metrics.errorCount as number) > 0 &&
         (metrics.productsUpserted as number) > 0,
@@ -614,6 +634,7 @@ async function finalizeRun(
         retailerName: feed.source.retailer?.name,
         network: feed.network,
         runId: run.id,
+        correlationId: metrics.correlationId as string | undefined,
       },
       (metrics.errorMessage as string) || 'Unknown error',
       newFailureCount
@@ -623,6 +644,9 @@ async function finalizeRun(
     if (newFailureCount >= MAX_CONSECUTIVE_FAILURES) {
       log.warn('Auto-disabling feed after consecutive failures', {
         feedId: feed.id,
+        runId: run.id,
+        sourceName: feed.source.name,
+        retailerName: feed.source.retailer?.name,
         failures: newFailureCount,
       })
       updateData.status = 'DISABLED'
@@ -638,6 +662,7 @@ async function finalizeRun(
           retailerName: feed.source.retailer?.name,
           network: feed.network,
           runId: run.id,
+          correlationId: metrics.correlationId as string | undefined,
         },
         newFailureCount,
         (metrics.errorMessage as string) || 'Unknown error'
@@ -660,6 +685,8 @@ async function finalizeRun(
   log.info('RUN_COMPLETE', {
     feedId: feed.id,
     runId: run.id,
+    sourceName: feed.source.name,
+    retailerName: feed.source.retailer?.name,
     status,
     durationMs,
     productsUpserted: metrics.productsUpserted,

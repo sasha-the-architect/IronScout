@@ -1,25 +1,23 @@
 'use client'
 
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import {
   Bookmark,
   ExternalLink,
   Trash2,
   Bell,
   BellOff,
-  Settings2,
   ChevronDown,
-  ChevronUp,
 } from 'lucide-react'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { useSavedItems } from '@/hooks/use-saved-items'
 import { ProductImage } from '@/components/products/product-image'
 import { toast } from 'sonner'
-import type { SavedItem, UpdateSavedItemPrefs } from '@/lib/api'
+import type { SavedItem } from '@/lib/api'
 import { createLogger } from '@/lib/logger'
 
 const logger = createLogger('components:saved-items-manager')
@@ -27,15 +25,14 @@ const logger = createLogger('components:saved-items-manager')
 /**
  * Saved Items Manager - unified view for saved products (ADR-011)
  *
- * Features:
- * - List all saved items with product info
- * - Toggle notifications (master switch)
- * - Expandable notification preferences per item
- * - Remove items from saved list
+ * Per UX Charter and 05_alerting_and_notifications.md:
+ * - Saving is the only user action
+ * - Alerts are an implicit side effect with deterministic thresholds
+ * - No user-defined thresholds in v1
+ * - Simple pause/resume toggle for notifications
  */
 export function SavedItemsManager() {
   const { items, meta, loading, error, remove, updatePrefs, refetch } = useSavedItems()
-  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const handleRemove = async (productId: string, name: string) => {
     if (!confirm(`Remove "${name}" from saved items?`)) return
@@ -49,27 +46,21 @@ export function SavedItemsManager() {
     }
   }
 
-  const handleToggleNotifications = async (item: SavedItem) => {
+  const handleUpdateNotificationPref = async (
+    item: SavedItem,
+    field: 'notificationsEnabled' | 'priceDropEnabled' | 'backInStockEnabled',
+    value: boolean
+  ) => {
     try {
-      await updatePrefs(item.productId, {
-        notificationsEnabled: !item.notificationsEnabled,
-      })
-      toast.success(
-        item.notificationsEnabled ? 'Notifications paused' : 'Notifications enabled'
-      )
-    } catch (err) {
-      logger.error('Failed to toggle notifications', {}, err)
-      toast.error('Failed to update notifications')
-    }
-  }
+      await updatePrefs(item.productId, { [field]: value })
 
-  const handleUpdatePrefs = async (productId: string, prefs: UpdateSavedItemPrefs) => {
-    try {
-      await updatePrefs(productId, prefs)
-      toast.success('Preferences updated')
+      // Show toast for master toggle only
+      if (field === 'notificationsEnabled') {
+        toast.success(value ? 'Notifications resumed' : 'Notifications paused')
+      }
     } catch (err) {
-      logger.error('Failed to update preferences', {}, err)
-      toast.error('Failed to update preferences')
+      logger.error('Failed to update notification preference', { field }, err)
+      toast.error('Failed to update notifications')
     }
   }
 
@@ -96,51 +87,15 @@ export function SavedItemsManager() {
     )
   }
 
-  const activeNotifications = items.filter((i) => i.notificationsEnabled).length
-  const withPriceDropAlerts = items.filter((i) => i.priceDropEnabled).length
-  const withStockAlerts = items.filter((i) => i.backInStockEnabled).length
+  // Saved Items is a management surface (ADR-012, UX Charter)
+  // No status cards, aggregate stats, or dashboard-style metrics
+  // Just: list items, allow removal, show current state per item
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{items.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Saved Items
-              {meta && meta.itemLimit !== -1 && (
-                <span className="ml-1">/ {meta.itemLimit} max</span>
-              )}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{activeNotifications}</div>
-            <p className="text-xs text-muted-foreground">Notifications Active</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-blue-600">{withPriceDropAlerts}</div>
-            <p className="text-xs text-muted-foreground">Price Drop Alerts</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-600">{withStockAlerts}</div>
-            <p className="text-xs text-muted-foreground">Stock Alerts</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Items List */}
+      {/* Items List - the only section needed */}
       <Card>
-        <CardHeader>
-          <CardTitle>Your Saved Items</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           {items.length === 0 ? (
             <div className="text-center py-12">
               <Bookmark className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -157,12 +112,7 @@ export function SavedItemsManager() {
                 <SavedItemRow
                   key={item.id}
                   item={item}
-                  isExpanded={expandedId === item.id}
-                  onToggleExpand={() =>
-                    setExpandedId(expandedId === item.id ? null : item.id)
-                  }
-                  onToggleNotifications={() => handleToggleNotifications(item)}
-                  onUpdatePrefs={(prefs) => handleUpdatePrefs(item.productId, prefs)}
+                  onUpdatePref={(field, value) => handleUpdateNotificationPref(item, field, value)}
                   onRemove={() => handleRemove(item.productId, item.name)}
                 />
               ))}
@@ -195,19 +145,16 @@ export function SavedItemsManager() {
 
 interface SavedItemRowProps {
   item: SavedItem
-  isExpanded: boolean
-  onToggleExpand: () => void
-  onToggleNotifications: () => void
-  onUpdatePrefs: (prefs: UpdateSavedItemPrefs) => void
+  onUpdatePref: (
+    field: 'notificationsEnabled' | 'priceDropEnabled' | 'backInStockEnabled',
+    value: boolean
+  ) => void
   onRemove: () => void
 }
 
 function SavedItemRow({
   item,
-  isExpanded,
-  onToggleExpand,
-  onToggleNotifications,
-  onUpdatePrefs,
+  onUpdatePref,
   onRemove,
 }: SavedItemRowProps) {
   return (
@@ -260,39 +207,86 @@ function SavedItemRow({
           </p>
         </div>
 
-        {/* Notification Status */}
+        {/* Notification Controls Popover */}
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onToggleNotifications}
-            title={item.notificationsEnabled ? 'Notifications on' : 'Notifications off'}
-            className={item.notificationsEnabled ? 'text-blue-600' : 'text-muted-foreground'}
-          >
-            {item.notificationsEnabled ? (
-              <Bell className="h-4 w-4" />
-            ) : (
-              <BellOff className="h-4 w-4" />
-            )}
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                title="Notification settings"
+                className={item.notificationsEnabled ? 'text-blue-600' : 'text-muted-foreground'}
+              >
+                {item.notificationsEnabled ? (
+                  <Bell className="h-4 w-4" />
+                ) : (
+                  <BellOff className="h-4 w-4" />
+                )}
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64">
+              <div className="space-y-4">
+                <h4 className="font-medium text-sm">Notifications</h4>
+
+                {/* Master toggle */}
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={`notif-master-${item.id}`} className="text-sm">
+                    All notifications
+                  </Label>
+                  <Switch
+                    id={`notif-master-${item.id}`}
+                    checked={item.notificationsEnabled}
+                    onCheckedChange={(checked) => onUpdatePref('notificationsEnabled', checked)}
+                  />
+                </div>
+
+                <div className="border-t pt-3 space-y-3">
+                  {/* Price drops toggle */}
+                  <div className="flex items-center justify-between">
+                    <Label
+                      htmlFor={`notif-price-${item.id}`}
+                      className={`text-sm ${!item.notificationsEnabled ? 'text-muted-foreground' : ''}`}
+                    >
+                      Price drops
+                    </Label>
+                    <Switch
+                      id={`notif-price-${item.id}`}
+                      checked={item.priceDropEnabled}
+                      onCheckedChange={(checked) => onUpdatePref('priceDropEnabled', checked)}
+                      disabled={!item.notificationsEnabled}
+                    />
+                  </div>
+
+                  {/* Back in stock toggle */}
+                  <div className="flex items-center justify-between">
+                    <Label
+                      htmlFor={`notif-stock-${item.id}`}
+                      className={`text-sm ${!item.notificationsEnabled ? 'text-muted-foreground' : ''}`}
+                    >
+                      Back in stock
+                    </Label>
+                    <Switch
+                      id={`notif-stock-${item.id}`}
+                      checked={item.backInStockEnabled}
+                      onCheckedChange={(checked) => onUpdatePref('backInStockEnabled', checked)}
+                      disabled={!item.notificationsEnabled}
+                    />
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground pt-2">
+                  {item.notificationsEnabled
+                    ? 'Notifications enabled for this item'
+                    : 'Turn on to receive alerts'}
+                </p>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onToggleExpand}
-            title="Notification settings"
-          >
-            <Settings2 className="h-4 w-4 mr-1" />
-            {isExpanded ? (
-              <ChevronUp className="h-3 w-3" />
-            ) : (
-              <ChevronDown className="h-3 w-3" />
-            )}
-          </Button>
-
           <Button size="sm" variant="outline" asChild title="View product">
             <a href={`/products/${item.productId}`}>
               <ExternalLink className="h-4 w-4" />
@@ -304,68 +298,6 @@ function SavedItemRow({
           </Button>
         </div>
       </div>
-
-      {/* Expanded preferences */}
-      {isExpanded && (
-        <div className="border-t bg-muted/30 p-4">
-          <NotificationPreferences item={item} onUpdate={onUpdatePrefs} />
-        </div>
-      )}
-    </div>
-  )
-}
-
-interface NotificationPreferencesProps {
-  item: SavedItem
-  onUpdate: (prefs: UpdateSavedItemPrefs) => void
-}
-
-function NotificationPreferences({ item, onUpdate }: NotificationPreferencesProps) {
-  return (
-    <div className="space-y-4">
-      <h4 className="text-sm font-medium">Notification Preferences</h4>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Price Drop Alert */}
-        <div className="flex items-center justify-between p-3 border rounded-lg">
-          <div>
-            <Label className="font-medium">
-              Price Drop Alerts
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Notify when price drops by {item.minDropPercent}% or ${item.minDropAmount}
-            </p>
-          </div>
-          <Switch
-            checked={item.priceDropEnabled}
-            onCheckedChange={(checked) => onUpdate({ priceDropEnabled: checked })}
-            disabled={!item.notificationsEnabled}
-          />
-        </div>
-
-        {/* Back in Stock Alert */}
-        <div className="flex items-center justify-between p-3 border rounded-lg">
-          <div>
-            <Label className="font-medium">
-              Back in Stock Alerts
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Notify when item comes back in stock (cooldown: {item.stockAlertCooldownHours}h)
-            </p>
-          </div>
-          <Switch
-            checked={item.backInStockEnabled}
-            onCheckedChange={(checked) => onUpdate({ backInStockEnabled: checked })}
-            disabled={!item.notificationsEnabled}
-          />
-        </div>
-      </div>
-
-      {!item.notificationsEnabled && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">
-          Enable notifications to configure these settings
-        </p>
-      )}
     </div>
   )
 }

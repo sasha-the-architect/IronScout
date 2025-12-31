@@ -210,7 +210,7 @@ function AddSourceForm({ onSuccess }: { onSuccess: () => void }) {
         alert(`Error: ${error.error}`)
       }
     } catch (error) {
-      console.error('Error creating source:', error)
+      logger.error('Error creating source', {}, error)
       alert('Failed to create source')
     }
   }

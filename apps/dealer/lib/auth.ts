@@ -20,8 +20,14 @@ import { logger } from './logger';
 // Configuration
 // =============================================
 
+// JWT secret for dealer portal tokens
+// CRITICAL: At least one of these must be set in production
+const jwtSecretString = process.env.DEALER_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+if (!jwtSecretString && process.env.NODE_ENV === 'production') {
+  throw new Error('CRITICAL: No JWT secret configured. Set DEALER_JWT_SECRET, JWT_SECRET, or NEXTAUTH_SECRET in production.');
+}
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.DEALER_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dealer-secret-change-me'
+  jwtSecretString || 'dev-only-dealer-secret-not-for-production'
 );
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')

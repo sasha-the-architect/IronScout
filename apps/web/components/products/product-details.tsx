@@ -6,7 +6,7 @@ import { ProductImage } from './product-image'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Bell, ExternalLink, Crown, TrendingDown, Store, Package } from 'lucide-react'
+import { Bookmark, ExternalLink, Crown, TrendingDown, Store, Package } from 'lucide-react'
 import type { Product } from '@/lib/api'
 import { CreateAlertDialog } from './create-alert-dialog'
 import { PriceHistoryChart } from './price-history-chart'
@@ -17,17 +17,28 @@ interface ProductDetailsProps {
 
 export function ProductDetails({ product }: ProductDetailsProps) {
   const { data: session } = useSession()
-  const [showAlertDialog, setShowAlertDialog] = useState(false)
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
 
   // Check if user is Premium
   const isPremium = (session?.user as any)?.tier === 'PREMIUM'
 
+  // Guard against empty prices array to prevent crashes
+  if (!product.prices || product.prices.length === 0) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        <p>No pricing information available for this product.</p>
+      </div>
+    )
+  }
+
   const lowestPrice = product.prices.reduce((min, price) =>
-    price.price < min.price ? price : min
+    price.price < min.price ? price : min,
+    product.prices[0]
   )
 
   const highestPrice = product.prices.reduce((max, price) =>
-    price.price > max.price ? price : max
+    price.price > max.price ? price : max,
+    product.prices[0]
   )
 
   const averagePrice = product.prices.reduce((sum, price) => sum + price.price, 0) / product.prices.length
@@ -134,10 +145,10 @@ export function ProductDetails({ product }: ProductDetailsProps) {
               size="lg"
               variant="outline"
               className="flex-1"
-              onClick={() => setShowAlertDialog(true)}
+              onClick={() => setShowSaveDialog(true)}
             >
-              <Bell className="h-4 w-4 mr-2" />
-              Create Alert
+              <Bookmark className="h-4 w-4 mr-2" />
+              Save
             </Button>
           </div>
 
@@ -245,8 +256,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
 
       <CreateAlertDialog
         product={product}
-        open={showAlertDialog}
-        onOpenChange={setShowAlertDialog}
+        open={showSaveDialog}
+        onOpenChange={setShowSaveDialog}
       />
     </div>
   )
