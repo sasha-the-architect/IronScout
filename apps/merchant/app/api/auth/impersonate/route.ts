@@ -7,13 +7,13 @@ import { loggers } from '@/lib/logger';
 export const dynamic = 'force-dynamic';
 
 const MERCHANT_JWT_SECRET = new TextEncoder().encode(
-  process.env.MERCHANT_JWT_SECRET || process.env.DEALER_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'merchant-secret-change-me'
+  process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'merchant-secret-change-me'
 );
 
 // Get the base URL for redirects
 function getBaseUrl(request: NextRequest): string {
   // Always prefer explicit configuration
-  const configuredUrl = process.env.NEXTAUTH_URL || process.env.MERCHANT_PORTAL_URL || process.env.DEALER_PORTAL_URL;
+  const configuredUrl = process.env.NEXTAUTH_URL || process.env.MERCHANT_PORTAL_URL;
 
   if (configuredUrl) {
     // Remove trailing slashes
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
   loggers.auth.info('Impersonate route environment', {
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-    MERCHANT_PORTAL_URL: process.env.MERCHANT_PORTAL_URL || process.env.DEALER_PORTAL_URL,
+    MERCHANT_PORTAL_URL: process.env.MERCHANT_PORTAL_URL,
     computedBaseUrl: baseUrl,
     requestOrigin: request.nextUrl.origin,
   });

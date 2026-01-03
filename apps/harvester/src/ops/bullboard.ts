@@ -111,7 +111,7 @@ createBullBoard({
     new BullMQAdapter(normalizeQueue),
     new BullMQAdapter(writeQueue),
     new BullMQAdapter(alertQueue),
-    // Merchant (dealer) portal queues
+    // Merchant portal queues
     new BullMQAdapter(merchantFeedIngestQueue),
     new BullMQAdapter(merchantSkuMatchQueue),
     new BullMQAdapter(merchantBenchmarkQueue),
@@ -164,7 +164,7 @@ const server = app.listen(config.port, () => {
     url: `http://localhost:${config.port}${config.basePath}`,
     queues: [
       'crawl', 'fetch', 'extract', 'normalize', 'write', 'alert',
-      'dealer-feed-ingest', 'dealer-sku-match', 'dealer-benchmark', 'dealer-insight',
+      'merchant-feed-ingest', 'merchant-sku-match', 'merchant-benchmark', 'merchant-insight',
       'affiliate-feed', 'affiliate-feed-scheduler',
     ],
     warning: 'DO NOT EXPOSE TO PUBLIC INTERNET',

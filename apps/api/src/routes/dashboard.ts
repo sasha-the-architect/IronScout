@@ -37,14 +37,17 @@ router.get('/pulse', async (req: Request, res: Response) => {
     const maxCalibers = getMaxMarketPulseCalibers(userTier)
 
     // Get user's calibers from saved items (watchlist)
+    // Per ADR-011A Section 17.2: All user-facing queries MUST include deletedAt: null
     const watchlistItems = await prisma.watchlist_items.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       include: { products: { select: { caliber: true } } }
     })
 
-    // Extract unique calibers
+    // Extract unique calibers (products may be null for SEARCH intent items)
     const calibersSet = new Set<string>()
-    watchlistItems.forEach((w: { products: { caliber: string | null } }) => w.products.caliber && calibersSet.add(w.products.caliber))
+    watchlistItems.forEach((w) => {
+      if (w.products?.caliber) calibersSet.add(w.products.caliber)
+    })
 
     // Default calibers if user has none tracked
     if (calibersSet.size === 0) {
@@ -187,8 +190,9 @@ router.get('/deals', async (req: Request, res: Response) => {
     const showExplanations = hasFeature(userTier, 'aiExplanations')
 
     // Get user's calibers from saved items (watchlist) for personalization
+    // Per ADR-011A Section 17.2: All user-facing queries MUST include deletedAt: null
     const watchlistItems = await prisma.watchlist_items.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       include: { products: { select: { caliber: true, id: true } } }
     })
 
@@ -196,9 +200,10 @@ router.get('/deals', async (req: Request, res: Response) => {
     const calibersSet = new Set<string>()
     const watchedProductIds = new Set<string>()
 
-    watchlistItems.forEach((w: { products: { caliber: string | null; id: string } }) => {
-      if (w.products.caliber) calibersSet.add(w.products.caliber)
-      watchedProductIds.add(w.products.id)
+    // Products may be null for SEARCH intent items; filter safely
+    watchlistItems.forEach((w) => {
+      if (w.products?.caliber) calibersSet.add(w.products.caliber)
+      if (w.products?.id) watchedProductIds.add(w.products.id)
     })
 
     const calibers = Array.from(calibersSet)
@@ -430,7 +435,8 @@ router.get('/price-history/:caliber', async (req: Request, res: Response) => {
       if (!dailyData[dateKey]) {
         dailyData[dateKey] = { prices: [], date: dateKey }
       }
-      dailyData[dateKey].prices.push(parseFloat(price.toString()))
+      // price is a Decimal-like object; convert explicitly to number
+      dailyData[dateKey].prices.push(parseFloat(price.price.toString()))
     }
 
     // Calculate daily averages

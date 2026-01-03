@@ -28,10 +28,10 @@ Bull Board provides a web UI for monitoring all BullMQ queues in the harvester. 
 | `normalize` | Data normalization and validation |
 | `write` | Database writes and price updates |
 | `alert` | Price/availability alert triggers |
-| `dealer-feed-ingest` | Merchant product feed ingestion (legacy queue name) |
-| `dealer-sku-match` | SKU matching to canonical products (legacy queue name) |
-| `dealer-benchmark` | Market benchmark calculations (legacy queue name) |
-| `dealer-insight` | Merchant competitive insights (legacy queue name) |
+| `merchant-feed-ingest` | Merchant product feed ingestion |
+| `merchant-sku-match` | SKU matching to canonical products |
+| `merchant-benchmark` | Market benchmark calculations |
+| `merchant-insight` | Merchant competitive insights |
 | `affiliate-feed` | Affiliate feed processing (FTP/SFTP) |
 | `affiliate-feed-scheduler` | Affiliate feed scheduling ticks |
 

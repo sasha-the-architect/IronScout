@@ -47,10 +47,10 @@ export interface AllSettings {
     normalize: SettingValue;
     write: SettingValue;
     alert: SettingValue;
-    dealerFeedIngest: SettingValue;
-    dealerSkuMatch: SettingValue;
-    dealerBenchmark: SettingValue;
-    dealerInsight: SettingValue;
+    merchantFeedIngest: SettingValue;
+    merchantSkuMatch: SettingValue;
+    merchantBenchmark: SettingValue;
+    merchantInsight: SettingValue;
     affiliateFeed: SettingValue;
     affiliateScheduler: SettingValue;
   };
@@ -113,10 +113,10 @@ export async function getAllSettings(): Promise<{ success: boolean; error?: stri
       queueHistoryNormalize,
       queueHistoryWrite,
       queueHistoryAlert,
-      queueHistoryDealerFeedIngest,
-      queueHistoryDealerSkuMatch,
-      queueHistoryDealerBenchmark,
-      queueHistoryDealerInsight,
+      queueHistoryMerchantFeedIngest,
+      queueHistoryMerchantSkuMatch,
+      queueHistoryMerchantBenchmark,
+      queueHistoryMerchantInsight,
       queueHistoryAffiliateFeed,
       queueHistoryAffiliateScheduler,
       // Feature flags
@@ -142,10 +142,10 @@ export async function getAllSettings(): Promise<{ success: boolean; error?: stri
       getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_NORMALIZE),
       getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_WRITE),
       getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_ALERT),
-      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_DEALER_FEED_INGEST),
-      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_DEALER_SKU_MATCH),
-      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_DEALER_BENCHMARK),
-      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_DEALER_INSIGHT),
+      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_MERCHANT_FEED_INGEST),
+      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_MERCHANT_SKU_MATCH),
+      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_MERCHANT_BENCHMARK),
+      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_MERCHANT_INSIGHT),
       getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_FEED),
       getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_SCHEDULER),
       // Feature flags
@@ -179,10 +179,10 @@ export async function getAllSettings(): Promise<{ success: boolean; error?: stri
           normalize: queueHistoryNormalize,
           write: queueHistoryWrite,
           alert: queueHistoryAlert,
-          dealerFeedIngest: queueHistoryDealerFeedIngest,
-          dealerSkuMatch: queueHistoryDealerSkuMatch,
-          dealerBenchmark: queueHistoryDealerBenchmark,
-          dealerInsight: queueHistoryDealerInsight,
+          merchantFeedIngest: queueHistoryMerchantFeedIngest,
+          merchantSkuMatch: queueHistoryMerchantSkuMatch,
+          merchantBenchmark: queueHistoryMerchantBenchmark,
+          merchantInsight: queueHistoryMerchantInsight,
           affiliateFeed: queueHistoryAffiliateFeed,
           affiliateScheduler: queueHistoryAffiliateScheduler,
         },
