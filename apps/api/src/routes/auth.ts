@@ -203,7 +203,7 @@ router.post('/signin', authRateLimits.signin, async (req: Request, res: Response
 
     // Block admin emails from credentials login
     if (ADMIN_EMAILS.includes(emailLower)) {
-      log.warn('Blocked credentials login attempt for admin email', { email: emailLower })
+      log.warn('Blocked credentials login attempt for admin email')
       return res.status(403).json({
         error: 'Admin accounts must use OAuth sign-in',
       })

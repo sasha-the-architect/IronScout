@@ -50,14 +50,8 @@ export default async function MerchantDetailPage({
           { createdAt: 'asc' },
         ],
       },
-      merchant_feeds: {
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      },
       _count: {
         select: {
-          merchant_skus: true,
-          merchant_feeds: true,
           click_events: true,
           pixel_events: true,
         },
@@ -68,6 +62,31 @@ export default async function MerchantDetailPage({
   if (!merchant) {
     notFound();
   }
+
+  // Get retailer data for this merchant (V1: 1:1 relationship)
+  const merchantRetailer = await prisma.merchant_retailers.findFirst({
+    where: { merchantId: id },
+    select: { retailerId: true }
+  });
+
+  const retailerId = merchantRetailer?.retailerId;
+
+  // Get feeds and SKU counts from the retailer
+  const [retailerFeeds, skuCount, feedCount] = await Promise.all([
+    retailerId
+      ? prisma.retailer_feeds.findMany({
+          where: { retailerId },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        })
+      : Promise.resolve([]),
+    retailerId
+      ? prisma.retailer_skus.count({ where: { retailerId } })
+      : Promise.resolve(0),
+    retailerId
+      ? prisma.retailer_feeds.count({ where: { retailerId } })
+      : Promise.resolve(0),
+  ]);
 
   const status = statusConfig[merchant.status];
   const ownerUser = merchant.merchant_users[0];
@@ -88,7 +107,7 @@ export default async function MerchantDetailPage({
   }));
 
   // Serialize feeds for client component
-  const feeds = merchant.merchant_feeds.map(feed => ({
+  const feeds = retailerFeeds.map(feed => ({
     id: feed.id,
     name: feed.name,
     accessType: feed.accessType,
@@ -214,7 +233,7 @@ export default async function MerchantDetailPage({
                 <span className="text-sm font-medium text-gray-500">SKUs</span>
               </div>
               <p className="mt-2 text-2xl font-semibold text-gray-900">
-                {merchant._count.merchant_skus.toLocaleString()}
+                {skuCount.toLocaleString()}
               </p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">
@@ -223,7 +242,7 @@ export default async function MerchantDetailPage({
                 <span className="text-sm font-medium text-gray-500">Feeds</span>
               </div>
               <p className="mt-2 text-2xl font-semibold text-gray-900">
-                {merchant._count.merchant_feeds}
+                {feedCount}
               </p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">

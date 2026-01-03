@@ -46,9 +46,9 @@ export async function sendPriceDropEmail(
       subject: `🎉 Price Drop Alert: ${data.productName}`,
       html
     })
-    log.info('Price drop email sent', { to, productName: data.productName })
+    log.info('Price drop email sent', { productName: data.productName })
   } catch (error) {
-    log.error('Failed to send price drop email', { to, error }, error as Error)
+    log.error('Failed to send price drop email', { error: (error as Error)?.message })
     throw error
   }
 }
@@ -66,9 +66,9 @@ export async function sendBackInStockEmail(
       subject: `✨ Back in Stock: ${data.productName}`,
       html
     })
-    log.info('Back in stock email sent', { to, productName: data.productName })
+    log.info('Back in stock email sent', { productName: data.productName })
   } catch (error) {
-    log.error('Failed to send back in stock email', { to, error }, error as Error)
+    log.error('Failed to send back in stock email', { error: (error as Error)?.message })
     throw error
   }
 }
@@ -317,9 +317,9 @@ export async function sendAccountDeletionEmail(
       subject: 'Account Deletion Request Received',
       html
     })
-    log.info('Account deletion email sent', { to })
+    log.info('Account deletion email sent')
   } catch (error) {
-    log.error('Failed to send account deletion email', { to, error }, error as Error)
+    log.error('Failed to send account deletion email', { error: (error as Error)?.message })
     throw error
   }
 }

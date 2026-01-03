@@ -72,8 +72,8 @@ export async function POST(request: Request) {
     reqLogger.debug('Looking up feed', { feedId, merchantId });
 
     // Verify ownership
-    const feed = await prisma.merchant_feeds.findFirst({
-      where: { id: feedId, merchantId },
+    const feed = await prisma.retailer_feeds.findFirst({
+      where: { id: feedId, retailerId: merchantId },
     });
 
     if (!feed) {
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
     }
 
     // Check for rate limiting (max 1 manual refresh per 5 minutes)
-    const recentRun = await prisma.merchant_feed_runs.findFirst({
+    const recentRun = await prisma.retailer_feed_runs.findFirst({
       where: {
         feedId,
         startedAt: {
@@ -124,12 +124,27 @@ export async function POST(request: Request) {
       );
     }
 
-    reqLogger.info('Creating feed run record', { feedId, merchantId });
+    // Look up retailerId via merchant_retailers
+    const merchantRetailer = await prisma.merchant_retailers.findFirst({
+      where: { merchantId },
+      select: { retailerId: true }
+    });
+    const retailerId = merchantRetailer?.retailerId;
+
+    if (!retailerId) {
+      reqLogger.warn('No retailerId found for merchant', { merchantId });
+      return NextResponse.json(
+        { error: 'No retailer configured for this merchant' },
+        { status: 400 }
+      );
+    }
+
+    reqLogger.info('Creating feed run record', { feedId, merchantId, retailerId });
 
     // Create a feed run record
-    const run = await prisma.merchant_feed_runs.create({
+    const run = await prisma.retailer_feed_runs.create({
       data: {
-        merchantId,
+        retailerId,
         feedId,
         status: 'RUNNING',
       },
@@ -144,7 +159,7 @@ export async function POST(request: Request) {
     await queue.add(
       'ingest-manual',
       {
-        merchantId,
+        retailerId: merchantId,
         feedId: feed.id,
         feedRunId: run.id,
         accessType: feed.accessType,

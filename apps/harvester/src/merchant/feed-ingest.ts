@@ -77,7 +77,7 @@ async function sendFeedNotifications(
       },
     })
 
-    const feed = await prisma.merchant_feeds.findUnique({
+    const feed = await prisma.retailer_feeds.findUnique({
       where: { id: feedId },
       select: { formatType: true },
     })
@@ -195,18 +195,29 @@ function generateMatchKey(title: string, sku?: string): string {
 // ============================================================================
 
 async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
-  const { merchantId, feedId, feedRunId, accessType, formatType, url, username, password, adminOverride, adminId } = job.data
+  const { retailerId, feedId, feedRunId, accessType, formatType, url, username, password, adminOverride, adminId } = job.data
 
   const startTime = Date.now()
   const jobStartedAt = new Date().toISOString()
   let parseResult: FeedParseResult | null = null
 
-  // Fetch merchant name for readable logs
-  const merchantInfo = await prisma.merchants.findUnique({
-    where: { id: merchantId },
-    select: { businessName: true },
+  // Fetch retailer info for readable logs (via merchant_retailers join)
+  const retailerInfo = await prisma.retailers.findUnique({
+    where: { id: retailerId },
+    select: {
+      name: true,
+      merchant_retailers: {
+        select: {
+          merchants: {
+            select: { id: true, businessName: true },
+          },
+        },
+        take: 1,
+      },
+    },
   })
-  const merchantName = merchantInfo?.businessName || 'Unknown'
+  const merchantName = retailerInfo?.merchant_retailers[0]?.merchants.businessName || retailerInfo?.name || 'Unknown'
+  const merchantId = retailerInfo?.merchant_retailers[0]?.merchants.id
 
   log.info('MERCHANT_JOB_START', {
     jobId: job.id,
@@ -229,7 +240,7 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
     // SUBSCRIPTION CHECK
     // =========================================================================
     // Check merchant subscription status before processing (unless admin override)
-    if (!adminOverride) {
+    if (!adminOverride && merchantId) {
       const subscriptionResult = await checkMerchantSubscription(merchantId)
 
       if (!subscriptionResult.isActive) {
@@ -241,7 +252,7 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
         })
 
         // Update feed run as skipped
-        await prisma.merchant_feed_runs.update({
+        await prisma.retailer_feed_runs.update({
           where: { id: feedRunId },
           data: {
             status: 'SKIPPED',
@@ -282,12 +293,12 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
           message: subscriptionResult.reason,
         }
       }
-    } else {
+    } else if (adminOverride) {
       log.info('Admin override active', { merchantId, merchantName, adminId: adminId || 'unknown' })
     }
 
     // Update feed run status
-    await prisma.merchant_feed_runs.update({
+    await prisma.retailer_feed_runs.update({
       where: { id: feedRunId },
       data: { status: 'RUNNING' },
     })
@@ -321,13 +332,13 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
     const contentHash = createHash('sha256').update(content).digest('hex')
 
     // Check if content has changed
-    const feed = await prisma.merchant_feeds.findUnique({
+    const feed = await prisma.retailer_feeds.findUnique({
       where: { id: feedId },
     })
 
     if (feed?.feedHash === contentHash) {
       log.debug('No changes detected', { merchantId, merchantName })
-      await prisma.merchant_feed_runs.update({
+      await prisma.retailer_feed_runs.update({
         where: { id: feedRunId },
         data: {
           status: 'SUCCESS',
@@ -413,14 +424,14 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
     for (const result of parseResult.parsedRecords) {
       try {
         if (result.isIndexable) {
-          // Indexable Lane: Create/update MerchantSku
-          const skuId = await processIndexableRecord(merchantId, feedId, feedRunId, result)
+          // Indexable Lane: Create/update RetailerSku
+          const skuId = await processIndexableRecord(retailerId, feedId, feedRunId, result)
           if (skuId) {
             merchantSkuIds.push(skuId)
           }
         } else if (hasRequiredFields(result)) {
           // Quarantine Lane: Record has data but missing UPC
-          const quarantineId = await processQuarantineRecord(merchantId, feedId, feedRunId, result)
+          const quarantineId = await processQuarantineRecord(retailerId, feedId, feedRunId, result)
           if (quarantineId) {
             quarantinedIds.push(quarantineId)
           }
@@ -449,9 +460,9 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
     }
 
     // Mark SKUs not in this feed run as inactive
-    await prisma.merchant_skus.updateMany({
+    await prisma.retailer_skus.updateMany({
       where: {
-        merchantId,
+        retailerId,
         feedId,
         feedRunId: { not: feedRunId },
         isActive: true,
@@ -480,7 +491,7 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
 
     // Update feed status and timing
     const completedAt = new Date()
-    await prisma.merchant_feeds.update({
+    await prisma.retailer_feeds.update({
       where: { id: feedId },
       data: {
         feedHash: contentHash,
@@ -494,22 +505,24 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
       },
     })
 
-    // Send notifications based on status changes
-    await sendFeedNotifications(
-      merchantId,
-      feedId,
-      feedStatus,
-      previousStatus || 'PENDING',
-      {
-        indexedCount: merchantSkuIds.length,
-        quarantinedCount: quarantinedIds.length,
-        quarantineRatio,
-        errorMessage: feedStatus === 'FAILED' ? `High rejection rate: ${(rejectRatio * 100).toFixed(1)}%` : undefined,
-      }
-    )
+    // Send notifications based on status changes (only if we have a merchant association)
+    if (merchantId) {
+      await sendFeedNotifications(
+        merchantId,
+        feedId,
+        feedStatus,
+        previousStatus || 'PENDING',
+        {
+          indexedCount: merchantSkuIds.length,
+          quarantinedCount: quarantinedIds.length,
+          quarantineRatio,
+          errorMessage: feedStatus === 'FAILED' ? `High rejection rate: ${(rejectRatio * 100).toFixed(1)}%` : undefined,
+        }
+      )
+    }
 
     // Update feed run with detailed counts
-    await prisma.merchant_feed_runs.update({
+    await prisma.retailer_feed_runs.update({
       where: { id: feedRunId },
       data: {
         status: feedStatus === 'FAILED' ? 'FAILURE' : feedStatus === 'WARNING' ? 'WARNING' : 'SUCCESS',
@@ -535,7 +548,7 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
         await merchantSkuMatchQueue.add(
           'match-batch',
           {
-            merchantId,
+            retailerId,
             feedRunId,
             merchantSkuIds: batch,
           },
@@ -626,7 +639,7 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
 
     // Update feed status and timing
     const failedAt = new Date()
-    await prisma.merchant_feeds.update({
+    await prisma.retailer_feeds.update({
       where: { id: feedId },
       data: {
         // Update lastRunAt so next run calculation is accurate even after failure
@@ -639,7 +652,7 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
     })
 
     // Update feed run
-    await prisma.merchant_feed_runs.update({
+    await prisma.retailer_feed_runs.update({
       where: { id: feedRunId },
       data: {
         status: 'FAILURE',
@@ -650,13 +663,15 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
       },
     })
 
-    // Send failure notification
-    await sendFeedNotifications(merchantId, feedId, 'FAILED', 'HEALTHY', {
-      indexedCount: 0,
-      quarantinedCount: 0,
-      quarantineRatio: 0,
-      errorMessage: String(error),
-    })
+    // Send failure notification (only if we have a merchant association)
+    if (merchantId) {
+      await sendFeedNotifications(merchantId, feedId, 'FAILED', 'HEALTHY', {
+        indexedCount: 0,
+        quarantinedCount: 0,
+        quarantineRatio: 0,
+        errorMessage: String(error),
+      })
+    }
 
     throw error
   }
@@ -670,7 +685,7 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
  * Process an indexable record (has valid UPC)
  */
 async function processIndexableRecord(
-  merchantId: string,
+  retailerId: string,
   feedId: string,
   feedRunId: string,
   result: ParsedRecordResult
@@ -679,18 +694,18 @@ async function processIndexableRecord(
 
   const skuHash = generateSkuHash(record.title, record.upc, record.sku, record.price)
 
-  const merchantSku = await prisma.merchant_skus.upsert({
+  const retailerSku = await prisma.retailer_skus.upsert({
     where: {
-      merchantId_merchantSkuHash: {
-        merchantId,
-        merchantSkuHash: skuHash,
+      retailerId_retailerSkuHash: {
+        retailerId,
+        retailerSkuHash: skuHash,
       },
     },
     create: {
-      merchantId,
+      retailerId,
       feedId,
       feedRunId,
-      merchantSkuHash: skuHash,
+      retailerSkuHash: skuHash,
       rawTitle: record.title,
       rawDescription: record.description,
       rawPrice: record.price,
@@ -720,14 +735,14 @@ async function processIndexableRecord(
     },
   })
 
-  return merchantSku.id
+  return retailerSku.id
 }
 
 /**
  * Process a quarantine record (missing UPC but has other data)
  */
 async function processQuarantineRecord(
-  merchantId: string,
+  retailerId: string,
   feedId: string,
   feedRunId: string,
   result: ParsedRecordResult
@@ -753,7 +768,7 @@ async function processQuarantineRecord(
       },
     },
     create: {
-      merchantId,
+      retailerId,
       feedId,
       runId: feedRunId,
       matchKey,

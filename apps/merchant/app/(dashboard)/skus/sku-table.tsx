@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import type { merchant_skus, canonical_skus } from '@ironscout/db';
+import type { retailer_skus, canonical_skus } from '@ironscout/db';
 import {
   Package,
   CheckCircle,
@@ -13,8 +13,8 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-// Serialized version of merchant_skus with Decimal converted to number
-interface SerializedSku extends Omit<merchant_skus, 'rawPrice'> {
+// Serialized version of retailer_skus with Decimal converted to number
+interface SerializedSku extends Omit<retailer_skus, 'rawPrice'> {
   rawPrice: number | null;
   canonical_skus: canonical_skus | null;
 }

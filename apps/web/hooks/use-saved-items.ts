@@ -69,6 +69,7 @@ export function useSavedItems(): UseSavedItemsResult {
 
   const fetchSavedItems = useCallback(async () => {
     if (!token) {
+      logger.debug('No token available, skipping fetch')
       setLoading(false)
       return
     }
@@ -76,11 +77,13 @@ export function useSavedItems(): UseSavedItemsResult {
     try {
       setLoading(true)
       setError(null)
+      logger.debug('Fetching saved items', { hasToken: !!token, tokenLength: token?.length })
       const response = await getSavedItems(token)
       setData(response)
     } catch (err) {
-      logger.error('Failed to fetch saved items', {}, err)
-      setError(err instanceof Error ? err.message : 'Failed to load saved items')
+      const message = err instanceof Error ? err.message : 'Failed to load saved items'
+      logger.error('Failed to fetch saved items', { message }, err)
+      setError(message)
     } finally {
       setLoading(false)
     }

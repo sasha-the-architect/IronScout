@@ -185,7 +185,7 @@ export const alertQueue = new Queue<AlertJobData>(QUEUE_NAMES.ALERT, {
 // ============================================================================
 
 export interface MerchantFeedIngestJobData {
-  merchantId: string
+  retailerId: string
   feedId: string
   feedRunId: string
   accessType: 'URL' | 'AUTH_URL' | 'FTP' | 'SFTP' | 'UPLOAD'
@@ -199,7 +199,7 @@ export interface MerchantFeedIngestJobData {
 }
 
 export interface MerchantSkuMatchJobData {
-  merchantId: string
+  retailerId: string
   feedRunId: string
   merchantSkuIds: string[] // Batch of SKU IDs to process
 }

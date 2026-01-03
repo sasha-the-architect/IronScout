@@ -242,7 +242,7 @@ model canonical_skus {
   productId           String?
   benchmarks          benchmarks?
   products            products?             @relation(fields: [productId], references: [id])
-  merchant_skus       merchant_skus[]
+  retailer_skus       retailer_skus[]
   pricing_snapshots   pricing_snapshots[]
   product_suggestions product_suggestions[]
 
@@ -253,7 +253,7 @@ model canonical_skus {
 model click_events {
   id             String    @id @default(cuid())
   merchantId     String
-  merchantSkuId  String?
+  retailerSkuId  String?
   canonicalSkuId String?
   sessionId      String?
   userAgent      String?
@@ -264,7 +264,7 @@ model click_events {
 
   @@index([createdAt])
   @@index([merchantId])
-  @@index([merchantSkuId])
+  @@index([retailerSkuId])
   @@index([sessionId])
 }
 
@@ -301,9 +301,9 @@ model merchant_contacts {
   @@index([email])
 }
 
-model merchant_feed_runs {
+model retailer_feed_runs {
   id               String         @id @default(cuid())
-  merchantId       String
+  retailerId       String
   feedId           String
   status           FeedRunStatus
   errors           Json?
@@ -327,17 +327,17 @@ model merchant_feed_runs {
   /// Reason for ignoring (e.g., 'bad_feed_data', 'duplicate_run', 'test_run')
   ignoredReason    String?
 
-  merchant_feeds   merchant_feeds @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  retailer_feeds   retailer_feeds @relation(fields: [feedId], references: [id], onDelete: Cascade)
 
-  @@index([merchantId])
+  @@index([retailerId])
   @@index([feedId])
   @@index([startedAt])
   @@index([ignoredAt])
 }
 
-model merchant_feed_test_runs {
+model retailer_feed_test_runs {
   id               String         @id @default(cuid())
-  merchantId       String
+  retailerId       String
   feedId           String
   sampleSize       Int            @default(50)
   status           TestRunStatus
@@ -353,16 +353,16 @@ model merchant_feed_test_runs {
   duration         Int?
   startedAt        DateTime       @default(now())
   completedAt      DateTime?
-  merchant_feeds   merchant_feeds @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  retailer_feeds   retailer_feeds @relation(fields: [feedId], references: [id], onDelete: Cascade)
 
-  @@index([merchantId])
+  @@index([retailerId])
   @@index([feedId])
   @@index([startedAt])
 }
 
-model merchant_feeds {
+model retailer_feeds {
   id                      String                    @id @default(cuid())
-  merchantId              String
+  retailerId              String
   name                    String?
   url                     String?
   username                String?
@@ -380,21 +380,21 @@ model merchant_feeds {
   formatType              FeedFormatType            @default(GENERIC)
   lastRunAt               DateTime?
   primaryErrorCode        String?
-  merchant_feed_runs      merchant_feed_runs[]
-  merchant_feed_test_runs merchant_feed_test_runs[]
-  merchants               merchants                 @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  merchant_skus           merchant_skus[]
+  retailer_feed_runs      retailer_feed_runs[]
+  retailer_feed_test_runs retailer_feed_test_runs[]
+  retailers               retailers                 @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  retailer_skus           retailer_skus[]
   feed_corrections        feed_corrections[]
   quarantined_records     quarantined_records[]
 
-  @@index([merchantId])
+  @@index([retailerId])
   @@index([enabled])
 }
 
 model merchant_insights {
   id             String            @id @default(cuid())
   merchantId     String
-  merchantSkuId  String?
+  retailerSkuId  String?
   canonicalSkuId String?
   type           InsightType
   confidence     InsightConfidence
@@ -414,7 +414,7 @@ model merchant_insights {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   merchants      merchants         @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  merchant_skus  merchant_skus?    @relation(fields: [merchantSkuId], references: [id])
+  retailer_skus  retailer_skus?    @relation(fields: [retailerSkuId], references: [id])
 
   @@index([merchantId])
   @@index([isActive])
@@ -452,9 +452,9 @@ model merchant_notification_prefs {
   merchants          merchants @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 }
 
-model merchant_skus {
+model retailer_skus {
   id                  String                @id @default(cuid())
-  merchantId          String
+  retailerId          String
   feedId              String?
   feedRunId           String?
   rawTitle            String
@@ -482,7 +482,7 @@ model merchant_skus {
   parsedBulletType    String?
   parsedBrand         String?
   parseConfidence     Decimal?              @db.Decimal(3, 2)
-  merchantSkuHash     String?
+  retailerSkuHash     String?
   isActive            Boolean               @default(true)
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
@@ -492,13 +492,13 @@ model merchant_skus {
   coercionsApplied    Json?
   merchant_insights   merchant_insights[]
   canonical_skus      canonical_skus?       @relation(fields: [canonicalSkuId], references: [id])
-  merchants           merchants             @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  merchant_feeds      merchant_feeds?       @relation(fields: [feedId], references: [id])
+  retailers           retailers             @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  retailer_feeds      retailer_feeds?       @relation(fields: [feedId], references: [id])
   product_suggestions product_suggestions[]
 
-  @@unique([merchantId, merchantSkuHash])
+  @@unique([retailerId, retailerSkuHash])
   @@index([canonicalSkuId])
-  @@index([merchantId])
+  @@index([retailerId])
   @@index([feedId])
   @@index([isActive])
   @@index([needsReview])
@@ -554,11 +554,9 @@ model merchants {
   stripeSubscriptionId        String?                      @unique
   click_events                click_events[]
   merchant_contacts           merchant_contacts[]
-  merchant_feeds              merchant_feeds[]
   merchant_insights           merchant_insights[]
   merchant_invites            merchant_invites[]
   merchant_notification_prefs merchant_notification_prefs?
-  merchant_skus               merchant_skus[]
   merchant_users              merchant_users[]
   pixel_events                pixel_events[]
   product_suggestions         product_suggestions[]
@@ -668,7 +666,7 @@ model executions {
 
 model feed_corrections {
   id                  String               @id @default(cuid())
-  merchantId          String
+  retailerId          String
   feedId              String
   quarantinedRecordId String?
   recordRef           String
@@ -677,10 +675,10 @@ model feed_corrections {
   newValue            String
   createdBy           String
   createdAt           DateTime             @default(now())
-  merchant_feeds      merchant_feeds       @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  retailer_feeds      retailer_feeds       @relation(fields: [feedId], references: [id], onDelete: Cascade)
   quarantined_records quarantined_records? @relation(fields: [quarantinedRecordId], references: [id])
 
-  @@index([merchantId])
+  @@index([retailerId])
   @@index([feedId, recordRef])
   @@index([quarantinedRecordId])
 }
@@ -862,7 +860,7 @@ model product_reports {
 model product_suggestions {
   id             String                  @id @default(cuid())
   merchantId     String
-  merchantSkuId  String?
+  retailerSkuId  String?
   status         ProductSuggestionStatus @default(PENDING)
   suggestedName  String
   suggestedUpc   String?
@@ -880,7 +878,7 @@ model product_suggestions {
   updatedAt      DateTime                @updatedAt
   canonical_skus canonical_skus?         @relation(fields: [canonicalSkuId], references: [id])
   merchants      merchants               @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  merchant_skus  merchant_skus?          @relation(fields: [merchantSkuId], references: [id])
+  retailer_skus  retailer_skus?          @relation(fields: [retailerSkuId], references: [id])
 
   @@index([createdAt])
   @@index([merchantId])
@@ -933,7 +931,7 @@ model products {
 
 model quarantined_records {
   id               String             @id @default(cuid())
-  merchantId       String
+  retailerId       String
   feedId           String
   runId            String?
   productType      String?
@@ -945,10 +943,10 @@ model quarantined_records {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   feed_corrections feed_corrections[]
-  merchant_feeds   merchant_feeds     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  retailer_feeds   retailer_feeds     @relation(fields: [feedId], references: [id], onDelete: Cascade)
 
   @@unique([feedId, matchKey])
-  @@index([merchantId])
+  @@index([retailerId])
   @@index([feedId, status])
   @@index([status])
 }
@@ -976,6 +974,8 @@ model retailers {
   subscriptions      subscriptions[]
   merchant_retailers merchant_retailers[]
   pricing_snapshots  pricing_snapshots[]
+  retailer_feeds     retailer_feeds[]
+  retailer_skus      retailer_skus[]
 
   @@index([visibilityStatus])
 }

@@ -922,7 +922,11 @@ export async function getSavedItems(token: string): Promise<SavedItemsResponse> 
     headers: buildAuthHeaders(token),
   })
   if (!response.ok) {
-    throw new Error('Failed to fetch saved items')
+    const error = await response.json().catch(() => ({}))
+    const message = error.details
+      ? `${error.error}: ${error.details}`
+      : error.error || `Failed to fetch saved items (${response.status})`
+    throw new Error(message)
   }
   return response.json()
 }

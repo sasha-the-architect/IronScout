@@ -40,18 +40,29 @@ export async function POST(request: Request) {
 
     const { recordIds } = validation.data;
 
+    // Look up retailerId via merchant_retailers
+    const merchantRetailer = await prisma.merchant_retailers.findFirst({
+      where: { merchantId: session.merchantId },
+      select: { retailerId: true }
+    });
+    const retailerId = merchantRetailer?.retailerId;
+
+    if (!retailerId) {
+      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
+    }
+
     // Get all records with their corrections
     const records = await prisma.quarantined_records.findMany({
       where: {
         id: { in: recordIds },
-        merchantId: session.merchantId,
+        retailerId,
         status: 'QUARANTINED',
       },
       include: {
         feed_corrections: {
           orderBy: { createdAt: 'desc' },
         },
-        merchant_feeds: true,
+        retailer_feeds: true,
       },
     });
 
@@ -59,7 +70,7 @@ export async function POST(request: Request) {
       recordId: string;
       success: boolean;
       error?: string;
-      merchantSkuId?: string;
+      retailerSkuId?: string;
     }> = [];
 
     for (const record of records) {
@@ -105,7 +116,7 @@ export async function POST(request: Request) {
           continue;
         }
 
-        // Generate SKU hash and create MerchantSku
+        // Generate SKU hash and create RetailerSku
         const skuHash = generateSkuHash(
           title,
           upc,
@@ -113,17 +124,17 @@ export async function POST(request: Request) {
           price
         );
 
-        const merchantSku = await prisma.merchant_skus.upsert({
+        const retailerSku = await prisma.retailer_skus.upsert({
           where: {
-            merchantId_merchantSkuHash: {
-              merchantId: session.merchantId,
-              merchantSkuHash: skuHash,
+            retailerId_retailerSkuHash: {
+              retailerId,
+              retailerSkuHash: skuHash,
             },
           },
           create: {
-            merchantId: session.merchantId,
+            retailerId,
             feedId: record.feedId,
-            merchantSkuHash: skuHash,
+            retailerSkuHash: skuHash,
             rawTitle: title,
             rawPrice: price,
             rawUpc: upc,
@@ -150,7 +161,7 @@ export async function POST(request: Request) {
         results.push({
           recordId: record.id,
           success: true,
-          merchantSkuId: merchantSku.id,
+          retailerSkuId: retailerSku.id,
         });
       } catch (error) {
         results.push({

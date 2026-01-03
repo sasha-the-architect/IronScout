@@ -16,7 +16,7 @@
 
 import { Worker, Job } from 'bullmq'
 import { prisma, Prisma } from '@ironscout/db'
-import type { merchant_skus, canonical_skus, MappingConfidence } from '@ironscout/db/generated/prisma'
+import type { retailer_skus, canonical_skus, MappingConfidence } from '@ironscout/db/generated/prisma'
 import { redisConnection } from '../config/redis'
 import { QUEUE_NAMES, MerchantSkuMatchJobData } from '../config/queues'
 import {
@@ -51,7 +51,7 @@ interface MatchResult {
 }
 
 interface SkuWithParsedAttrs {
-  sku: merchant_skus
+  sku: retailer_skus
   attrs: ParsedAttributes
   matchResult: MatchResult
 }
@@ -69,7 +69,7 @@ const DB_BATCH_SIZE = 500
 // ATTRIBUTE PARSING
 // ============================================================================
 
-function parseAttributes(sku: merchant_skus): ParsedAttributes {
+function parseAttributes(sku: retailer_skus): ParsedAttributes {
   // Use raw values if provided, otherwise parse from title
   const caliber = sku.rawCaliber || extractCaliber(sku.rawTitle)
 
@@ -430,7 +430,7 @@ interface SkuUpdate {
   mappedBy: string | null
 }
 
-async function batchUpdatemerchant_skuss(updates: SkuUpdate[]): Promise<void> {
+async function batchUpdateretailer_skuss(updates: SkuUpdate[]): Promise<void> {
   if (updates.length === 0) return
 
   // Process in batches
@@ -440,7 +440,7 @@ async function batchUpdatemerchant_skuss(updates: SkuUpdate[]): Promise<void> {
     // Use a transaction for atomic updates
     await prisma.$transaction(
       batch.map((update) =>
-        prisma.merchant_skus.update({
+        prisma.retailer_skus.update({
           where: { id: update.id },
           data: {
             parsedCaliber: update.parsedCaliber,
@@ -465,12 +465,12 @@ async function batchUpdatemerchant_skuss(updates: SkuUpdate[]): Promise<void> {
 // ============================================================================
 
 async function processSkuMatch(job: Job<MerchantSkuMatchJobData>): Promise<BatchStats> {
-  const { merchantId, feedRunId, merchantSkuIds } = job.data
+  const { retailerId, feedRunId, merchantSkuIds } = job.data
 
-  log.info('Processing SKUs', { count: merchantSkuIds.length, merchantId })
+  log.info('Processing SKUs', { count: merchantSkuIds.length, retailerId })
 
   // STEP 1: Batch fetch all dealer SKUs
-  const merchantSkus = await prisma.merchant_skus.findMany({
+  const merchantSkus = await prisma.retailer_skus.findMany({
     where: {
       id: { in: merchantSkuIds },
     },
@@ -569,7 +569,7 @@ async function processSkuMatch(job: Job<MerchantSkuMatchJobData>): Promise<Batch
   }))
 
   // STEP 8: Batch update all dealer SKUs
-  await batchUpdatemerchant_skuss(updates)
+  await batchUpdateretailer_skuss(updates)
 
   // Calculate stats
   const stats: BatchStats = {
@@ -579,7 +579,7 @@ async function processSkuMatch(job: Job<MerchantSkuMatchJobData>): Promise<Batch
   }
 
   // Update feed run with match stats
-  await prisma.merchant_feed_runs.update({
+  await prisma.retailer_feed_runs.update({
     where: { id: feedRunId },
     data: {
       matchedCount: {

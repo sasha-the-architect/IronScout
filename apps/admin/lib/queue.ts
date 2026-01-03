@@ -11,8 +11,8 @@ const redisHost = process.env.REDIS_HOST || 'localhost';
 const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
 const redisPassword = process.env.REDIS_PASSWORD || undefined;
 
-// Log Redis config on module load
-console.log(`[Redis Queue] Configured: ${redisHost}:${redisPort} (password: ${redisPassword ? 'set' : 'not set'})`);
+// Log Redis config on module load (avoid leaking host/secret)
+console.log('[Redis Queue] Configured Redis connection', { passwordSet: !!redisPassword });
 
 const redisConnection = {
   host: redisHost,
@@ -62,8 +62,7 @@ export async function enqueueAffiliateFeedJob(
     return { jobId };
   } catch (error) {
     const err = error as Error & { code?: string };
-    console.error(`[Redis Queue] ECONNREFUSED or connection error to ${redisHost}:${redisPort}`);
-    console.error(`[Redis Queue] Error: ${err.message} (code: ${err.code})`);
+    console.error('[Redis Queue] Connection error', { message: err.message, code: err.code });
     throw new Error(`Redis connection failed: ${err.message}`);
   }
 }
@@ -81,8 +80,7 @@ export async function hasActiveJob(feedId: string): Promise<boolean> {
     return hasJob;
   } catch (error) {
     const err = error as Error & { code?: string };
-    console.error(`[Redis Queue] ECONNREFUSED or connection error to ${redisHost}:${redisPort}`);
-    console.error(`[Redis Queue] Error: ${err.message} (code: ${err.code})`);
+    console.error('[Redis Queue] Connection error', { message: err.message, code: err.code });
     throw new Error(`Redis connection failed: ${err.message}`);
   }
 }

@@ -638,17 +638,29 @@ export async function triggerManualFeedRun(merchantId: string, feedId: string) {
   }
 
   try {
+    // Look up retailerId for this merchant
+    const merchantRetailer = await prisma.merchant_retailers.findFirst({
+      where: { merchantId },
+      select: { retailerId: true }
+    });
+
+    if (!merchantRetailer?.retailerId) {
+      return { success: false, error: 'No retailer configured for this merchant' };
+    }
+
+    const retailerId = merchantRetailer.retailerId;
+
     // Get the feed details
-    const feed = await prisma.merchant_feeds.findUnique({
+    const feed = await prisma.retailer_feeds.findUnique({
       where: { id: feedId },
-      include: { merchants: true },
+      include: { retailers: true },
     });
 
     if (!feed) {
       return { success: false, error: 'Feed not found' };
     }
 
-    if (feed.merchantId !== merchantId) {
+    if (feed.retailerId !== retailerId) {
       return { success: false, error: 'Feed does not belong to this merchant' };
     }
 
@@ -657,9 +669,9 @@ export async function triggerManualFeedRun(merchantId: string, feedId: string) {
     }
 
     // Create a feed run record
-    const feedRun = await prisma.merchant_feed_runs.create({
+    const feedRun = await prisma.retailer_feed_runs.create({
       data: {
-        merchantId,
+        retailerId,
         feedId,
         status: 'PENDING',
       },
@@ -674,7 +686,7 @@ export async function triggerManualFeedRun(merchantId: string, feedId: string) {
     // The scheduler will pick up pending runs and queue them
 
     // Update feed to mark it as needing manual run
-    await prisma.merchant_feeds.update({
+    await prisma.retailer_feeds.update({
       where: { id: feedId },
       data: {
         lastRunAt: null, // Reset lastRunAt to trigger scheduler
@@ -684,7 +696,7 @@ export async function triggerManualFeedRun(merchantId: string, feedId: string) {
     // Log the admin action
     await logAdminAction(session.userId, 'TRIGGER_MANUAL_FEED_RUN', {
       merchantId,
-      resource: 'MerchantFeed',
+      resource: 'RetailerFeed',
       resourceId: feedId,
       newValue: {
         feedRunId: feedRun.id,
@@ -1136,15 +1148,15 @@ export async function getMerchantFeeds(merchantId: string) {
   }
 
   try {
-    const feeds = await prisma.merchant_feeds.findMany({
-      where: { merchantId },
+    const feeds = await prisma.retailer_feeds.findMany({
+      where: { retailerId: merchantId },
       include: {
-        merchant_feed_runs: {
+        retailer_feed_runs: {
           orderBy: { startedAt: 'desc' },
           take: 5,
         },
         _count: {
-          select: { merchant_skus: true },
+          select: { retailer_skus: true },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -1164,8 +1176,8 @@ export async function getMerchantFeeds(merchantId: string) {
         lastSuccessAt: feed.lastSuccessAt,
         lastFailureAt: feed.lastFailureAt,
         lastError: feed.lastError,
-        skuCount: feed._count.merchant_skus,
-        recentRuns: feed.merchant_feed_runs.map(run => ({
+        skuCount: feed._count.retailer_skus,
+        recentRuns: feed.retailer_feed_runs.map(run => ({
           id: run.id,
           status: run.status,
           startedAt: run.startedAt,

@@ -16,9 +16,16 @@ export default async function QuarantinePage() {
     redirect('/auth/login');
   }
 
-  const feed = await prisma.merchant_feeds.findFirst({
+  // Look up retailerId via merchant_retailers
+  const merchantRetailer = await prisma.merchant_retailers.findFirst({
     where: { merchantId: session.merchantId },
+    select: { retailerId: true }
   });
+  const retailerId = merchantRetailer?.retailerId;
+
+  const feed = retailerId ? await prisma.retailer_feeds.findFirst({
+    where: { retailerId },
+  }) : null;
 
   if (!feed) {
     return (

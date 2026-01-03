@@ -1,10 +1,10 @@
 'use client';
 
-import type { merchant_feed_runs as MerchantFeedRun } from '@ironscout/db';
+import type { retailer_feed_runs as RetailerFeedRun } from '@ironscout/db';
 import { CheckCircle, AlertTriangle, XCircle, Clock, Loader2, SkipForward } from 'lucide-react';
 
 interface FeedRunsTableProps {
-  runs: MerchantFeedRun[];
+  runs: RetailerFeedRun[];
 }
 
 const statusConfig = {

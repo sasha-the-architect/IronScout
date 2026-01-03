@@ -24,11 +24,21 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Look up retailerId via merchant_retailers
+    const merchantRetailer = await prisma.merchant_retailers.findFirst({
+      where: { merchantId: session.merchantId },
+      select: { retailerId: true }
+    });
+
+    if (!merchantRetailer?.retailerId) {
+      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
+    }
+
     // Verify ownership
     const correction = await prisma.feed_corrections.findFirst({
       where: {
         id,
-        merchantId: session.merchantId,
+        retailerId: merchantRetailer.retailerId,
       },
     });
 

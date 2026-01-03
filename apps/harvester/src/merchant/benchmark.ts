@@ -108,19 +108,25 @@ async function collectMerchantPrices(canonicalSkuId: string): Promise<PriceDataP
     orderBy: { createdAt: 'desc' },
   })
 
-  // MerchantSku has a merchants relation, so we can use it directly
-  const merchantSkus = await prisma.merchant_skus.findMany({
+  // RetailerSku has a retailers relation, so we can use it directly
+  const retailerSkus = await prisma.retailer_skus.findMany({
     where: {
       canonicalSkuId,
       isActive: true,
       rawInStock: true,
-      merchants: {
-        subscriptionStatus: { in: ['ACTIVE', 'EXPIRED'] }, // EXPIRED still in grace period
+      retailers: {
+        merchant_retailers: {
+          some: {
+            merchants: {
+              subscriptionStatus: { in: ['ACTIVE', 'EXPIRED'] }, // EXPIRED still in grace period
+            },
+          },
+        },
       },
     },
     select: {
       rawPrice: true,
-      merchantId: true,
+      retailerId: true,
       updatedAt: true,
     },
   })
@@ -131,9 +137,9 @@ async function collectMerchantPrices(canonicalSkuId: string): Promise<PriceDataP
       merchantId: s.merchantId,
       createdAt: s.createdAt,
     })),
-    ...merchantSkus.map(s => ({
+    ...retailerSkus.map(s => ({
       price: Number(s.rawPrice),
-      merchantId: s.merchantId,
+      merchantId: s.retailerId,
       createdAt: s.updatedAt,
     })),
   ]
@@ -243,10 +249,10 @@ async function processBenchmark(job: Job<MerchantBenchmarkJobData>) {
   let skuIds: string[]
   
   if (fullRecalc) {
-    // Get all canonical SKUs with at least one merchant SKU
+    // Get all canonical SKUs with at least one retailer SKU
     const skus = await prisma.canonical_skus.findMany({
       where: {
-        merchant_skus: {
+        retailer_skus: {
           some: { isActive: true },
         },
       },
@@ -262,7 +268,7 @@ async function processBenchmark(job: Job<MerchantBenchmarkJobData>) {
     
     const skus = await prisma.canonical_skus.findMany({
       where: {
-        merchant_skus: {
+        retailer_skus: {
           some: { isActive: true },
         },
         OR: [
@@ -319,18 +325,24 @@ async function processBenchmark(job: Job<MerchantBenchmarkJobData>) {
       })
       
       // Capture pricing snapshot for history (only from active subscriptions)
-      const merchantSkus = await prisma.merchant_skus.findMany({
+      const retailerSkus = await prisma.retailer_skus.findMany({
         where: {
           canonicalSkuId: skuId,
           isActive: true,
           rawInStock: true,
           // Only create snapshots for merchants with active subscriptions
-          merchants: {
-            subscriptionStatus: { in: ['ACTIVE', 'EXPIRED'] }, // EXPIRED still in grace period
+          retailers: {
+            merchant_retailers: {
+              some: {
+                merchants: {
+                  subscriptionStatus: { in: ['ACTIVE', 'EXPIRED'] }, // EXPIRED still in grace period
+                },
+              },
+            },
           },
         },
         select: {
-          merchantId: true,
+          retailerId: true,
           rawPrice: true,
           rawPackSize: true,
           parsedPackSize: true,
@@ -342,7 +354,7 @@ async function processBenchmark(job: Job<MerchantBenchmarkJobData>) {
       const benchmarkRunId = `benchmark-${new Date().toISOString().slice(0, 10)}`
       const provenance = createProvenance('MANUAL', benchmarkRunId)
 
-      for (const sku of merchantSkus) {
+      for (const sku of retailerSkus) {
         const packSize = sku.rawPackSize || sku.parsedPackSize || 1
         const price = Number(sku.rawPrice)
 
@@ -352,7 +364,7 @@ async function processBenchmark(job: Job<MerchantBenchmarkJobData>) {
         await prisma.pricing_snapshots.create({
           data: {
             canonicalSkuId: skuId,
-            merchantId: sku.merchantId,
+            merchantId: sku.retailerId,
             // retailerId: null - merchant benchmarks have no retailer association
             price,
             pricePerRound: price / packSize,
@@ -363,7 +375,7 @@ async function processBenchmark(job: Job<MerchantBenchmarkJobData>) {
           },
         })
         
-        merchantsToNotify.add(sku.merchantId)
+        merchantsToNotify.add(sku.retailerId)
       }
       
       calculatedCount++

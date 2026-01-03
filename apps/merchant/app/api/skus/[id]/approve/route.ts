@@ -22,8 +22,8 @@ export async function POST(
 
   try {
     // Verify ownership and that it has a mapping
-    const sku = await prisma.merchant_skus.findFirst({
-      where: { id, merchantId: session.merchantId },
+    const sku = await prisma.retailer_skus.findFirst({
+      where: { id, retailerId: session.merchantId },
     });
 
     if (!sku) {
@@ -35,7 +35,7 @@ export async function POST(
     }
 
     // Approve the mapping
-    await prisma.merchant_skus.update({
+    await prisma.retailer_skus.update({
       where: { id },
       data: {
         needsReview: false,

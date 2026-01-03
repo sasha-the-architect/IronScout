@@ -15,9 +15,9 @@ import { createHash } from 'crypto'
 vi.mock('@ironscout/db', () => ({
   prisma: {
     merchants: { findUnique: vi.fn() },
-    merchant_feeds: { findUnique: vi.fn(), update: vi.fn() },
-    merchant_feed_runs: { update: vi.fn() },
-    merchant_skus: { upsert: vi.fn(), updateMany: vi.fn() },
+    retailer_feeds: { findUnique: vi.fn(), update: vi.fn() },
+    retailer_feed_runs: { update: vi.fn() },
+    retailer_skus: { upsert: vi.fn(), updateMany: vi.fn() },
     quarantined_records: { upsert: vi.fn() },
   },
   Prisma: { InputJsonValue: {} },
@@ -116,21 +116,21 @@ function setupDefaultMocks() {
   } as never)
 
   // Default: feed exists without hash (first run)
-  vi.mocked(prisma.merchant_feeds.findUnique).mockResolvedValue({
+  vi.mocked(prisma.retailer_feeds.findUnique).mockResolvedValue({
     id: 'feed-456',
     feedHash: null,
     status: 'PENDING',
   } as never)
 
   // Default: all DB operations succeed
-  vi.mocked(prisma.merchant_feed_runs.update).mockResolvedValue({} as never)
-  vi.mocked(prisma.merchant_feeds.update).mockResolvedValue({} as never)
-  vi.mocked(prisma.merchant_skus.upsert).mockResolvedValue({
+  vi.mocked(prisma.retailer_feed_runs.update).mockResolvedValue({} as never)
+  vi.mocked(prisma.retailer_feeds.update).mockResolvedValue({} as never)
+  vi.mocked(prisma.retailer_skus.upsert).mockResolvedValue({
     id: `sku-mock`,
     createdAt: new Date(),
     updatedAt: new Date(),
     isActive: true,
-    merchantId: 'merchant-123',
+    retailerId: 'merchant-123',
     feedId: 'feed-456',
     feedRunId: 'run-789',
     productType: 'ammo',
@@ -162,7 +162,7 @@ function setupDefaultMocks() {
     pressureRating: null,
     isSubsonic: null,
   } as never)
-  vi.mocked(prisma.merchant_skus.updateMany).mockResolvedValue({ count: 0 } as never)
+  vi.mocked(prisma.retailer_skus.updateMany).mockResolvedValue({ count: 0 } as never)
   vi.mocked(prisma.quarantined_records.upsert).mockResolvedValue({
     id: `quarantine-mock`,
     createdAt: new Date(),
@@ -701,7 +701,7 @@ describe('Feed Ingest Worker', () => {
       for (let i = 0; i < merchantSkuIds.length; i += BATCH_SIZE) {
         const batch = merchantSkuIds.slice(i, i + BATCH_SIZE)
         await merchantSkuMatchQueue.add('match-batch', {
-          merchantId: 'merchant-123',
+          retailerId: 'retailer-123',
           feedRunId: 'run-789',
           merchantSkuIds: batch,
         })
@@ -722,7 +722,7 @@ describe('Feed Ingest Worker', () => {
 
       if (merchantSkuIds.length > 0) {
         await merchantSkuMatchQueue.add('match-batch', {
-          merchantId: 'merchant-123',
+          retailerId: 'retailer-123',
           feedRunId: 'run-789',
           merchantSkuIds,
         })

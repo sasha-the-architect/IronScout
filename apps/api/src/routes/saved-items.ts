@@ -67,8 +67,13 @@ router.get('/', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    log.error('Get saved items error', { error }, error as Error)
-    res.status(500).json({ error: 'Failed to fetch saved items' })
+    const err = error as Error
+    log.error('Get saved items error', { message: err.message }, err)
+    res.status(500).json({
+      error: 'Failed to fetch saved items',
+      // Include details in dev for debugging
+      ...(process.env.NODE_ENV !== 'production' && { details: err.message })
+    })
   }
 })
 

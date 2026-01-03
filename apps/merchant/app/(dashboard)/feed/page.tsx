@@ -25,22 +25,29 @@ export default async function FeedPage() {
 
   const merchantId = session.merchantId;
 
+  // Look up retailerId via merchant_retailers
+  const merchantRetailer = await prisma.merchant_retailers.findFirst({
+    where: { merchantId },
+    select: { retailerId: true }
+  });
+  const retailerId = merchantRetailer?.retailerId;
+
   // Get feed, recent runs, and quarantine count
   const [feed, recentRuns, quarantineCount] = await Promise.all([
-    prisma.merchant_feeds.findFirst({
-      where: { merchantId },
-    }),
-    prisma.merchant_feed_runs.findMany({
-      where: { merchantId },
+    retailerId ? prisma.retailer_feeds.findFirst({
+      where: { retailerId },
+    }) : Promise.resolve(null),
+    retailerId ? prisma.retailer_feed_runs.findMany({
+      where: { retailerId },
       orderBy: { startedAt: 'desc' },
       take: 10,
-    }),
-    prisma.quarantined_records.count({
+    }) : Promise.resolve([]),
+    retailerId ? prisma.quarantined_records.count({
       where: {
-        merchantId,
+        retailerId,
         status: 'QUARANTINED',
       },
-    }),
+    }) : Promise.resolve(0),
   ]);
 
   // Status configuration matching affiliate feeds pattern

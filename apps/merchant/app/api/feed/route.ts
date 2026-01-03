@@ -32,8 +32,8 @@ export async function GET() {
 
     reqLogger.debug('Fetching feed for merchant', { merchantId: session.merchantId });
 
-    const feed = await prisma.merchant_feeds.findFirst({
-      where: { merchantId: session.merchantId },
+    const feed = await prisma.retailer_feeds.findFirst({
+      where: { retailerId: session.merchantId },
     });
 
     reqLogger.debug('Feed lookup complete', {
@@ -92,8 +92,8 @@ export async function POST(request: Request) {
     reqLogger.debug('Checking for existing feed', { merchantId });
 
     // Check if merchant already has a feed
-    const existingFeed = await prisma.merchant_feeds.findFirst({
-      where: { merchantId },
+    const existingFeed = await prisma.retailer_feeds.findFirst({
+      where: { retailerId: merchantId },
     });
 
     if (existingFeed) {
@@ -112,9 +112,9 @@ export async function POST(request: Request) {
     });
 
     // Create feed
-    const feed = await prisma.merchant_feeds.create({
+    const feed = await prisma.retailer_feeds.create({
       data: {
-        merchantId,
+        retailerId: merchantId,
         accessType,
         formatType,
         url: url || null,
@@ -191,8 +191,8 @@ export async function PUT(request: Request) {
     reqLogger.debug('Verifying feed ownership', { feedId: id, merchantId });
 
     // Verify ownership
-    const existingFeed = await prisma.merchant_feeds.findFirst({
-      where: { id, merchantId },
+    const existingFeed = await prisma.retailer_feeds.findFirst({
+      where: { id, retailerId: merchantId },
     });
 
     if (!existingFeed) {
@@ -211,7 +211,7 @@ export async function PUT(request: Request) {
     });
 
     // Update feed
-    const feed = await prisma.merchant_feeds.update({
+    const feed = await prisma.retailer_feeds.update({
       where: { id },
       data: {
         accessType,
@@ -254,8 +254,8 @@ export async function DELETE() {
     reqLogger.debug('Session verified', { merchantId });
 
     // Find and verify ownership
-    const feed = await prisma.merchant_feeds.findFirst({
-      where: { merchantId },
+    const feed = await prisma.retailer_feeds.findFirst({
+      where: { retailerId: merchantId },
     });
 
     if (!feed) {
@@ -266,7 +266,7 @@ export async function DELETE() {
     reqLogger.info('Deleting feed', { feedId: feed.id, merchantId });
 
     // Delete the feed (cascade will handle related records)
-    await prisma.merchant_feeds.delete({
+    await prisma.retailer_feeds.delete({
       where: { id: feed.id },
     });
 

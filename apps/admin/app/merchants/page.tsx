@@ -1,7 +1,7 @@
 import { prisma } from '@ironscout/db';
 import { MerchantActions } from './merchant-actions';
 import { MerchantSearch } from './merchant-search';
-import { Users, Clock, CheckCircle, AlertTriangle, XCircle, Rss, CreditCard } from 'lucide-react';
+import { Users, Clock, CheckCircle, AlertTriangle, XCircle, CreditCard } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,12 +18,6 @@ const tierConfig: Record<string, { label: string; color: string }> = {
   ENTERPRISE: { label: 'Enterprise', color: 'bg-indigo-100 text-indigo-700' },
 };
 
-const feedStatusConfig: Record<string, { label: string; color: string }> = {
-  PENDING: { label: 'Pending', color: 'text-gray-500' },
-  HEALTHY: { label: 'Healthy', color: 'text-green-600' },
-  WARNING: { label: 'Warning', color: 'text-yellow-600' },
-  FAILED: { label: 'Failed', color: 'text-red-600' },
-};
 
 interface SearchParams {
   search?: string;
@@ -57,16 +51,6 @@ export default async function MerchantsPage({
       merchant_users: {
         where: { role: 'OWNER' },
         take: 1,
-      },
-      merchant_feeds: {
-        take: 1,
-        orderBy: { createdAt: 'desc' },
-      },
-      _count: {
-        select: {
-          merchant_skus: true,
-          merchant_feeds: true,
-        },
       },
     },
   });
@@ -180,12 +164,6 @@ export default async function MerchantsPage({
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Payment
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Feed
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                SKUs
-              </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -197,8 +175,6 @@ export default async function MerchantsPage({
               const StatusIcon = status.icon;
               const ownerUser = merchant.merchant_users[0];
               const tier = tierConfig[merchant.tier] || tierConfig.STANDARD;
-              const feed = merchant.merchant_feeds[0];
-              const feedStatus = feed ? feedStatusConfig[feed.status] : null;
 
               // Calculate expiration display
               const expiresAt = merchant.subscriptionExpiresAt;
@@ -277,19 +253,6 @@ export default async function MerchantsPage({
                       <span className="text-sm text-gray-400">—</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {feed ? (
-                      <span className={`inline-flex items-center gap-1 text-sm ${feedStatus?.color || 'text-gray-500'}`}>
-                        <Rss className="h-3.5 w-3.5" />
-                        {feedStatus?.label}
-                      </span>
-                    ) : (
-                      <span className="text-sm text-gray-400">No feed</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {merchant._count.merchant_skus.toLocaleString()}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <MerchantActions merchant={{
                       id: merchant.id,
@@ -303,7 +266,7 @@ export default async function MerchantsPage({
 
             {merchants.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                   {search ? `No merchants found matching "${search}"` : 'No merchants registered yet.'}
                 </td>
               </tr>

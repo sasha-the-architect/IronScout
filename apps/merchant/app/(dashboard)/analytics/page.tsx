@@ -66,14 +66,14 @@ export default async function AnalyticsPage() {
       _count: true,
     }),
     prisma.click_events.groupBy({
-      by: ['merchantSkuId'],
-      where: { 
-        merchantId, 
+      by: ['retailerSkuId'],
+      where: {
+        merchantId,
         createdAt: { gte: monthAgo },
-        merchantSkuId: { not: null },
+        retailerSkuId: { not: null },
       },
       _count: true,
-      orderBy: { _count: { merchantSkuId: 'desc' } },
+      orderBy: { _count: { retailerSkuId: 'desc' } },
       take: 10,
     }),
     prisma.merchants.findUnique({
@@ -82,11 +82,18 @@ export default async function AnalyticsPage() {
     }),
   ]);
 
+  // Look up retailerId via merchant_retailers for retailer_skus query
+  const merchantRetailer = await prisma.merchant_retailers.findFirst({
+    where: { merchantId },
+    select: { retailerId: true }
+  });
+  const retailerId = merchantRetailer?.retailerId;
+
   // Get SKU details for top clicked
-  const topSkuIds = topSkus.map(s => s.merchantSkuId).filter(Boolean) as string[];
-  const skuDetails = topSkuIds.length > 0
-    ? await prisma.merchant_skus.findMany({
-        where: { id: { in: topSkuIds } },
+  const topSkuIds = topSkus.map(s => s.retailerSkuId).filter(Boolean) as string[];
+  const skuDetails = topSkuIds.length > 0 && retailerId
+    ? await prisma.retailer_skus.findMany({
+        where: { id: { in: topSkuIds }, retailerId },
         select: { id: true, rawTitle: true },
       })
     : [];
@@ -228,13 +235,13 @@ export default async function AnalyticsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {topSkus.map((sku, index) => (
-                    <tr key={sku.merchantSkuId}>
+                    <tr key={sku.retailerSkuId}>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         #{index + 1}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        <span className="truncate block max-w-md" title={skuMap.get(sku.merchantSkuId!) || 'Unknown'}>
-                          {skuMap.get(sku.merchantSkuId!) || 'Unknown Product'}
+                        <span className="truncate block max-w-md" title={skuMap.get(sku.retailerSkuId!) || 'Unknown'}>
+                          {skuMap.get(sku.retailerSkuId!) || 'Unknown Product'}
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right font-medium">

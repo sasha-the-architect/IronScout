@@ -25,17 +25,28 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Look up retailerId via merchant_retailers
+    const merchantRetailer = await prisma.merchant_retailers.findFirst({
+      where: { merchantId: session.merchantId },
+      select: { retailerId: true }
+    });
+    const retailerId = merchantRetailer?.retailerId;
+
+    if (!retailerId) {
+      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
+    }
+
     // Get the quarantine record with corrections
     const record = await prisma.quarantined_records.findFirst({
       where: {
         id,
-        merchantId: session.merchantId,
+        retailerId,
       },
       include: {
         feed_corrections: {
           orderBy: { createdAt: 'desc' },
         },
-        merchant_feeds: true,
+        retailer_feeds: true,
       },
     });
 
@@ -100,18 +111,18 @@ export async function POST(
       price
     );
 
-    // Create MerchantSku from corrected data
-    const merchantSku = await prisma.merchant_skus.upsert({
+    // Create RetailerSku from corrected data
+    const retailerSku = await prisma.retailer_skus.upsert({
       where: {
-        merchantId_merchantSkuHash: {
-          merchantId: session.merchantId,
-          merchantSkuHash: skuHash,
+        retailerId_retailerSkuHash: {
+          retailerId,
+          retailerSkuHash: skuHash,
         },
       },
       create: {
-        merchantId: session.merchantId,
+        retailerId,
         feedId: record.feedId,
-        merchantSkuHash: skuHash,
+        retailerSkuHash: skuHash,
         rawTitle: title,
         rawPrice: price,
         rawUpc: upc,
@@ -137,12 +148,12 @@ export async function POST(
 
     reqLogger.info('Quarantine record reprocessed', {
       quarantineId: id,
-      merchantSkuId: merchantSku.id,
+      retailerSkuId: retailerSku.id,
     });
 
     return NextResponse.json({
       success: true,
-      merchantSku,
+      retailerSku,
       message: 'Record successfully promoted to indexed SKUs',
     });
   } catch (error) {

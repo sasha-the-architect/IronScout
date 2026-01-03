@@ -41,7 +41,7 @@ export default async function InsightsPage() {
       { createdAt: 'desc' },
     ],
     include: {
-      merchant_skus: true,
+      retailer_skus: true,
     },
   });
 

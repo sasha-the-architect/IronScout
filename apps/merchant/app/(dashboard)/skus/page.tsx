@@ -24,8 +24,15 @@ export default async function SkusPage({ searchParams }: { searchParams: SearchP
   const search = searchParams.search || '';
   const pageSize = 25;
 
+  // Look up retailerId via merchant_retailers
+  const merchantRetailer = await prisma.merchant_retailers.findFirst({
+    where: { merchantId },
+    select: { retailerId: true }
+  });
+  const retailerId = merchantRetailer?.retailerId;
+
   // Build where clause
-  const where: Record<string, unknown> = { merchantId };
+  const where: Record<string, unknown> = { retailerId };
   
   if (filter === 'needs-review') {
     where.needsReview = true;
@@ -47,7 +54,7 @@ export default async function SkusPage({ searchParams }: { searchParams: SearchP
 
   // Get SKUs with pagination
   const [skus, totalCount, stats] = await Promise.all([
-    prisma.merchant_skus.findMany({
+    retailerId ? prisma.retailer_skus.findMany({
       where,
       orderBy: [
         { needsReview: 'desc' },
@@ -58,13 +65,13 @@ export default async function SkusPage({ searchParams }: { searchParams: SearchP
       include: {
         canonical_skus: true,
       },
-    }),
-    prisma.merchant_skus.count({ where }),
-    prisma.merchant_skus.groupBy({
+    }) : Promise.resolve([]),
+    retailerId ? prisma.retailer_skus.count({ where }) : Promise.resolve(0),
+    retailerId ? prisma.retailer_skus.groupBy({
       by: ['needsReview', 'mappingConfidence'],
-      where: { merchantId },
+      where: { retailerId },
       _count: true,
-    }),
+    }) : Promise.resolve([]),
   ]);
 
   const totalPages = Math.ceil(totalCount / pageSize);

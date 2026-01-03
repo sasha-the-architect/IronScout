@@ -40,8 +40,8 @@ export async function POST(request: Request) {
     const { enabled } = validation.data;
 
     // Get merchant's feed
-    const feed = await prisma.merchant_feeds.findFirst({
-      where: { merchantId: session.merchantId },
+    const feed = await prisma.retailer_feeds.findFirst({
+      where: { retailerId: session.merchantId },
     });
 
     if (!feed) {
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
 
     // Update enabled status
-    const updatedFeed = await prisma.merchant_feeds.update({
+    const updatedFeed = await prisma.retailer_feeds.update({
       where: { id: feed.id },
       data: {
         enabled,

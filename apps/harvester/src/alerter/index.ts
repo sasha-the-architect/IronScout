@@ -302,14 +302,14 @@ export const alerterWorker = new Worker<AlertJobData>(
               }
             )
 
-            log.info('Queued delayed notification', { email: alert.users.email, delayMinutes: delayMs / 60000, userTier })
+            log.info('Queued delayed notification', { userId: alert.userId, delayMinutes: delayMs / 60000, userTier })
 
             await prisma.execution_logs.create({
               data: {
                 executionId,
                 level: 'INFO',
                 event: 'ALERT_DELAYED',
-                message: `Alert queued with ${delayMs / 60000} minute delay for ${alert.users.email} (${userTier} tier)`,
+                message: `Alert queued with ${delayMs / 60000} minute delay for user ${alert.userId} (${userTier} tier)`,
                 metadata: {
                   alertId: alert.id,
                   userId: alert.userId,
@@ -346,12 +346,12 @@ export const alerterWorker = new Worker<AlertJobData>(
                   executionId,
                   level: 'INFO',
                   event: 'ALERT_NOTIFY',
-                  message: `Alert triggered immediately for PREMIUM user ${alert.users.email}: ${triggerReason}`,
-                  metadata: {
-                    alertId: alert.id,
-                    userId: alert.userId,
-                    productId: alert.productId,
-                    userTier,
+              message: `Alert triggered immediately for PREMIUM user ${alert.userId}: ${triggerReason}`,
+              metadata: {
+                alertId: alert.id,
+                userId: alert.userId,
+                productId: alert.productId,
+                userTier,
                     reason: triggerReason,
                   },
                 },
@@ -378,7 +378,6 @@ export const alerterWorker = new Worker<AlertJobData>(
               log.error('Failed to send immediate notification', {
                 alertId: alert.id,
                 userId: alert.userId,
-                email: alert.users.email,
                 error: notifyError instanceof Error ? notifyError.message : 'Unknown error',
               })
 
@@ -387,7 +386,7 @@ export const alerterWorker = new Worker<AlertJobData>(
                   executionId,
                   level: 'ERROR',
                   event: 'ALERT_NOTIFY_FAILED',
-                  message: `Failed to send notification to ${alert.users.email}: ${notifyError instanceof Error ? notifyError.message : 'Unknown error'}`,
+                  message: `Failed to send notification to user ${alert.userId}: ${notifyError instanceof Error ? notifyError.message : 'Unknown error'}`,
                   metadata: {
                     alertId: alert.id,
                     userId: alert.userId,
@@ -492,7 +491,7 @@ export const delayedNotificationWorker = new Worker<{
           executionId,
           level: 'INFO',
           event: 'ALERT_DELAYED_SENT',
-          message: `Delayed alert notification sent to ${alert.users.email}`,
+          message: `Delayed alert notification sent`,
           metadata: {
             alertId: alert.id,
             userId: alert.userId,
@@ -523,13 +522,12 @@ async function sendNotification(alert: any, reason: string) {
   if (!emailEnabled) {
     log.info('Email notifications disabled via admin settings, skipping', {
       alertId: alert.id,
-      email: alert.user.email,
     })
     return
   }
 
   log.info('Sending notification', {
-    email: alert.users.email,
+    userId: alert.userId,
     productName: alert.products.name,
     ruleType: alert.ruleType,
     userTier: alert.users.tier,
@@ -585,9 +583,9 @@ async function sendNotification(alert: any, reason: string) {
           subject: `🎉 Price Drop Alert: ${alert.products.name}`,
           html
         })
-        log.info('Price drop email sent', { email: alert.users.email })
+        log.info('Price drop email sent', { userId: alert.userId })
       } else {
-        log.debug('Email sending disabled (no RESEND_API_KEY)', { email: alert.users.email, type: 'price_drop' })
+        log.debug('Email sending disabled (no RESEND_API_KEY)', { userId: alert.userId, type: 'price_drop' })
       }
     } else if (alert.ruleType === 'BACK_IN_STOCK') {
       const html = generateBackInStockEmailHTML({
@@ -608,9 +606,9 @@ async function sendNotification(alert: any, reason: string) {
           subject: `✨ Back in Stock: ${alert.products.name}`,
           html
         })
-        log.info('Back in stock email sent', { email: alert.users.email })
+        log.info('Back in stock email sent', { userId: alert.userId })
       } else {
-        log.debug('Email sending disabled (no RESEND_API_KEY)', { email: alert.users.email, type: 'back_in_stock' })
+        log.debug('Email sending disabled (no RESEND_API_KEY)', { userId: alert.userId, type: 'back_in_stock' })
       }
     }
   } catch (error) {

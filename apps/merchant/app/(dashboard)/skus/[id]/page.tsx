@@ -45,11 +45,18 @@ export default async function SkuDetailPage({
 
   const { id } = await params;
 
+  // Look up retailerId via merchant_retailers
+  const merchantRetailer = await prisma.merchant_retailers.findFirst({
+    where: { merchantId: session.merchantId },
+    select: { retailerId: true }
+  });
+  const retailerId = merchantRetailer?.retailerId;
+
   // Fetch SKU with related data
-  const sku = await prisma.merchant_skus.findFirst({
+  const sku = retailerId ? await prisma.retailer_skus.findFirst({
     where: {
       id,
-      merchantId: session.merchantId,
+      retailerId,
     },
     include: {
       canonical_skus: {
@@ -63,7 +70,7 @@ export default async function SkuDetailPage({
         take: 5,
       },
     },
-  });
+  }) : null;
 
   if (!sku) {
     notFound();

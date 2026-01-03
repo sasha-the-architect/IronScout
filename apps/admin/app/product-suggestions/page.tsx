@@ -21,7 +21,7 @@ export default async function ProductSuggestionsPage() {
       merchants: {
         select: { businessName: true },
       },
-      merchant_skus: {
+      retailer_skus: {
         select: { id: true, rawTitle: true, rawUpc: true, rawPrice: true },
       },
       canonical_skus: {
@@ -174,9 +174,9 @@ export default async function ProductSuggestionsPage() {
                           UPC: {suggestion.suggestedUpc}
                         </div>
                       )}
-                      {suggestion.merchant_skus && (
-                        <div className="text-xs text-gray-400 mt-1 truncate" title={suggestion.merchant_skus.rawTitle}>
-                          From: {suggestion.merchant_skus.rawTitle}
+                      {suggestion.retailer_skus && (
+                        <div className="text-xs text-gray-400 mt-1 truncate" title={suggestion.retailer_skus.rawTitle}>
+                          From: {suggestion.retailer_skus.rawTitle}
                         </div>
                       )}
                     </div>

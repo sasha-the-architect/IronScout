@@ -34,8 +34,8 @@ export async function POST(
 
   try {
     // Verify ownership
-    const sku = await prisma.merchant_skus.findFirst({
-      where: { id, merchantId: session.merchantId },
+    const sku = await prisma.retailer_skus.findFirst({
+      where: { id, retailerId: session.merchantId },
     });
 
     if (!sku) {
@@ -45,7 +45,7 @@ export async function POST(
     // Check for existing pending suggestion for this SKU
     const existingSuggestion = await prisma.product_suggestions.findFirst({
       where: {
-        merchantSkuId: id,
+        retailerSkuId: id,
         status: 'PENDING',
       },
     });
@@ -78,7 +78,7 @@ export async function POST(
     const suggestion = await prisma.product_suggestions.create({
       data: {
         merchantId: session.merchantId,
-        merchantSkuId: id,
+        retailerSkuId: id,
         suggestedName: data.suggestedName,
         suggestedUpc: data.suggestedUpc || sku.rawUpc,
         caliber: data.caliber,
@@ -119,8 +119,8 @@ export async function GET(
 
   try {
     // Verify ownership
-    const sku = await prisma.merchant_skus.findFirst({
-      where: { id, merchantId: session.merchantId },
+    const sku = await prisma.retailer_skus.findFirst({
+      where: { id, retailerId: session.merchantId },
     });
 
     if (!sku) {
@@ -129,7 +129,7 @@ export async function GET(
 
     // Find suggestion for this SKU
     const suggestion = await prisma.product_suggestions.findFirst({
-      where: { merchantSkuId: id },
+      where: { retailerSkuId: id },
       orderBy: { createdAt: 'desc' },
     });
 

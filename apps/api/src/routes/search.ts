@@ -70,7 +70,6 @@ const semanticSearchSchema = z.object({
 
 router.post('/semantic', async (req: Request, res: Response) => {
   try {
-    log.debug('Semantic search request', { body: req.body })
 
     // Check if AI search is enabled
     const aiEnabled = await isAiSearchEnabled()
@@ -83,8 +82,6 @@ router.post('/semantic', async (req: Request, res: Response) => {
     }
 
     const { query, page, limit, sortBy, filters } = semanticSearchSchema.parse(req.body)
-
-    log.debug('Parsed filters', { filters })
 
     // Get user tier
     const userTier = await getUserTier(req)

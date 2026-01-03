@@ -19,7 +19,7 @@ export async function approveSuggestion(suggestionId: string) {
       where: { id: suggestionId },
       include: {
         merchants: { select: { businessName: true } },
-        merchant_skus: { select: { id: true, rawUpc: true } },
+        retailer_skus: { select: { id: true, rawUpc: true } },
       },
     });
 
@@ -81,10 +81,10 @@ export async function approveSuggestion(suggestionId: string) {
       },
     });
 
-    // Map the merchant's SKU if one was provided
-    if (suggestion.merchantSkuId) {
-      await prisma.merchant_skus.update({
-        where: { id: suggestion.merchantSkuId },
+    // Map the retailer's SKU if one was provided
+    if (suggestion.retailerSkuId) {
+      await prisma.retailer_skus.update({
+        where: { id: suggestion.retailerSkuId },
         data: {
           canonicalSkuId: canonicalSku.id,
           mappingConfidence: 'HIGH',
@@ -100,7 +100,7 @@ export async function approveSuggestion(suggestionId: string) {
       resourceId: suggestionId,
       newValue: {
         canonicalSkuId: canonicalSku.id,
-        merchantSkuId: suggestion.merchantSkuId,
+        retailerSkuId: suggestion.retailerSkuId,
       },
     });
 
@@ -108,7 +108,7 @@ export async function approveSuggestion(suggestionId: string) {
 
     return {
       success: true,
-      message: `Created "${canonicalSku.name}" and mapped merchant SKU`,
+      message: `Created "${canonicalSku.name}" and mapped retailer SKU`,
       canonicalSkuId: canonicalSku.id,
     };
   } catch (error) {
@@ -159,10 +159,10 @@ export async function mergeSuggestion(suggestionId: string, canonicalSkuId: stri
       },
     });
 
-    // Map the merchant's SKU
-    if (suggestion.merchantSkuId) {
-      await prisma.merchant_skus.update({
-        where: { id: suggestion.merchantSkuId },
+    // Map the retailer's SKU
+    if (suggestion.retailerSkuId) {
+      await prisma.retailer_skus.update({
+        where: { id: suggestion.retailerSkuId },
         data: {
           canonicalSkuId,
           mappingConfidence: 'HIGH',
@@ -178,7 +178,7 @@ export async function mergeSuggestion(suggestionId: string, canonicalSkuId: stri
       resourceId: suggestionId,
       newValue: {
         canonicalSkuId,
-        merchantSkuId: suggestion.merchantSkuId,
+        retailerSkuId: suggestion.retailerSkuId,
       },
     });
 

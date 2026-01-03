@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { merchant_insights, merchant_skus } from '@ironscout/db';
+import type { merchant_insights, retailer_skus } from '@ironscout/db';
 import { X, ExternalLink, type LucideIcon } from 'lucide-react';
 
 interface InsightWithSku extends merchant_insights {
-  merchant_skus: merchant_skus | null;
+  retailer_skus: retailer_skus | null;
 }
 
 interface InsightCardProps {
@@ -110,9 +110,9 @@ export function InsightCard({ insight, config }: InsightCardProps) {
 
       {/* Actions */}
       <div className="mt-4 flex items-center justify-between">
-        {insight.merchant_skus?.rawUrl ? (
+        {insight.retailer_skus?.rawUrl ? (
           <a
-            href={insight.merchant_skus.rawUrl}
+            href={insight.retailer_skus.rawUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"

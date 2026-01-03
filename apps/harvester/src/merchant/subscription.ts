@@ -193,7 +193,7 @@ export async function sendSubscriptionExpiryNotification(
     },
   })
 
-  const feed = await prisma.merchant_feeds.findUnique({
+  const feed = await prisma.retailer_feeds.findUnique({
     where: { id: feedId },
     select: { name: true, formatType: true },
   })

@@ -81,19 +81,25 @@ export async function scheduleMerchantFeeds(): Promise<number> {
     timestamp: new Date().toISOString(),
   })
 
-  // Get all enabled feeds from active merchants that are not failed
+  // Get all enabled feeds from active retailers (with merchant associations) that are not failed
   const queryStart = Date.now()
-  const feeds = await prisma.merchant_feeds.findMany({
+  const feeds = await prisma.retailer_feeds.findMany({
     where: {
       enabled: true, // Only enabled feeds
-      merchants: {
-        status: 'ACTIVE',
+      retailers: {
+        merchant_retailers: {
+          some: {
+            merchants: {
+              status: 'ACTIVE',
+            },
+          },
+        },
       },
       status: { not: 'FAILED' }, // Don't auto-retry failed feeds
     },
     include: {
-      merchants: {
-        select: { id: true, status: true },
+      retailers: {
+        select: { id: true },
       },
     },
   })
@@ -121,7 +127,7 @@ export async function scheduleMerchantFeeds(): Promise<number> {
         notDueCount++
         log.debug('MERCHANT_FEED_NOT_DUE', {
           feedId: feed.id,
-          merchantId: feed.merchantId,
+          merchantId: feed.retailerId,
           minutesSinceRun: Math.round(minutesSinceRun),
           scheduleMinutes: feed.scheduleMinutes,
           nextDueInMinutes: Math.round(feed.scheduleMinutes - minutesSinceRun),
@@ -142,7 +148,7 @@ export async function scheduleMerchantFeeds(): Promise<number> {
         skippedCount++
         log.debug('MERCHANT_FEED_ALREADY_SCHEDULED', {
           feedId: feed.id,
-          merchantId: feed.merchantId,
+          merchantId: feed.retailerId,
           jobId,
           existingJobState: await existingJob.getState(),
           decision: 'SKIP_IDEMPOTENT',
@@ -152,16 +158,16 @@ export async function scheduleMerchantFeeds(): Promise<number> {
 
       log.debug('MERCHANT_FEED_SCHEDULING', {
         feedId: feed.id,
-        merchantId: feed.merchantId,
+        merchantId: feed.retailerId,
         minutesSinceRun: Math.round(minutesSinceRun),
         scheduleMinutes: feed.scheduleMinutes,
         jobId,
       })
 
       // Create feed run record
-      const feedRun = await prisma.merchant_feed_runs.create({
+      const feedRun = await prisma.retailer_feed_runs.create({
         data: {
-          merchantId: feed.merchantId,
+          retailerId: feed.retailerId,
           feedId: feed.id,
           status: 'PENDING',
         },
@@ -176,7 +182,7 @@ export async function scheduleMerchantFeeds(): Promise<number> {
       await merchantFeedIngestQueue.add(
         'ingest',
         {
-          merchantId: feed.merchantId,
+          retailerId: feed.retailerId,
           feedId: feed.id,
           feedRunId: feedRun.id,
           accessType: feed.accessType,
@@ -195,14 +201,14 @@ export async function scheduleMerchantFeeds(): Promise<number> {
 
       // Update lastRunAt ONLY AFTER successful enqueue
       // This prevents missed ingestion if Redis fails
-      await prisma.merchant_feeds.update({
+      await prisma.retailer_feeds.update({
         where: { id: feed.id },
         data: { lastRunAt: now },
       })
 
       log.debug('MERCHANT_FEED_SCHEDULED', {
         feedId: feed.id,
-        merchantId: feed.merchantId,
+        merchantId: feed.retailerId,
         feedRunId: feedRun.id,
         jobId,
         jitterMs,
@@ -215,7 +221,7 @@ export async function scheduleMerchantFeeds(): Promise<number> {
       errorCount++
       log.error('MERCHANT_FEED_SCHEDULE_ERROR', {
         feedId: feed.id,
-        merchantId: feed.merchantId,
+        merchantId: feed.retailerId,
         error: error instanceof Error ? error.message : String(error),
         decision: 'CONTINUE_LOOP',
       }, error instanceof Error ? error : undefined)
@@ -255,11 +261,20 @@ export async function scheduleImmediateFeedIngest(
 ): Promise<string> {
   const { adminOverride = false, adminId } = options
 
-  const feed = await prisma.merchant_feeds.findUnique({
+  const feed = await prisma.retailer_feeds.findUnique({
     where: { id: feedId },
     include: {
-      merchants: {
-        select: { id: true, status: true, businessName: true },
+      retailers: {
+        select: {
+          id: true,
+          merchant_retailers: {
+            select: {
+              merchants: {
+                select: { id: true, status: true, businessName: true },
+              },
+            },
+          },
+        },
       },
     },
   })
@@ -268,13 +283,17 @@ export async function scheduleImmediateFeedIngest(
     throw new Error('Feed not found')
   }
 
-  if (feed.merchants.status !== 'ACTIVE') {
-    throw new Error('Merchant account is not active')
+  // Check if any associated merchant is active
+  const activeMerchant = feed.retailers.merchant_retailers.find(
+    (mr) => mr.merchants.status === 'ACTIVE'
+  )
+  if (!activeMerchant) {
+    throw new Error('No active merchant account associated with this retailer')
   }
 
   // Reset feed status if it was failed (manual trigger re-enables)
   if (feed.status === 'FAILED') {
-    await prisma.merchant_feeds.update({
+    await prisma.retailer_feeds.update({
       where: { id: feedId },
       data: {
         status: 'PENDING',
@@ -285,9 +304,9 @@ export async function scheduleImmediateFeedIngest(
   }
 
   // Create feed run record
-  const feedRun = await prisma.merchant_feed_runs.create({
+  const feedRun = await prisma.retailer_feed_runs.create({
     data: {
-      merchantId: feed.merchantId,
+      retailerId: feed.retailerId,
       feedId: feed.id,
       status: 'PENDING',
     },
@@ -297,7 +316,7 @@ export async function scheduleImmediateFeedIngest(
   await merchantFeedIngestQueue.add(
     adminOverride ? 'ingest-admin-override' : 'ingest-immediate',
     {
-      merchantId: feed.merchantId,
+      retailerId: feed.retailerId,
       feedId: feed.id,
       feedRunId: feedRun.id,
       accessType: feed.accessType,
@@ -318,7 +337,7 @@ export async function scheduleImmediateFeedIngest(
 
   if (adminOverride) {
     log.info('Admin override feed ingestion', {
-      businessName: feed.merchants.businessName,
+      businessName: activeMerchant.merchants.businessName,
       adminId: adminId || 'unknown',
     })
   }
@@ -330,7 +349,7 @@ export async function scheduleImmediateFeedIngest(
  * Enable or disable a feed
  */
 export async function setFeedEnabled(feedId: string, enabled: boolean): Promise<void> {
-  await prisma.merchant_feeds.update({
+  await prisma.retailer_feeds.update({
     where: { id: feedId },
     data: {
       enabled,

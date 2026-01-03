@@ -195,9 +195,9 @@ async function findStockOpportunities(merchantId: string): Promise<InsightCandid
   // "High demand" = many other merchants stock it with good benchmarks
   
   // Get canonical SKUs this merchant currently stocks
-  const merchantCanonicalIds = await prisma.merchant_skus.findMany({
+  const merchantCanonicalIds = await prisma.retailer_skus.findMany({
     where: {
-      merchantId,
+      retailerId: merchantId,
       isActive: true,
       canonicalSkuId: { not: null },
     },
@@ -271,7 +271,7 @@ async function saveInsights(
       where: {
         merchantId,
         type: candidate.type,
-        merchantSkuId: candidate.merchantSkuId || undefined,
+        retailerSkuId: candidate.merchantSkuId || undefined,
         canonicalSkuId: candidate.canonicalSkuId || undefined,
         isActive: true,
         OR: [
@@ -305,7 +305,7 @@ async function saveInsights(
       await prisma.merchant_insights.create({
         data: {
           merchantId,
-          merchantSkuId: candidate.merchantSkuId,
+          retailerSkuId: candidate.merchantSkuId,
           canonicalSkuId: candidate.canonicalSkuId,
           type: candidate.type,
           confidence: candidate.confidence,
@@ -338,9 +338,9 @@ async function deactivateStaleInsights(
     where: {
       merchantId,
       isActive: true,
-      merchantSkuId: { not: null },
+      retailerSkuId: { not: null },
       NOT: {
-        merchantSkuId: { in: activeSkuIds },
+        retailerSkuId: { in: activeSkuIds },
       },
     },
     data: {
@@ -392,18 +392,18 @@ async function processInsightGeneration(job: Job<MerchantInsightJobData>) {
   // Get merchant SKUs to analyze
   let skus
   if (merchantSkuIds && merchantSkuIds.length > 0) {
-    skus = await prisma.merchant_skus.findMany({
+    skus = await prisma.retailer_skus.findMany({
       where: {
         id: { in: merchantSkuIds },
-        merchantId,
+        retailerId: merchantId,
         isActive: true,
       },
     })
   } else {
     // Analyze all active SKUs for this merchant
-    skus = await prisma.merchant_skus.findMany({
+    skus = await prisma.retailer_skus.findMany({
       where: {
-        merchantId,
+        retailerId: merchantId,
         isActive: true,
       },
     })

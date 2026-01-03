@@ -29,16 +29,26 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Look up retailerId via merchant_retailers
+    const merchantRetailer = await prisma.merchant_retailers.findFirst({
+      where: { merchantId: session.merchantId },
+      select: { retailerId: true }
+    });
+
+    if (!merchantRetailer?.retailerId) {
+      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
+    }
+
     const record = await prisma.quarantined_records.findFirst({
       where: {
         id,
-        merchantId: session.merchantId,
+        retailerId: merchantRetailer.retailerId,
       },
       include: {
         feed_corrections: {
           orderBy: { createdAt: 'desc' },
         },
-        merchant_feeds: {
+        retailer_feeds: {
           select: {
             name: true,
             formatType: true,
@@ -88,11 +98,21 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid update data' }, { status: 400 });
     }
 
+    // Look up retailerId via merchant_retailers
+    const merchantRetailer = await prisma.merchant_retailers.findFirst({
+      where: { merchantId: session.merchantId },
+      select: { retailerId: true }
+    });
+
+    if (!merchantRetailer?.retailerId) {
+      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
+    }
+
     // Verify ownership
     const existing = await prisma.quarantined_records.findFirst({
       where: {
         id,
-        merchantId: session.merchantId,
+        retailerId: merchantRetailer.retailerId,
       },
     });
 

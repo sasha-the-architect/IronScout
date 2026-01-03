@@ -20,7 +20,7 @@ const mockFeedRunCreate = vi.fn()
 
 vi.mock('@ironscout/db', () => ({
   prisma: {
-    merchant_feeds: {
+    retailer_feeds: {
       findMany: mockFeedFindMany,
       findUnique: mockFeedFindUnique,
       update: mockFeedUpdate,
@@ -28,7 +28,7 @@ vi.mock('@ironscout/db', () => ({
     merchants: {
       findUnique: mockDealerFindUnique,
     },
-    merchant_feed_runs: {
+    retailer_feed_runs: {
       create: mockFeedRunCreate,
     },
   },
@@ -88,7 +88,7 @@ vi.mock('bullmq', () => ({
 // Helper to create mock feed
 const createMockFeed = (overrides = {}) => ({
   id: 'feed-123',
-  merchantId: 'merchant-456',
+  retailerId: 'merchant-456',
   enabled: true,
   status: 'HEALTHY',
   scheduleMinutes: 60,
@@ -210,7 +210,7 @@ describe('Merchant Feed Scheduling', () => {
 
       const result = await mockFeedRunCreate({
         data: {
-          merchantId: 'merchant-456',
+          retailerId: 'merchant-456',
           feedId: 'feed-123',
           status: 'PENDING',
         },

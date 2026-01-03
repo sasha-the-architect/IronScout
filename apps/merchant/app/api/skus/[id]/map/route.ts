@@ -27,8 +27,8 @@ export async function POST(
 
   try {
     // Verify ownership
-    const sku = await prisma.merchant_skus.findFirst({
-      where: { id, merchantId: session.merchantId },
+    const sku = await prisma.retailer_skus.findFirst({
+      where: { id, retailerId: session.merchantId },
     });
 
     if (!sku) {
@@ -59,7 +59,7 @@ export async function POST(
     }
 
     // Update the mapping
-    await prisma.merchant_skus.update({
+    await prisma.retailer_skus.update({
       where: { id },
       data: {
         canonicalSkuId,
@@ -93,8 +93,8 @@ export async function DELETE(
 
   try {
     // Verify ownership
-    const sku = await prisma.merchant_skus.findFirst({
-      where: { id, merchantId: session.merchantId },
+    const sku = await prisma.retailer_skus.findFirst({
+      where: { id, retailerId: session.merchantId },
     });
 
     if (!sku) {
@@ -102,7 +102,7 @@ export async function DELETE(
     }
 
     // Clear the mapping
-    await prisma.merchant_skus.update({
+    await prisma.retailer_skus.update({
       where: { id },
       data: {
         canonicalSkuId: null,

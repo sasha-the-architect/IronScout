@@ -39,8 +39,8 @@ export async function GET(request: Request) {
     const offset = (page - 1) * limit;
 
     // Get merchant's feed
-    const feed = await prisma.merchant_feeds.findFirst({
-      where: { merchantId: session.merchantId },
+    const feed = await prisma.retailer_feeds.findFirst({
+      where: { retailerId: session.merchantId },
     });
 
     if (!feed) {

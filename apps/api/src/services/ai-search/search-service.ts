@@ -176,8 +176,22 @@ export async function aiSearch(
     log.debug('Standard search returned', { productsCount: products.length, total })
   }
 
+  // Filter out products with no visible prices
+  // Products may exist but have all prices filtered out by visiblePriceWhere()
+  const originalCount = products.length
+  products = products.filter((p: any) => p.prices && p.prices.length > 0)
+
+  if (products.length !== originalCount) {
+    log.debug('Filtered products without visible prices', {
+      before: originalCount,
+      after: products.length
+    })
+    // Adjust total estimate based on ratio of products with prices
+    const ratio = products.length / (originalCount || 1)
+    total = Math.max(products.length, Math.floor(total * ratio))
+  }
+
   // Ensure total is at least the number of products returned on this page
-  // This handles edge cases where count query doesn't match actual results
   if (page === 1 && products.length > total) {
     log.warn('Count mismatch - adjusting', { productsLength: products.length, total })
     total = products.length

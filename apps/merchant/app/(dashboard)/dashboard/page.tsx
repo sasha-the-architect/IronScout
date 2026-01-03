@@ -26,6 +26,13 @@ export default async function DashboardPage() {
   // Get merchant stats
   const merchantId = session.merchantId;
 
+  // Look up retailer(s) for this merchant (V1: 1:1 relationship)
+  const merchantRetailer = await prisma.merchant_retailers.findFirst({
+    where: { merchantId },
+    select: { retailerId: true }
+  });
+  const retailerId = merchantRetailer?.retailerId;
+
   const [
     skuCount,
     activeSkuCount,
@@ -34,15 +41,15 @@ export default async function DashboardPage() {
     feed,
     recentRun
   ] = await Promise.all([
-    prisma.merchant_skus.count({ where: { merchantId } }),
-    prisma.merchant_skus.count({ where: { merchantId, isActive: true } }),
-    prisma.merchant_skus.count({ where: { merchantId, needsReview: true } }),
+    retailerId ? prisma.retailer_skus.count({ where: { retailerId } }) : Promise.resolve(0),
+    retailerId ? prisma.retailer_skus.count({ where: { retailerId, isActive: true } }) : Promise.resolve(0),
+    retailerId ? prisma.retailer_skus.count({ where: { retailerId, needsReview: true } }) : Promise.resolve(0),
     prisma.merchant_insights.count({ where: { merchantId, isActive: true } }),
-    prisma.merchant_feeds.findFirst({ where: { merchantId } }),
-    prisma.merchant_feed_runs.findFirst({ 
-      where: { merchantId },
+    retailerId ? prisma.retailer_feeds.findFirst({ where: { retailerId } }) : Promise.resolve(null),
+    retailerId ? prisma.retailer_feed_runs.findFirst({
+      where: { retailerId },
       orderBy: { startedAt: 'desc' }
-    }),
+    }) : Promise.resolve(null),
   ]);
   
   const stats = [

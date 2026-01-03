@@ -27,6 +27,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Look up retailerId via merchant_retailers
+    const merchantRetailer = await prisma.merchant_retailers.findFirst({
+      where: { merchantId: session.merchantId },
+      select: { retailerId: true }
+    });
+
+    if (!merchantRetailer?.retailerId) {
+      return NextResponse.json({ corrections: [] });
+    }
+
+    const retailerId = merchantRetailer.retailerId;
+
     const { searchParams } = new URL(request.url);
     const quarantinedRecordId = searchParams.get('quarantinedRecordId');
     const feedId = searchParams.get('feedId');
@@ -34,8 +46,8 @@ export async function GET(request: Request) {
     // Get merchant's feed if not specified
     let targetFeedId: string | null = feedId;
     if (!targetFeedId) {
-      const feed = await prisma.merchant_feeds.findFirst({
-        where: { merchantId: session.merchantId },
+      const feed = await prisma.retailer_feeds.findFirst({
+        where: { retailerId },
       });
       targetFeedId = feed?.id ?? null;
     }
@@ -44,8 +56,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ corrections: [] });
     }
 
-    const where: { merchantId: string; feedId: string; quarantinedRecordId?: string } = {
-      merchantId: session.merchantId,
+    const where: { retailerId: string; feedId: string; quarantinedRecordId?: string } = {
+      retailerId,
       feedId: targetFeedId,
     };
 
@@ -88,6 +100,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Look up retailerId via merchant_retailers
+    const merchantRetailer = await prisma.merchant_retailers.findFirst({
+      where: { merchantId: session.merchantId },
+      select: { retailerId: true }
+    });
+
+    if (!merchantRetailer?.retailerId) {
+      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
+    }
+
+    const retailerId = merchantRetailer.retailerId;
+
     let body: unknown;
     try {
       body = await request.json();
@@ -109,10 +133,10 @@ export async function POST(request: Request) {
     const quarantinedRecord = await prisma.quarantined_records.findFirst({
       where: {
         id: quarantinedRecordId,
-        merchantId: session.merchantId,
+        retailerId,
       },
       include: {
-        merchant_feeds: true,
+        retailer_feeds: true,
       },
     });
 
@@ -129,7 +153,7 @@ export async function POST(request: Request) {
     // Create the correction
     const correction = await prisma.feed_corrections.create({
       data: {
-        merchantId: session.merchantId,
+        retailerId,
         feedId: quarantinedRecord.feedId,
         quarantinedRecordId,
         recordRef: quarantinedRecord.matchKey,

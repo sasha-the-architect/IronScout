@@ -23,8 +23,8 @@ export async function POST(request: Request) {
     }
 
     // Get merchant's feed
-    const feed = await prisma.merchant_feeds.findFirst({
-      where: { merchantId: session.merchantId },
+    const feed = await prisma.retailer_feeds.findFirst({
+      where: { retailerId: session.merchantId },
     });
 
     if (!feed) {
@@ -143,9 +143,9 @@ export async function POST(request: Request) {
     }
 
     // Save test run result
-    const testRun = await prisma.merchant_feed_test_runs.create({
+    const testRun = await prisma.retailer_feed_test_runs.create({
       data: {
-        merchantId: session.merchantId,
+        retailerId: session.merchantId,
         feedId: feed.id,
         sampleSize,
         status,
@@ -208,8 +208,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const testRuns = await prisma.merchant_feed_test_runs.findMany({
-      where: { merchantId: session.merchantId },
+    const testRuns = await prisma.retailer_feed_test_runs.findMany({
+      where: { retailerId: session.merchantId },
       orderBy: { startedAt: 'desc' },
       take: 10,
     });
