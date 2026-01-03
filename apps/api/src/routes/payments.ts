@@ -10,8 +10,8 @@ const router: any = Router()
 // System user ID for Stripe webhook-initiated changes
 const STRIPE_SYSTEM_USER = 'STRIPE_WEBHOOK'
 
-// Legacy compatibility: accept old portal type identifier while migrating to merchant-only naming
-const isMerchantPortalRequest = (type?: string) => type === 'merchant' || type === 'dealer'
+// Merchant portal request identifier - dealer legacy type no longer accepted
+const isMerchantPortalRequest = (type?: string) => type === 'merchant'
 
 /**
  * Log a subscription change from Stripe webhook to admin audit log.
@@ -749,7 +749,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const session = event.data.object as Stripe.Checkout.Session
         const metadata = session.metadata || {}
 
-        // Handle merchant portal sessions (legacy metadata supported for compatibility)
+        // Handle merchant portal sessions
         if (isMerchantPortalRequest(metadata.type)) {
           await handleMerchantCheckoutCompleted(session)
         } else {
@@ -773,7 +773,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId)
           const metadata = subscription.metadata || {}
 
-          // Handle both 'merchant' (new) and 'dealer' (legacy) for backwards compatibility
+          // Route to merchant handler if metadata.type === 'merchant'
           if (isMerchantPortalRequest(metadata.type)) {
             await handleMerchantInvoicePaid(invoice, subscription)
           } else {
@@ -798,7 +798,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId)
           const metadata = subscription.metadata || {}
 
-          // Handle both 'merchant' (new) and 'dealer' (legacy) for backwards compatibility
+          // Route to merchant handler if metadata.type === 'merchant'
           if (isMerchantPortalRequest(metadata.type)) {
             await handleMerchantPaymentFailed(invoice, subscription)
           } else {
@@ -815,7 +815,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const subscription = event.data.object as Stripe.Subscription
         const metadata = subscription.metadata || {}
 
-        // Handle both 'merchant' (new) and 'dealer' (legacy) for backwards compatibility
+        // Route to merchant handler if metadata.type === 'merchant'
         if (isMerchantPortalRequest(metadata.type)) {
           await handleMerchantSubscriptionUpdated(subscription)
         } else {
@@ -831,7 +831,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const subscription = event.data.object as Stripe.Subscription
         const metadata = subscription.metadata || {}
 
-        // Handle both 'merchant' (new) and 'dealer' (legacy) for backwards compatibility
+        // Route to merchant handler if metadata.type === 'merchant'
         if (isMerchantPortalRequest(metadata.type)) {
           await handleMerchantSubscriptionDeleted(subscription)
         } else {
@@ -847,7 +847,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const subscription = event.data.object as Stripe.Subscription
         const metadata = subscription.metadata || {}
 
-        // Handle both 'merchant' (new) and 'dealer' (legacy) for backwards compatibility
+        // Route to merchant handler if metadata.type === 'merchant'
         if (isMerchantPortalRequest(metadata.type)) {
           await handleMerchantSubscriptionPaused(subscription)
         }
@@ -861,7 +861,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const subscription = event.data.object as Stripe.Subscription
         const metadata = subscription.metadata || {}
 
-        // Handle both 'merchant' (new) and 'dealer' (legacy) for backwards compatibility
+        // Route to merchant handler if metadata.type === 'merchant'
         if (isMerchantPortalRequest(metadata.type)) {
           await handleMerchantSubscriptionResumed(subscription)
         }
@@ -918,8 +918,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
 // =============================================================================
 
 async function handleMerchantCheckoutCompleted(session: Stripe.Checkout.Session) {
-  // Support both merchantId (new) and dealerId (legacy) metadata keys
-  const merchantId = session.metadata?.merchantId || session.metadata?.dealerId || session.client_reference_id
+  const merchantId = session.metadata?.merchantId || session.client_reference_id
   const subscriptionId = session.subscription as string
   const customerId = session.customer as string
 
@@ -993,8 +992,7 @@ async function handleMerchantCheckoutCompleted(session: Stripe.Checkout.Session)
 }
 
 async function handleMerchantInvoicePaid(invoice: Stripe.Invoice, subscription: Stripe.Subscription) {
-  // Support both merchantId (new) and dealerId (legacy) metadata keys
-  const merchantId = subscription.metadata?.merchantId || subscription.metadata?.dealerId
+  const merchantId = subscription.metadata?.merchantId
   const invoiceId = invoice.id
   const amount = invoice.amount_paid
 
@@ -1058,8 +1056,7 @@ async function handleMerchantInvoicePaid(invoice: Stripe.Invoice, subscription: 
 }
 
 async function handleMerchantPaymentFailed(invoice: Stripe.Invoice, subscription: Stripe.Subscription) {
-  // Support both merchantId (new) and dealerId (legacy) metadata keys
-  const merchantId = subscription.metadata?.merchantId || subscription.metadata?.dealerId
+  const merchantId = subscription.metadata?.merchantId
   const invoiceId = invoice.id
   const attemptCount = invoice.attempt_count
 
@@ -1131,8 +1128,7 @@ async function handleMerchantPaymentFailed(invoice: Stripe.Invoice, subscription
 }
 
 async function handleMerchantSubscriptionUpdated(subscription: Stripe.Subscription) {
-  // Support both merchantId (new) and dealerId (legacy) metadata keys
-  const merchantId = subscription.metadata?.merchantId || subscription.metadata?.dealerId
+  const merchantId = subscription.metadata?.merchantId
   const stripeStatus = subscription.status
 
   if (!merchantId) {
@@ -1238,8 +1234,7 @@ async function handleMerchantSubscriptionUpdated(subscription: Stripe.Subscripti
 }
 
 async function handleMerchantSubscriptionDeleted(subscription: Stripe.Subscription) {
-  // Support both merchantId (new) and dealerId (legacy) metadata keys
-  const merchantId = subscription.metadata?.merchantId || subscription.metadata?.dealerId
+  const merchantId = subscription.metadata?.merchantId
 
   if (!merchantId) {
     log('ERROR', 'No merchantId in subscription metadata', {
@@ -1305,8 +1300,7 @@ async function handleMerchantSubscriptionDeleted(subscription: Stripe.Subscripti
 }
 
 async function handleMerchantSubscriptionPaused(subscription: Stripe.Subscription) {
-  // Support both merchantId (new) and dealerId (legacy) metadata keys
-  const merchantId = subscription.metadata?.merchantId || subscription.metadata?.dealerId
+  const merchantId = subscription.metadata?.merchantId
 
   if (!merchantId) {
     log('ERROR', 'No merchantId in subscription metadata', {
@@ -1366,8 +1360,7 @@ async function handleMerchantSubscriptionPaused(subscription: Stripe.Subscriptio
 }
 
 async function handleMerchantSubscriptionResumed(subscription: Stripe.Subscription) {
-  // Support both merchantId (new) and dealerId (legacy) metadata keys
-  const merchantId = subscription.metadata?.merchantId || subscription.metadata?.dealerId
+  const merchantId = subscription.metadata?.merchantId
 
   if (!merchantId) {
     log('ERROR', 'No merchantId in subscription metadata', {
