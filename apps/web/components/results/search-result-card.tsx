@@ -80,7 +80,9 @@ export function SearchResultCard({
         onTrackChange?.(product.id, true)
       } catch (error) {
         logger.error('Failed to save item', {}, error)
-        toast.error('Failed to save item')
+        // Show the actual error message (includes limit info for tier limits)
+        const message = error instanceof Error ? error.message : 'Failed to save item'
+        toast.error(message)
       }
     }
   }, [accessToken, isTracked, product.id, onTrackChange])
