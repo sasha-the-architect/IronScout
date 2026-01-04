@@ -13,11 +13,19 @@ import {
 } from '@/lib/affiliate-feed-validation';
 import { encryptSecret } from '@ironscout/crypto';
 
+export type AffiliateNetwork = 'IMPACT' | 'AVANTLINK' | 'SHAREASALE' | 'CJ' | 'RAKUTEN';
+
 export interface CreateAffiliateFeedWithSourceInput {
   // Source info
   sourceName: string;
   retailerName: string;
   websiteUrl?: string;
+  // Affiliate network
+  affiliateNetwork: AffiliateNetwork;
+  affiliateAdvertiserId?: string;
+  affiliateAccountId?: string;
+  affiliateProgramId?: string;
+  affiliateTrackingTemplate?: string;
   // Connection
   transport: 'FTP' | 'SFTP';
   host: string;
@@ -81,7 +89,11 @@ export async function createAffiliateFeedWithSource(data: CreateAffiliateFeedWit
         url: data.websiteUrl!,
         retailerId: retailer.id,
         sourceKind: 'AFFILIATE_FEED',
-        affiliateNetwork: 'IMPACT',
+        affiliateNetwork: data.affiliateNetwork,
+        affiliateAdvertiserId: data.affiliateAdvertiserId || null,
+        affiliateAccountId: data.affiliateAccountId || null,
+        affiliateProgramId: data.affiliateProgramId || null,
+        affiliateTrackingTemplate: data.affiliateTrackingTemplate || null,
       },
     });
 
@@ -93,7 +105,7 @@ export async function createAffiliateFeedWithSource(data: CreateAffiliateFeedWit
     const feed = await prisma.affiliate_feeds.create({
       data: {
         sourceId: source.id,
-        network: 'IMPACT',
+        network: data.affiliateNetwork,
         status: 'DRAFT',
         transport: data.transport,
         host: data.host,
@@ -117,7 +129,8 @@ export async function createAffiliateFeedWithSource(data: CreateAffiliateFeedWit
         sourceId: source.id,
         sourceName: data.sourceName,
         retailerName: data.retailerName,
-        network: 'IMPACT',
+        network: data.affiliateNetwork,
+        affiliateAdvertiserId: data.affiliateAdvertiserId,
         host: data.host,
         path: data.path,
       },

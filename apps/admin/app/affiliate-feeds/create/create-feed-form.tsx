@@ -4,9 +4,17 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Save, Loader2 } from 'lucide-react';
-import { createAffiliateFeedWithSource } from './actions';
+import { createAffiliateFeedWithSource, type AffiliateNetwork } from './actions';
 
 type Transport = 'FTP' | 'SFTP';
+
+const AFFILIATE_NETWORKS: { value: AffiliateNetwork; label: string }[] = [
+  { value: 'IMPACT', label: 'Impact' },
+  { value: 'AVANTLINK', label: 'AvantLink' },
+  { value: 'SHAREASALE', label: 'ShareASale' },
+  { value: 'CJ', label: 'CJ Affiliate' },
+  { value: 'RAKUTEN', label: 'Rakuten' },
+];
 
 export function CreateFeedForm() {
   const router = useRouter();
@@ -18,6 +26,12 @@ export function CreateFeedForm() {
     sourceName: '',
     retailerName: '',
     websiteUrl: '',
+    // Affiliate network
+    affiliateNetwork: 'IMPACT' as AffiliateNetwork,
+    affiliateAdvertiserId: '',
+    affiliateAccountId: '',
+    affiliateProgramId: '',
+    affiliateTrackingTemplate: '',
     // Connection
     transport: 'SFTP' as Transport,
     host: '',
@@ -39,6 +53,11 @@ export function CreateFeedForm() {
         sourceName: formData.sourceName,
         retailerName: formData.retailerName,
         websiteUrl: formData.websiteUrl || undefined,
+        affiliateNetwork: formData.affiliateNetwork,
+        affiliateAdvertiserId: formData.affiliateAdvertiserId || undefined,
+        affiliateAccountId: formData.affiliateAccountId || undefined,
+        affiliateProgramId: formData.affiliateProgramId || undefined,
+        affiliateTrackingTemplate: formData.affiliateTrackingTemplate || undefined,
         transport: formData.transport,
         host: formData.host,
         port: formData.port,
@@ -120,6 +139,83 @@ export function CreateFeedForm() {
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               placeholder="e.g., https://palmettostatearmory.com"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Affiliate Network */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Affiliate Network</h2>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Network *
+            </label>
+            <select
+              value={formData.affiliateNetwork}
+              onChange={(e) => updateField('affiliateNetwork', e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            >
+              {AFFILIATE_NETWORKS.map((network) => (
+                <option key={network.value} value={network.value}>
+                  {network.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Advertiser ID
+            </label>
+            <input
+              type="text"
+              value={formData.affiliateAdvertiserId}
+              onChange={(e) => updateField('affiliateAdvertiserId', e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              placeholder="e.g., 12345"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Network-assigned advertiser identifier for attribution
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Account ID
+            </label>
+            <input
+              type="text"
+              value={formData.affiliateAccountId}
+              onChange={(e) => updateField('affiliateAccountId', e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              placeholder="Optional"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Program ID
+            </label>
+            <input
+              type="text"
+              value={formData.affiliateProgramId}
+              onChange={(e) => updateField('affiliateProgramId', e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              placeholder="Optional"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Tracking Template
+            </label>
+            <input
+              type="text"
+              value={formData.affiliateTrackingTemplate}
+              onChange={(e) => updateField('affiliateTrackingTemplate', e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              placeholder="e.g., https://example.com/click?aid={advertiserId}&pid={programId}"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              URL template for generating affiliate tracking links
+            </p>
           </div>
         </div>
       </div>
