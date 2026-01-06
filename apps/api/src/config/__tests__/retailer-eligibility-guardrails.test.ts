@@ -152,14 +152,29 @@ describe('Retailer Eligibility Guardrails', () => {
       expect(typeof tiers.visibleRetailerPriceWhere).toBe('function')
     })
 
-    it('should use visibleRetailerPriceWhere in consumer routes', () => {
-      // Verifies all consumer routes use the new retailer-eligibility filter.
+    it('tiers.ts should import shared visibility predicate from @ironscout/db/visibility.js', () => {
+      // CRITICAL: Prevents drift between API and Harvester visibility logic
+      // The shared predicate lives in packages/db/visibility.js
+      const tiersPath = path.resolve(__dirname, '../tiers.ts')
+      const tiersSource = fs.readFileSync(tiersPath, 'utf-8')
+
+      // Must import the shared predicate directly from visibility.js
+      expect(tiersSource).toContain('visibleRetailerPriceWhere')
+      expect(tiersSource).toContain("from '@ironscout/db/visibility.js'")
+      expect(tiersSource).toContain('sharedVisibleRetailerPriceWhere')
+    })
+
+    it('should use visibility filters in consumer routes', () => {
+      // Verifies all consumer routes use the retailer-eligibility filter.
+      // Consumer routes should use either:
+      // - visiblePriceWhere() - combined filter (retailer visibility + ignored run filtering)
+      // - visibleRetailerPriceWhere() - retailer visibility only (for specialized cases)
 
       const routesDir = path.join(API_SRC_ROOT, 'routes')
       const servicesDir = path.join(API_SRC_ROOT, 'services')
       const files = [...findTsFiles(routesDir), ...findTsFiles(servicesDir)]
 
-      // Files that should use the new helper
+      // Files that should use the visibility helpers
       const consumerFiles = files.filter(
         (f) => !f.includes('__tests__') &&
                (f.includes('products.ts') ||
@@ -168,7 +183,8 @@ describe('Retailer Eligibility Guardrails', () => {
                 f.includes('search-service.ts'))
       )
 
-      const matches = grepFiles(consumerFiles, /visibleRetailerPriceWhere/)
+      // Accept either visiblePriceWhere (recommended) or visibleRetailerPriceWhere (direct)
+      const matches = grepFiles(consumerFiles, /visible(Price|RetailerPrice)Where/)
 
       // Should have at least one match in each consumer file
       expect(matches.length).toBeGreaterThan(0)
@@ -194,21 +210,132 @@ describe('Retailer Eligibility Guardrails', () => {
       expect(matches).toEqual([])
     })
 
-    it('should enforce ELIGIBLE + LISTED + ACTIVE in visibleRetailerPriceWhere', () => {
+    it('should enforce Option A visibility predicate in visibleRetailerPriceWhere', () => {
+      // Option A per Merchant-and-Retailer-Reference:
+      // Visible = ELIGIBLE AND (no ACTIVE relationships OR at least one ACTIVE+LISTED)
+      //
+      // Truth table:
+      // | visibilityStatus | Merchant Relationships      | Result              |
+      // |------------------|-----------------------------|---------------------|
+      // | ELIGIBLE         | none                        | Visible (crawl-only)|
+      // | ELIGIBLE         | >=1 ACTIVE + LISTED         | Visible             |
+      // | ELIGIBLE         | >=1 ACTIVE, all UNLISTED    | Hidden              |
+      // | ELIGIBLE         | all SUSPENDED               | Visible (crawl-only)|
+      // | INELIGIBLE       | any                         | Hidden              |
       const where = visibleRetailerPriceWhere()
       expect(where).toEqual({
         retailers: {
           is: {
             visibilityStatus: 'ELIGIBLE',
-            merchant_retailers: {
-              some: {
-                listingStatus: 'LISTED',
-                status: 'ACTIVE',
+            OR: [
+              // Crawl-only visible: no ACTIVE relationships exist
+              // This covers: no relationships at all, OR all relationships are SUSPENDED/INACTIVE
+              { merchant_retailers: { none: { status: 'ACTIVE' } } },
+              // Merchant-managed retailers: at least one ACTIVE + LISTED
+              {
+                merchant_retailers: {
+                  some: {
+                    listingStatus: 'LISTED',
+                    status: 'ACTIVE',
+                  },
+                },
               },
-            },
+            ],
           },
         },
       })
+    })
+
+    it('Option A: retailers with no ACTIVE relationships should be crawl-only visible', () => {
+      // Per Merchant-and-Retailer-Reference visibility truth table:
+      // | visibilityStatus | Merchant Relationships | Result              |
+      // | ELIGIBLE         | none                   | Visible (crawl-only)|
+      // | ELIGIBLE         | all SUSPENDED          | Visible (crawl-only)|
+      //
+      // The visibleRetailerPriceWhere() uses { merchant_retailers: { none: { status: 'ACTIVE' } } }
+      // This covers both:
+      // - Crawl-only retailers with no relationships at all
+      // - Retailers where all relationships are SUSPENDED/INACTIVE
+      const where = visibleRetailerPriceWhere()
+
+      // Verify the OR clause exists and includes the "no ACTIVE relationships" condition
+      const retailerIs = (where as any).retailers?.is
+      expect(retailerIs).toBeDefined()
+      expect(retailerIs.OR).toBeDefined()
+      expect(Array.isArray(retailerIs.OR)).toBe(true)
+
+      // Find the "no ACTIVE merchant relationships" condition
+      const noneCondition = retailerIs.OR.find(
+        (clause: any) => clause.merchant_retailers?.none !== undefined
+      )
+      expect(noneCondition).toBeDefined()
+      expect(noneCondition.merchant_retailers.none).toEqual({ status: 'ACTIVE' })
+    })
+
+    it('A1 regression: all SUSPENDED relationships → crawl-only visible', () => {
+      // Per A1 semantics:
+      // - ACTIVE relationships control visibility
+      // - No ACTIVE relationships means crawl-only fallback
+      //
+      // Scenario: Retailer has merchant_retailers rows, but all are SUSPENDED
+      // Expected: Visible (crawl-only) because no ACTIVE relationships exist
+      //
+      // The predicate `{ none: { status: 'ACTIVE' } }` matches this case:
+      // - "none" means "no records match the inner condition"
+      // - Inner condition is `{ status: 'ACTIVE' }`
+      // - If all relationships are SUSPENDED, no records have status=ACTIVE
+      // - Therefore `none: { status: 'ACTIVE' }` evaluates to TRUE → visible
+
+      const where = visibleRetailerPriceWhere()
+      const retailerIs = (where as any).retailers?.is
+
+      // Verify the predicate structure supports this case
+      const noneCondition = retailerIs.OR.find(
+        (clause: any) => clause.merchant_retailers?.none !== undefined
+      )
+      expect(noneCondition).toBeDefined()
+      // The key: checking for no ACTIVE, not for no relationships
+      expect(noneCondition.merchant_retailers.none).toEqual({ status: 'ACTIVE' })
+    })
+
+    it('A1 regression: ACTIVE + UNLISTED relationship → hidden', () => {
+      // Per A1 semantics:
+      // - ACTIVE relationships control visibility
+      // - Visibility requires ACTIVE + LISTED
+      //
+      // Scenario: Retailer has merchant_retailers row with status=ACTIVE, listingStatus=UNLISTED
+      // Expected: Hidden because:
+      // - `{ none: { status: 'ACTIVE' } }` is FALSE (an ACTIVE relationship exists)
+      // - `{ some: { status: 'ACTIVE', listingStatus: 'LISTED' } }` is FALSE (no LISTED)
+      // - Both OR conditions fail → not visible
+      //
+      // This is the delinquency-hide behavior: billing failure sets UNLISTED
+      // but status remains ACTIVE, so retailer is hidden until re-listed.
+
+      const where = visibleRetailerPriceWhere()
+      const retailerIs = (where as any).retailers?.is
+
+      // Verify the predicate requires BOTH ACTIVE AND LISTED for the "some" condition
+      const someCondition = retailerIs.OR.find(
+        (clause: any) => clause.merchant_retailers?.some !== undefined
+      )
+      expect(someCondition).toBeDefined()
+      expect(someCondition.merchant_retailers.some).toEqual({
+        listingStatus: 'LISTED',
+        status: 'ACTIVE',
+      })
+
+      // Verify there's no fallback that would make ACTIVE+UNLISTED visible
+      // The only other OR condition is "no ACTIVE relationships"
+      const noneCondition = retailerIs.OR.find(
+        (clause: any) => clause.merchant_retailers?.none !== undefined
+      )
+      expect(noneCondition.merchant_retailers.none).toEqual({ status: 'ACTIVE' })
+
+      // With ACTIVE+UNLISTED:
+      // - noneCondition fails (ACTIVE exists)
+      // - someCondition fails (not LISTED)
+      // → retailer is hidden (correct delinquency behavior)
     })
   })
 })
@@ -241,6 +368,22 @@ describe('Consumer Price Query Integration (PENDING)', () => {
     // 5. Query consumer API and verify prices ARE returned
     //
     // This ensures merchant subscription doesn't wrongly hide eligible retailers.
+
+    expect(true).toBe(false) // Placeholder - will fail until implemented
+  })
+
+  it.skip('Option A acceptance: crawl-only retailer with zero merchant_retailers appears in results', () => {
+    // Acceptance test per user story:
+    // "Retailer with visibilityStatus=ELIGIBLE and zero merchant_retailers
+    //  appears in results and triggers alerts."
+    //
+    // This integration test will:
+    // 1. Create a retailer with ELIGIBLE status and NO merchant_retailers links
+    // 2. Create prices for the retailer (simulating affiliate/crawl data)
+    // 3. Query consumer API and verify prices ARE returned
+    // 4. Trigger alert check and verify alert fires
+    //
+    // This validates Option A: crawl-only retailers are consumer-visible.
 
     expect(true).toBe(false) // Placeholder - will fail until implemented
   })

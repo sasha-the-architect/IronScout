@@ -115,3 +115,6 @@ export * from './system-settings.js'
 
 // Re-export validation utilities
 export * from './validation.js'
+
+// Re-export visibility predicates (A1 semantics)
+export * from './visibility.js'

@@ -1,4 +1,6 @@
 import { Prisma } from '@ironscout/db'
+// Import visibility predicate directly to avoid triggering Prisma client creation during tests
+import { visibleRetailerPriceWhere as sharedVisibleRetailerPriceWhere } from '@ironscout/db/visibility.js'
 import { premiumEnabled, getEffectiveTier } from '../lib/features'
 
 /**
@@ -343,10 +345,18 @@ export function visibleDealerPriceWhere(): Prisma.pricesWhereInput {
 /**
  * Prisma where clause to filter prices by retailer visibility.
  *
- * Per ADR-005 and Merchant-and-Retailer-Reference:
+ * Per Merchant-and-Retailer-Reference (Option A):
+ *
+ * | visibilityStatus | Merchant Relationships      | Result              |
+ * |------------------|-----------------------------|--------------------|
+ * | ELIGIBLE         | none                        | Visible (crawl-only)|
+ * | ELIGIBLE         | >=1 ACTIVE + LISTED         | Visible            |
+ * | ELIGIBLE         | >=1 ACTIVE, all UNLISTED    | Hidden             |
+ * | ELIGIBLE         | all SUSPENDED               | Visible (crawl-only)|
+ * | INELIGIBLE       | any                         | Hidden             |
+ *
  * Consumer visibility = retailers.visibilityStatus=ELIGIBLE
- *                    AND merchant_retailers.listingStatus=LISTED
- *                    AND merchant_retailers.status=ACTIVE
+ *   AND (no merchant_retailers OR at least one ACTIVE+LISTED relationship)
  *
  * IMPORTANT: Apply this filter to ALL consumer-facing queries that include prices.
  * This prevents ineligible or unlisted retailers from appearing in search, alerts, watchlist, etc.
@@ -385,20 +395,9 @@ export function visibleRetailerPriceWhere(): Prisma.pricesWhereInput {
     }
   }
 
-  return {
-    retailers: {
-      is: {
-        // Policy-level visibility check (data quality, compliance, etc.)
-        visibilityStatus: 'ELIGIBLE',
-        merchant_retailers: {
-          some: {
-            listingStatus: 'LISTED',
-            status: 'ACTIVE',
-          },
-        },
-      },
-    },
-  }
+  // Use shared A1 visibility predicate from @ironscout/db
+  // See packages/db/visibility.js for truth table and semantics
+  return sharedVisibleRetailerPriceWhere()
 }
 
 // ============================================================================
