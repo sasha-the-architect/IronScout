@@ -37,19 +37,22 @@ export const extractorWorker = new Worker<ExtractJobData>(
     const contentStr = typeof content === 'string' ? content : JSON.stringify(content)
     const contentBytes = Buffer.byteLength(contentStr, 'utf8')
 
-    log.debug('EXTRACT_JOB_RECEIVED', {
-      jobId: job.id,
-      executionId,
-      sourceId,
+    // Create run-scoped logger with correlation IDs
+    const runLog = log.child({ executionId, sourceId, jobId: job.id })
+
+    runLog.debug('EXTRACT_JOB_RECEIVED', {
       sourceType,
       contentBytes,
       contentHashPrefix: contentHash?.slice(0, 16),
       attemptsMade: job.attemptsMade,
+      maxAttempts: job.opts?.attempts ?? 3,
+      contentIsString: typeof content === 'string',
+      timestamp: new Date().toISOString(),
     })
 
     try {
       // Get source name for logging context
-      log.debug('EXTRACT_LOADING_SOURCE', { sourceId, executionId })
+      runLog.debug('EXTRACT_LOADING_SOURCE', { phase: 'init' })
       const sourceLoadStart = Date.now()
       const source = await prisma.sources.findUnique({
         where: { id: sourceId },
@@ -57,16 +60,24 @@ export const extractorWorker = new Worker<ExtractJobData>(
       })
       const sourceName = source?.name
       const retailerName = source?.retailers?.name
+      const sourceLoadDurationMs = Date.now() - sourceLoadStart
 
-      log.debug('EXTRACT_SOURCE_LOADED', {
-        sourceId,
+      runLog.debug('EXTRACT_SOURCE_LOADED', {
+        phase: 'init',
         sourceName,
         retailerName,
-        executionId,
-        loadDurationMs: Date.now() - sourceLoadStart,
+        sourceLoadDurationMs,
+        sourceExists: !!source,
       })
 
-      log.info('EXTRACT_START', { executionId, sourceId, sourceName, retailerName, sourceType, contentBytes })
+      runLog.info('EXTRACT_START', {
+        phase: 'extract',
+        sourceName,
+        retailerName,
+        sourceType,
+        contentBytes,
+        extractionStrategy: sourceType === 'RSS' ? 'xml_parser' : sourceType === 'JSON' ? 'json_parser' : 'html_scraper',
+      })
 
       await prisma.execution_logs.create({
         data: {
@@ -84,20 +95,40 @@ export const extractorWorker = new Worker<ExtractJobData>(
 
       let rawItems: any[] = []
 
+      const extractionStart = Date.now()
+      runLog.debug('EXTRACT_STRATEGY_SELECTED', {
+        phase: 'extract',
+        sourceType,
+        strategy: sourceType === 'RSS' ? 'xml_rss_items' : sourceType === 'JSON' ? 'json_array' : 'html_selectors',
+      })
+
       switch (sourceType) {
         case 'RSS':
-          rawItems = await extractFromRSS(content)
+          rawItems = await extractFromRSS(content, runLog)
           break
         case 'JSON':
-          rawItems = await extractFromJSON(content)
+          rawItems = await extractFromJSON(content, runLog)
           break
         case 'HTML':
         case 'JS_RENDERED':
-          rawItems = await extractFromHTML(content, sourceId)
+          rawItems = await extractFromHTML(content, sourceId, runLog)
           break
         default:
+          runLog.error('EXTRACT_UNSUPPORTED_TYPE', {
+            phase: 'extract',
+            sourceType,
+            reason: 'No extraction handler for this source type',
+          })
           throw new Error(`Unsupported source type: ${sourceType}`)
       }
+
+      const extractionDurationMs = Date.now() - extractionStart
+      runLog.debug('EXTRACT_ITEMS_EXTRACTED', {
+        phase: 'extract',
+        itemCount: rawItems.length,
+        extractionDurationMs,
+        avgMsPerItem: rawItems.length > 0 ? (extractionDurationMs / rawItems.length).toFixed(2) : null,
+      })
 
       const extractDurationMs = Date.now() - stageStart
 
@@ -133,12 +164,16 @@ export const extractorWorker = new Worker<ExtractJobData>(
       if (needsChunking) {
         // Chunk into smaller jobs
         const chunkCount = Math.ceil(rawItems.length / NORMALIZE_CHUNK_SIZE)
-        log.info('Chunking normalize jobs', {
-          executionId,
+        runLog.info('EXTRACT_CHUNKING_NORMALIZE', {
+          phase: 'routing',
           totalItems: rawItems.length,
           estimatedBytes,
           chunkCount,
           chunkSize: NORMALIZE_CHUNK_SIZE,
+          reason: rawItems.length > NORMALIZE_CHUNK_SIZE
+            ? 'item_count_exceeds_chunk_size'
+            : 'payload_size_exceeds_limit',
+          maxJobPayloadBytes: MAX_JOB_PAYLOAD_BYTES,
         })
 
         for (let i = 0; i < rawItems.length; i += NORMALIZE_CHUNK_SIZE) {
@@ -220,44 +255,144 @@ export const extractorWorker = new Worker<ExtractJobData>(
 )
 
 // Extract from RSS feed
-async function extractFromRSS(content: string): Promise<any[]> {
+async function extractFromRSS(content: string, runLog: typeof log): Promise<any[]> {
+  const parseStart = Date.now()
   const $ = cheerio.load(content, { xmlMode: true })
+  const parseDurationMs = Date.now() - parseStart
+
+  runLog.debug('EXTRACT_RSS_PARSED', {
+    phase: 'extract',
+    format: 'rss',
+    parseDurationMs,
+    contentLength: content.length,
+  })
+
   const items: any[] = []
+  let itemsWithTitle = 0
+  let itemsWithLink = 0
 
   $('item').each((_, element) => {
     const $item = $(element)
+    const title = $item.find('title').text().trim()
+    const link = $item.find('link').text().trim()
+
+    if (title) itemsWithTitle++
+    if (link) itemsWithLink++
+
     items.push({
-      title: $item.find('title').text().trim(),
+      title,
       description: $item.find('description').text().trim(),
-      link: $item.find('link').text().trim(),
+      link,
       pubDate: $item.find('pubDate').text().trim(),
     })
+  })
+
+  runLog.debug('EXTRACT_RSS_COMPLETE', {
+    phase: 'extract',
+    format: 'rss',
+    totalItems: items.length,
+    itemsWithTitle,
+    itemsWithLink,
+    extractionQuality: items.length > 0 ? ((itemsWithTitle / items.length) * 100).toFixed(1) + '%' : 'N/A',
   })
 
   return items
 }
 
 // Extract from JSON response
-async function extractFromJSON(content: string | any): Promise<any[]> {
+async function extractFromJSON(content: string | any, runLog: typeof log): Promise<any[]> {
+  const parseStart = Date.now()
+
   try {
     // Handle case where axios already parsed the JSON
-    const data = typeof content === 'string' ? JSON.parse(content) : content
-    // Assume the JSON has a products array
-    return Array.isArray(data) ? data : data.products || [data]
+    const needsParsing = typeof content === 'string'
+    const data = needsParsing ? JSON.parse(content) : content
+    const parseDurationMs = Date.now() - parseStart
+
+    runLog.debug('EXTRACT_JSON_PARSED', {
+      phase: 'extract',
+      format: 'json',
+      parseDurationMs,
+      needsParsing,
+      contentLength: typeof content === 'string' ? content.length : JSON.stringify(content).length,
+    })
+
+    // Determine structure
+    const isArray = Array.isArray(data)
+    const hasProductsKey = !isArray && data.products !== undefined
+    const extractionPath = isArray ? 'root_array' : hasProductsKey ? 'products_key' : 'single_object'
+
+    const result = isArray ? data : data.products || [data]
+
+    runLog.debug('EXTRACT_JSON_COMPLETE', {
+      phase: 'extract',
+      format: 'json',
+      extractionPath,
+      totalItems: result.length,
+      dataType: typeof data,
+      topLevelKeys: !isArray ? Object.keys(data).slice(0, 10) : null,
+    })
+
+    return result
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+    runLog.error('EXTRACT_JSON_FAILED', {
+      phase: 'extract',
+      format: 'json',
+      reason: 'JSON parsing failed',
+      errorMessage: errorMsg,
+      contentPreview: typeof content === 'string' ? content.slice(0, 100) : null,
+    })
     throw new Error('Invalid JSON content')
   }
 }
 
 // Extract from HTML - Site-specific adapters
-async function extractFromHTML(content: string, sourceId: string): Promise<any[]> {
+async function extractFromHTML(content: string, sourceId: string, runLog: typeof log): Promise<any[]> {
+  const parseStart = Date.now()
   const $ = cheerio.load(content)
+  const parseDurationMs = Date.now() - parseStart
+
+  runLog.debug('EXTRACT_HTML_PARSED', {
+    phase: 'extract',
+    format: 'html',
+    parseDurationMs,
+    contentLength: content.length,
+    sourceId,
+  })
+
   const items: any[] = []
 
   // This is a generic extractor - in production, you'd have site-specific adapters
   // For now, we'll look for common product patterns
 
+  // Track selector effectiveness
+  const selectorStats = {
+    '.product': 0,
+    '.product-card': 0,
+    '[data-product]': 0,
+  }
+
   // Example: Look for product cards with common class names
+  const selectors = ['.product', '.product-card', '[data-product]']
+
+  for (const selector of selectors) {
+    const count = $(selector).length
+    selectorStats[selector as keyof typeof selectorStats] = count
+  }
+
+  runLog.debug('EXTRACT_HTML_SELECTORS', {
+    phase: 'extract',
+    format: 'html',
+    selectorStats,
+    totalElements: Object.values(selectorStats).reduce((a, b) => a + b, 0),
+  })
+
+  let itemsWithName = 0
+  let itemsWithPrice = 0
+  let itemsWithImage = 0
+  let itemsWithLink = 0
+
   $('.product, .product-card, [data-product]').each((_, element) => {
     const $el = $(element)
 
@@ -265,6 +400,11 @@ async function extractFromHTML(content: string, sourceId: string): Promise<any[]
     const priceText = $el.find('.price, .product-price, [data-price]').first().text().trim()
     const image = $el.find('img').first().attr('src')
     const link = $el.find('a').first().attr('href')
+
+    if (name) itemsWithName++
+    if (priceText) itemsWithPrice++
+    if (image) itemsWithImage++
+    if (link) itemsWithLink++
 
     if (name && priceText) {
       items.push({
@@ -276,13 +416,43 @@ async function extractFromHTML(content: string, sourceId: string): Promise<any[]
     }
   })
 
+  runLog.debug('EXTRACT_HTML_COMPLETE', {
+    phase: 'extract',
+    format: 'html',
+    totalItems: items.length,
+    itemsWithName,
+    itemsWithPrice,
+    itemsWithImage,
+    itemsWithLink,
+    rejectedItems: itemsWithName - items.length,
+    rejectionReason: itemsWithName > items.length ? 'missing_required_fields' : null,
+  })
+
   return items
 }
 
 extractorWorker.on('completed', (job) => {
-  log.info('Job completed', { jobId: job.id })
+  log.info('EXTRACT_JOB_COMPLETED', {
+    jobId: job.id,
+    executionId: job.data?.executionId,
+    sourceId: job.data?.sourceId,
+    returnValue: job.returnvalue,
+    attemptsMade: job.attemptsMade,
+    processingDurationMs: job.processedOn ? Date.now() - job.processedOn : null,
+    totalDurationMs: job.finishedOn && job.timestamp ? job.finishedOn - job.timestamp : null,
+  })
 })
 
 extractorWorker.on('failed', (job, err) => {
-  log.error('Job failed', { jobId: job?.id, error: err.message })
+  log.error('EXTRACT_JOB_FAILED', {
+    jobId: job?.id,
+    executionId: job?.data?.executionId,
+    sourceId: job?.data?.sourceId,
+    errorName: err.name,
+    errorMessage: err.message,
+    errorStack: err.stack?.slice(0, 500),
+    attemptsMade: job?.attemptsMade,
+    maxAttempts: job?.opts?.attempts ?? 3,
+    willRetry: (job?.attemptsMade ?? 0) < (job?.opts?.attempts ?? 3),
+  }, err)
 })

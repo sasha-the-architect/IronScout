@@ -390,29 +390,37 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
         circuitBreakerBlocked: phase2Result.circuitBreakerBlocked,
       })
 
-      // Check for catastrophic failure: all products rejected (e.g., database error)
-      // If rowsParsed > 0 and productsUpserted == 0 with errors, this is a FAILED run
-      const isCatastrophicFailure =
-        result.metrics.rowsParsed > 0 &&
-        result.metrics.productsUpserted === 0 &&
-        result.metrics.errorCount > 0
+      // Check for processing failure:
+      // - File has rows but all failed validation (rowsRead > 0, rowsParsed == 0)
+      // - Validated products all failed to upsert (rowsParsed > 0, productsUpserted == 0)
+      // This prevents saving content hash for broken feeds, which would cause
+      // subsequent runs to skip reprocessing.
+      const isProcessingFailure =
+        result.metrics.rowsRead > 0 && result.metrics.productsUpserted === 0
 
-      if (isCatastrophicFailure) {
-        log.warn('Catastrophic failure detected - all products rejected', {
+      if (isProcessingFailure) {
+        const failureReason =
+          result.metrics.rowsParsed === 0
+            ? `All ${result.metrics.rowsRead} rows failed validation (check CSV column names)`
+            : `All ${result.metrics.rowsParsed} validated products failed to upsert`
+
+        log.warn('Processing failure detected - no products saved', {
           feedId: feed.id,
           runId: run.id,
+          rowsRead: result.metrics.rowsRead,
           rowsParsed: result.metrics.rowsParsed,
           productsUpserted: result.metrics.productsUpserted,
           productsRejected: result.metrics.productsRejected,
           errorCount: result.metrics.errorCount,
+          failureReason,
         })
         // Mark as FAILED and don't update content hash
         await finalizeRun(context, 'FAILED', {
           ...result.metrics,
           productsPromoted: phase2Result.productsPromoted,
           failureKind: 'PROCESSING_ERROR',
-          failureCode: 'CATASTROPHIC_REJECTION',
-          errorMessage: `All ${result.metrics.rowsParsed} products rejected due to processing errors`,
+          failureCode: result.metrics.rowsParsed === 0 ? 'VALIDATION_FAILURE' : 'UPSERT_FAILURE',
+          errorMessage: failureReason,
         })
       } else {
         // Success - include both Phase 1 and Phase 2 metrics
@@ -611,7 +619,8 @@ async function executePhase1(context: FeedRunContext): Promise<Phase1Result> {
   const parseResult = await parseFeed(
     downloadResult.content.toString('utf-8'),
     feed.format,
-    feed.maxRowCount || 500000
+    feed.maxRowCount || 500000,
+    feed.id // Pass feedId for logging correlation
   )
 
   // Log parse errors

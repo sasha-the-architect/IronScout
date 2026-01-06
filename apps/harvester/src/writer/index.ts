@@ -181,21 +181,47 @@ async function processBatch(
   items: NormalizedProduct[],
   executionId: string,
   retailerId: string,
-  sourceId: string
+  sourceId: string,
+  runLog: typeof log
 ): Promise<BatchResult> {
   const errors: Array<{ item: NormalizedProduct; error: string }> = []
 
   try {
     // Step 1: Batch upsert products
+    const productUpsertStart = Date.now()
     await batchUpsertProducts(items)
+    const productUpsertDurationMs = Date.now() - productUpsertStart
+
+    runLog.debug('WRITE_BATCH_PRODUCTS_UPSERTED', {
+      phase: 'write',
+      itemCount: items.length,
+      durationMs: productUpsertDurationMs,
+    })
 
     // Step 2: Batch process prices
+    const priceProcessStart = Date.now()
     const { upsertedCount, priceChanges } = await batchProcessPrices(items, retailerId, sourceId, executionId)
+    const priceProcessDurationMs = Date.now() - priceProcessStart
+
+    runLog.debug('WRITE_BATCH_PRICES_PROCESSED', {
+      phase: 'write',
+      itemCount: items.length,
+      pricesUpserted: upsertedCount,
+      priceChanges: priceChanges.length,
+      durationMs: priceProcessDurationMs,
+    })
 
     return { upsertedCount, priceChanges, errors }
   } catch (error) {
     // If batch fails, try item-by-item to identify failures
-    log.warn('Batch failed, falling back to item-by-item processing')
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+    runLog.warn('WRITE_BATCH_FALLBACK', {
+      phase: 'write',
+      reason: 'batch_transaction_failed',
+      errorMessage: errorMsg,
+      itemCount: items.length,
+      action: 'retrying_item_by_item',
+    })
 
     let upsertedCount = 0
     const priceChanges: Array<{ productId: string; oldPrice?: number; newPrice: number }> = []
@@ -285,15 +311,17 @@ export const writerWorker = new Worker<WriteJobData>(
     const totalItems = normalizedItems.length
     const batchCount = Math.ceil(totalItems / BATCH_SIZE)
 
-    log.debug('WRITE_JOB_RECEIVED', {
-      jobId: job.id,
-      executionId,
-      sourceId,
+    // Create run-scoped logger with correlation IDs
+    const runLog = log.child({ executionId, sourceId, jobId: job.id })
+
+    runLog.debug('WRITE_JOB_RECEIVED', {
       totalItems,
       batchCount,
       batchSize: BATCH_SIZE,
       contentHashPrefix: contentHash?.slice(0, 16),
       attemptsMade: job.attemptsMade,
+      maxAttempts: job.opts?.attempts ?? 3,
+      timestamp: new Date().toISOString(),
     })
 
     let totalUpserted = 0
@@ -302,7 +330,7 @@ export const writerWorker = new Worker<WriteJobData>(
 
     try {
       // Get source for retailer context
-      log.debug('WRITE_LOADING_SOURCE', { sourceId, executionId })
+      runLog.debug('WRITE_LOADING_SOURCE', { phase: 'init' })
       const sourceLoadStart = Date.now()
       const source = await prisma.sources.findUnique({
         where: { id: sourceId },
@@ -310,21 +338,34 @@ export const writerWorker = new Worker<WriteJobData>(
       })
 
       if (!source || !source.retailerId) {
+        runLog.error('WRITE_SOURCE_INVALID', {
+          phase: 'init',
+          reason: source ? 'missing_retailer_id' : 'source_not_found',
+          sourceExists: !!source,
+          hasRetailerId: !!source?.retailerId,
+        })
         throw new Error('Source missing retailerId; cannot write without explicit retailer mapping')
       }
 
       const retailerId = source.retailerId
+      const sourceLoadDurationMs = Date.now() - sourceLoadStart
 
-      log.debug('WRITE_SOURCE_LOADED', {
-        sourceId,
+      runLog.debug('WRITE_SOURCE_LOADED', {
+        phase: 'init',
         sourceName: source?.name,
         retailerName: source?.retailers?.name,
         retailerId,
-        executionId,
-        loadDurationMs: Date.now() - sourceLoadStart,
+        sourceLoadDurationMs,
       })
 
-      log.info('WRITE_START', { executionId, sourceId, sourceName: source?.name, retailerName: source?.retailers?.name, totalItems, batchCount })
+      runLog.info('WRITE_START', {
+        phase: 'write',
+        sourceName: source?.name,
+        retailerName: source?.retailers?.name,
+        totalItems,
+        batchCount,
+        batchSize: BATCH_SIZE,
+      })
       // Log start (summary only)
       await prisma.execution_logs.create({
         data: {
@@ -340,17 +381,34 @@ export const writerWorker = new Worker<WriteJobData>(
       for (let i = 0; i < totalItems; i += BATCH_SIZE) {
         const batchNum = Math.floor(i / BATCH_SIZE) + 1
         const batch = normalizedItems.slice(i, i + BATCH_SIZE)
+        const batchStart = Date.now()
 
-        const result = await processBatch(batch, executionId, retailerId, sourceId)
+        runLog.debug('WRITE_BATCH_START', {
+          phase: 'write',
+          batchNum,
+          batchCount,
+          batchSize: batch.length,
+          startIndex: i,
+        })
 
+        const result = await processBatch(batch, executionId, retailerId, sourceId, runLog)
+
+        const batchDurationMs = Date.now() - batchStart
         totalUpserted += result.upsertedCount
         allPriceChanges.push(...result.priceChanges)
         allErrors.push(...result.errors)
 
-        // Log batch progress (only every 5 batches or on last batch to reduce logs)
-        if (batchCount > 5 && (batchNum % 5 === 0 || batchNum === batchCount)) {
-          log.debug('Batch progress', { batchNum, batchCount, upsertedSoFar: totalUpserted })
-        }
+        runLog.debug('WRITE_BATCH_COMPLETE', {
+          phase: 'write',
+          batchNum,
+          batchCount,
+          batchDurationMs,
+          upsertedInBatch: result.upsertedCount,
+          priceChangesInBatch: result.priceChanges.length,
+          errorsInBatch: result.errors.length,
+          upsertedSoFar: totalUpserted,
+          percentComplete: ((batchNum / batchCount) * 100).toFixed(1) + '%',
+        })
       }
 
       // Log errors (item-level logging only for failures)
@@ -479,9 +537,27 @@ export const writerWorker = new Worker<WriteJobData>(
 )
 
 writerWorker.on('completed', (job) => {
-  log.info('Job completed', { jobId: job.id })
+  log.info('WRITE_JOB_COMPLETED', {
+    jobId: job.id,
+    executionId: job.data?.executionId,
+    sourceId: job.data?.sourceId,
+    returnValue: job.returnvalue,
+    attemptsMade: job.attemptsMade,
+    processingDurationMs: job.processedOn ? Date.now() - job.processedOn : null,
+    totalDurationMs: job.finishedOn && job.timestamp ? job.finishedOn - job.timestamp : null,
+  })
 })
 
 writerWorker.on('failed', (job, err) => {
-  log.error('Job failed', { jobId: job?.id, error: err.message })
+  log.error('WRITE_JOB_FAILED', {
+    jobId: job?.id,
+    executionId: job?.data?.executionId,
+    sourceId: job?.data?.sourceId,
+    errorName: err.name,
+    errorMessage: err.message,
+    errorStack: err.stack?.slice(0, 500),
+    attemptsMade: job?.attemptsMade,
+    maxAttempts: job?.opts?.attempts ?? 3,
+    willRetry: (job?.attemptsMade ?? 0) < (job?.opts?.attempts ?? 3),
+  }, err)
 })

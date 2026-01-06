@@ -122,18 +122,20 @@ export const fetcherWorker = new Worker<FetchJobData>(
     const { sourceId, executionId, url, type } = job.data
     const stageStart = Date.now()
 
-    log.debug('FETCH_JOB_RECEIVED', {
-      jobId: job.id,
-      sourceId,
-      executionId,
+    // Create run-scoped logger with correlation IDs
+    const runLog = log.child({ executionId, sourceId, jobId: job.id })
+
+    runLog.debug('FETCH_JOB_RECEIVED', {
       url: url?.slice(0, 100),
       type,
       attemptsMade: job.attemptsMade,
+      maxAttempts: job.opts?.attempts ?? 3,
+      timestamp: new Date().toISOString(),
     })
 
     try {
       // Get source to check pagination config
-      log.debug('FETCH_LOADING_SOURCE', { sourceId, executionId })
+      runLog.debug('FETCH_LOADING_SOURCE', { phase: 'init' })
       const sourceLoadStart = Date.now()
       const source = await prisma.sources.findUnique({
         where: { id: sourceId },
@@ -141,24 +143,35 @@ export const fetcherWorker = new Worker<FetchJobData>(
       })
 
       if (!source) {
-        log.error('FETCH_SOURCE_NOT_FOUND', { sourceId, executionId })
+        runLog.error('FETCH_SOURCE_NOT_FOUND', {
+          phase: 'init',
+          reason: 'Source record does not exist in database',
+        })
         throw new Error(`Source ${sourceId} not found`)
       }
 
       const sourceName = source.name
       const retailerName = source.retailers?.name
+      const sourceLoadDurationMs = Date.now() - sourceLoadStart
 
-      log.debug('FETCH_SOURCE_LOADED', {
-        sourceId,
+      runLog.debug('FETCH_SOURCE_LOADED', {
+        phase: 'init',
         sourceName,
         retailerName,
-        executionId,
-        loadDurationMs: Date.now() - sourceLoadStart,
+        sourceLoadDurationMs,
         affiliateNetwork: source.affiliateNetwork,
         hasPaginationConfig: !!source.paginationConfig,
+        sourceType: source.type,
+        feedHashExists: !!source.feedHash,
       })
 
-      log.info('FETCH_START', { sourceId, sourceName, retailerName, executionId, url, type })
+      runLog.info('FETCH_START', {
+        sourceName,
+        retailerName,
+        url: url?.slice(0, 200),
+        type,
+        phase: 'fetch',
+      })
 
       const paginationConfig = source.paginationConfig as PaginationConfig | null
 
@@ -191,16 +204,21 @@ export const fetcherWorker = new Worker<FetchJobData>(
       // Check if URL is likely gzip compressed
       const expectGzip = isGzipUrl(url)
 
-      log.debug('FETCH_CONFIG', {
-        executionId,
-        sourceId,
+      runLog.debug('FETCH_CONFIG', {
+        phase: 'config',
         expectGzip,
+        gzipDetectionMethod: expectGzip ? 'url_extension' : 'none',
         maxPages,
+        configuredMaxPages,
+        hardMaxPages: HARD_MAX_PAGES,
         maxContentPerPage: MAX_CONTENT_LENGTH_PER_PAGE,
         maxTotalContent: MAX_TOTAL_CONTENT_SIZE,
+        maxItemsCollected: MAX_ITEMS_COLLECTED,
         timeout: REQUEST_TIMEOUT,
         paginationType: paginationConfig?.type || 'none',
         paginationParam: paginationConfig?.param,
+        paginationStartValue: currentPage,
+        paginationIncrement: increment,
       })
 
       // Axios config with size limits
@@ -230,29 +248,78 @@ export const fetcherWorker = new Worker<FetchJobData>(
           }
         }
 
-        log.debug('Fetching page', { pageNum: pageNum + 1, pageUrl })
+        const pageRequestStart = Date.now()
+        runLog.debug('FETCH_PAGE_REQUEST', {
+          phase: 'pagination',
+          pageNum: pageNum + 1,
+          maxPages,
+          pageUrl: pageUrl.slice(0, 200),
+          paginationApplied: paginationConfig?.type !== 'none',
+          currentPageValue: currentPage,
+        })
 
         let pageContent: string
 
         // Standard HTTP fetch with limits
         const response = await axios.get(pageUrl, axiosConfig)
+        const pageRequestDurationMs = Date.now() - pageRequestStart
+
+        // Log HTTP response details
+        const responseSize = Buffer.isBuffer(response.data)
+          ? response.data.length
+          : typeof response.data === 'string'
+            ? Buffer.byteLength(response.data, 'utf8')
+            : JSON.stringify(response.data).length
+
+        runLog.debug('FETCH_PAGE_RESPONSE', {
+          phase: 'pagination',
+          pageNum: pageNum + 1,
+          httpStatus: response.status,
+          httpStatusText: response.statusText,
+          contentType: response.headers['content-type'],
+          contentEncoding: response.headers['content-encoding'],
+          contentLength: response.headers['content-length'],
+          actualResponseBytes: responseSize,
+          responseDataType: Buffer.isBuffer(response.data) ? 'buffer' : typeof response.data,
+          requestDurationMs: pageRequestDurationMs,
+        })
 
         // Handle response data based on type
+        let decompressionApplied = false
         if (expectGzip || Buffer.isBuffer(response.data)) {
           // Decompress if gzip
           pageContent = decompressIfGzip(response.data)
+          decompressionApplied = true
         } else if (typeof response.data === 'string') {
           // Check for gzip magic bytes in string (can happen with some servers)
+          const originalLength = response.data.length
           pageContent = decompressIfGzip(response.data)
+          decompressionApplied = pageContent.length !== originalLength
         } else {
           // Convert to string if axios parsed JSON, with size limit
           pageContent = safeJsonStringify(response.data, MAX_CONTENT_LENGTH_PER_PAGE)
         }
 
+        const pageContentBytes = Buffer.byteLength(pageContent, 'utf8')
+        runLog.debug('FETCH_PAGE_PROCESSED', {
+          phase: 'pagination',
+          pageNum: pageNum + 1,
+          decompressionApplied,
+          compressionRatio: decompressionApplied && responseSize > 0 ? (pageContentBytes / responseSize).toFixed(2) : null,
+          processedContentBytes: pageContentBytes,
+        })
+
         // Track total content size in bytes (accurate for UTF-8)
         totalContentSize += Buffer.byteLength(pageContent, 'utf8')
         if (totalContentSize > MAX_TOTAL_CONTENT_SIZE) {
-          log.warn('Total content size limit exceeded, stopping', { totalContentSize, limit: MAX_TOTAL_CONTENT_SIZE })
+          runLog.warn('FETCH_SIZE_LIMIT_EXCEEDED', {
+            phase: 'pagination',
+            pageNum: pageNum + 1,
+            totalContentSize,
+            limit: MAX_TOTAL_CONTENT_SIZE,
+            reason: 'Total accumulated content size exceeds maximum allowed',
+            action: 'stopping_pagination',
+          })
           await prisma.execution_logs.create({
             data: {
               executionId,
@@ -275,7 +342,12 @@ export const fetcherWorker = new Worker<FetchJobData>(
             const items = safeExtractArray(parsed)
 
             if (items.length === 0) {
-              log.debug('No more items found, stopping pagination', { pageNum: pageNum + 1 })
+              runLog.debug('FETCH_PAGINATION_EMPTY', {
+                phase: 'pagination',
+                pageNum: pageNum + 1,
+                reason: 'Page returned zero items',
+                action: 'stopping_pagination',
+              })
               break
             }
 
@@ -283,7 +355,14 @@ export const fetcherWorker = new Worker<FetchJobData>(
 
             // Check items limit
             if (allContent.length >= MAX_ITEMS_COLLECTED) {
-              log.warn('Max items limit reached, stopping', { itemCount: allContent.length, limit: MAX_ITEMS_COLLECTED })
+              runLog.warn('FETCH_ITEMS_LIMIT_REACHED', {
+                phase: 'pagination',
+                pageNum: pageNum + 1,
+                itemCount: allContent.length,
+                limit: MAX_ITEMS_COLLECTED,
+                reason: 'Maximum items collection limit reached',
+                action: 'stopping_pagination',
+              })
               await prisma.execution_logs.create({
                 data: {
                   executionId,
@@ -313,7 +392,17 @@ export const fetcherWorker = new Worker<FetchJobData>(
         currentPage += increment
       }
 
-      log.info('Fetch complete', { sourceId, sourceName, retailerName, executionId, pagesFetched, itemCount: allContent.length, totalContentSize })
+      runLog.info('FETCH_COMPLETE', {
+        phase: 'fetch',
+        sourceName,
+        retailerName,
+        pagesFetched,
+        itemCount: allContent.length,
+        totalContentSize,
+        fetchDurationMs: Date.now() - stageStart,
+        avgBytesPerPage: pagesFetched > 0 ? Math.round(totalContentSize / pagesFetched) : 0,
+        avgItemsPerPage: pagesFetched > 0 ? Math.round(allContent.length / pagesFetched) : 0,
+      })
 
       // Serialize content based on type with size limits
       let content: string
@@ -459,12 +548,17 @@ export const fetcherWorker = new Worker<FetchJobData>(
         if (needsChunking) {
           // Chunk into smaller jobs
           const chunkCount = Math.ceil(parsedItems.length / NORMALIZE_CHUNK_SIZE)
-          log.info('Chunking normalize jobs (feed path)', {
-            executionId,
+          runLog.info('FETCH_CHUNKING_NORMALIZE', {
+            phase: 'routing',
+            routePath: 'feed',
             totalItems: parsedItems.length,
             estimatedBytes,
             chunkCount,
             chunkSize: NORMALIZE_CHUNK_SIZE,
+            reason: parsedItems.length > NORMALIZE_CHUNK_SIZE
+              ? 'item_count_exceeds_chunk_size'
+              : 'payload_size_exceeds_limit',
+            maxJobPayloadBytes: MAX_JOB_PAYLOAD_BYTES,
           })
 
           for (let i = 0; i < parsedItems.length; i += NORMALIZE_CHUNK_SIZE) {
@@ -568,9 +662,27 @@ export const fetcherWorker = new Worker<FetchJobData>(
 )
 
 fetcherWorker.on('completed', (job) => {
-  log.info('Job completed', { jobId: job.id })
+  log.info('FETCH_JOB_COMPLETED', {
+    jobId: job.id,
+    executionId: job.data?.executionId,
+    sourceId: job.data?.sourceId,
+    returnValue: job.returnvalue,
+    attemptsMade: job.attemptsMade,
+    processingDurationMs: job.processedOn ? Date.now() - job.processedOn : null,
+    totalDurationMs: job.finishedOn && job.timestamp ? job.finishedOn - job.timestamp : null,
+  })
 })
 
 fetcherWorker.on('failed', (job, err) => {
-  log.error('Job failed', { jobId: job?.id, error: err.message })
+  log.error('FETCH_JOB_FAILED', {
+    jobId: job?.id,
+    executionId: job?.data?.executionId,
+    sourceId: job?.data?.sourceId,
+    errorName: err.name,
+    errorMessage: err.message,
+    errorStack: err.stack?.slice(0, 500),
+    attemptsMade: job?.attemptsMade,
+    maxAttempts: job?.opts?.attempts ?? 3,
+    willRetry: (job?.attemptsMade ?? 0) < (job?.opts?.attempts ?? 3),
+  }, err)
 })

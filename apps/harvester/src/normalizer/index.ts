@@ -14,18 +14,20 @@ export const normalizerWorker = new Worker<NormalizeJobData>(
     const { executionId, sourceId, rawItems, contentHash } = job.data
     const stageStart = Date.now()
 
-    log.debug('NORMALIZE_JOB_RECEIVED', {
-      jobId: job.id,
-      executionId,
-      sourceId,
+    // Create run-scoped logger with correlation IDs
+    const runLog = log.child({ executionId, sourceId, jobId: job.id })
+
+    runLog.debug('NORMALIZE_JOB_RECEIVED', {
       itemCount: rawItems.length,
       contentHashPrefix: contentHash?.slice(0, 16),
       attemptsMade: job.attemptsMade,
+      maxAttempts: job.opts?.attempts ?? 3,
+      timestamp: new Date().toISOString(),
     })
 
     try {
       // Get source info to determine retailer (moved up for logging context)
-      log.debug('NORMALIZE_LOADING_SOURCE', { sourceId, executionId })
+      runLog.debug('NORMALIZE_LOADING_SOURCE', { phase: 'init' })
       const sourceLoadStart = Date.now()
       const source = await prisma.sources.findUnique({
         where: { id: sourceId },
@@ -33,22 +35,31 @@ export const normalizerWorker = new Worker<NormalizeJobData>(
       })
 
       if (!source) {
-        log.error('NORMALIZE_SOURCE_NOT_FOUND', { sourceId, executionId })
+        runLog.error('NORMALIZE_SOURCE_NOT_FOUND', {
+          phase: 'init',
+          reason: 'Source record does not exist in database',
+        })
         throw new Error(`Source ${sourceId} not found`)
       }
 
       const sourceName = source.name
       const retailerName = source.retailers?.name
+      const sourceLoadDurationMs = Date.now() - sourceLoadStart
 
-      log.debug('NORMALIZE_SOURCE_LOADED', {
-        sourceId,
+      runLog.debug('NORMALIZE_SOURCE_LOADED', {
+        phase: 'init',
         sourceName,
         retailerName,
-        executionId,
-        loadDurationMs: Date.now() - sourceLoadStart,
+        sourceLoadDurationMs,
+        sourceUrl: source.url?.slice(0, 100),
       })
 
-      log.info('NORMALIZE_START', { executionId, sourceId, sourceName, retailerName, itemCount: rawItems.length })
+      runLog.info('NORMALIZE_START', {
+        phase: 'normalize',
+        sourceName,
+        retailerName,
+        itemCount: rawItems.length,
+      })
 
       await prisma.execution_logs.create({
         data: {
@@ -65,14 +76,53 @@ export const normalizerWorker = new Worker<NormalizeJobData>(
 
       const normalizedItems: NormalizedProduct[] = []
 
-      for (const rawItem of rawItems) {
+      // Track normalization statistics
+      const stats = {
+        totalItems: rawItems.length,
+        normalized: 0,
+        skippedNoPrice: 0,
+        skippedNoName: 0,
+        errored: 0,
+        categories: {} as Record<string, number>,
+        brands: {} as Record<string, number>,
+      }
+
+      runLog.debug('NORMALIZE_LOOP_START', {
+        phase: 'normalize',
+        totalItems: rawItems.length,
+      })
+
+      for (let i = 0; i < rawItems.length; i++) {
+        const rawItem = rawItems[i]
         try {
-          const normalized = await normalizeItem(rawItem, source)
+          const normalized = await normalizeItem(rawItem, source, runLog, i)
           if (normalized) {
             normalizedItems.push(normalized)
+            stats.normalized++
+
+            // Track category distribution
+            stats.categories[normalized.category] = (stats.categories[normalized.category] || 0) + 1
+
+            // Track brand distribution (top brands only)
+            if (normalized.brand) {
+              stats.brands[normalized.brand] = (stats.brands[normalized.brand] || 0) + 1
+            }
+          } else {
+            // Item was skipped (no price or no name)
+            const hasPrice = !!(rawItem.priceText || rawItem.price)
+            const hasName = !!(rawItem.name || rawItem.title)
+            if (!hasPrice) stats.skippedNoPrice++
+            if (!hasName) stats.skippedNoName++
           }
         } catch (error) {
+          stats.errored++
           const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+          runLog.warn('NORMALIZE_ITEM_ERROR', {
+            phase: 'normalize',
+            itemIndex: i,
+            errorMessage: errorMsg,
+            rawItemPreview: JSON.stringify(rawItem).slice(0, 200),
+          })
           await prisma.execution_logs.create({
             data: {
               executionId,
@@ -84,6 +134,21 @@ export const normalizerWorker = new Worker<NormalizeJobData>(
           })
         }
       }
+
+      // Log normalization summary statistics
+      runLog.debug('NORMALIZE_STATS', {
+        phase: 'normalize',
+        stats: {
+          ...stats,
+          // Limit brand list to top 10
+          brands: Object.fromEntries(
+            Object.entries(stats.brands)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 10)
+          ),
+        },
+        successRate: rawItems.length > 0 ? ((stats.normalized / rawItems.length) * 100).toFixed(1) + '%' : 'N/A',
+      })
 
       const normalizeDurationMs = Date.now() - stageStart
       const skippedCount = rawItems.length - normalizedItems.length
@@ -158,16 +223,42 @@ export const normalizerWorker = new Worker<NormalizeJobData>(
 )
 
 // Normalize a single item
-async function normalizeItem(rawItem: any, source: any): Promise<NormalizedProduct | null> {
+async function normalizeItem(
+  rawItem: any,
+  source: any,
+  runLog: typeof log,
+  itemIndex: number
+): Promise<NormalizedProduct | null> {
   // Extract price from various formats
-  const price = extractPrice(rawItem.priceText || rawItem.price || '')
+  const rawPriceValue = rawItem.priceText || rawItem.price || ''
+  const price = extractPrice(rawPriceValue)
+
   if (!price || price <= 0) {
+    // Log at DEBUG level for normal validation failures (not errors)
+    if (itemIndex < 5 || itemIndex % 100 === 0) {
+      // Only log first 5 and every 100th to avoid log spam
+      runLog.debug('NORMALIZE_ITEM_SKIP_PRICE', {
+        phase: 'normalize',
+        itemIndex,
+        reason: 'invalid_or_missing_price',
+        rawPriceValue: String(rawPriceValue).slice(0, 50),
+        extractedPrice: price,
+      })
+    }
     return null
   }
 
   // Extract name
   const name = (rawItem.name || rawItem.title || '').trim()
   if (!name) {
+    if (itemIndex < 5 || itemIndex % 100 === 0) {
+      runLog.debug('NORMALIZE_ITEM_SKIP_NAME', {
+        phase: 'normalize',
+        itemIndex,
+        reason: 'missing_name',
+        availableFields: Object.keys(rawItem).slice(0, 10),
+      })
+    }
     return null
   }
 
@@ -176,9 +267,11 @@ async function normalizeItem(rawItem: any, source: any): Promise<NormalizedProdu
 
   // Build full URL
   let url = rawItem.url || rawItem.link || ''
+  let urlNormalized = false
   if (url && !url.startsWith('http')) {
     const baseUrl = new URL(source.url).origin
     url = new URL(url, baseUrl).toString()
+    urlNormalized = true
   }
 
   // Apply ammo-specific normalization
@@ -187,6 +280,21 @@ async function normalizeItem(rawItem: any, source: any): Promise<NormalizedProdu
     upc: rawItem.upc || rawItem.UPC || rawItem.gtin || null,
     brand: rawItem.brand || extractBrand(name) || null,
   })
+
+  // Log detailed normalization for first few items (helps debug format issues)
+  if (itemIndex < 3) {
+    runLog.debug('NORMALIZE_ITEM_DETAIL', {
+      phase: 'normalize',
+      itemIndex,
+      inputFields: Object.keys(rawItem),
+      extractedPrice: price,
+      extractedName: name.slice(0, 50),
+      category,
+      urlNormalized,
+      ammoDetected: !!(ammoData.caliber || ammoData.grainWeight),
+      productIdType: ammoData.upc ? 'upc' : 'hash',
+    })
+  }
 
   return {
     name,
@@ -286,9 +394,27 @@ function categorizeProduct(name: string, description: string): string {
 }
 
 normalizerWorker.on('completed', (job) => {
-  log.info('Job completed', { jobId: job.id })
+  log.info('NORMALIZE_JOB_COMPLETED', {
+    jobId: job.id,
+    executionId: job.data?.executionId,
+    sourceId: job.data?.sourceId,
+    returnValue: job.returnvalue,
+    attemptsMade: job.attemptsMade,
+    processingDurationMs: job.processedOn ? Date.now() - job.processedOn : null,
+    totalDurationMs: job.finishedOn && job.timestamp ? job.finishedOn - job.timestamp : null,
+  })
 })
 
 normalizerWorker.on('failed', (job, err) => {
-  log.error('Job failed', { jobId: job?.id, error: err.message })
+  log.error('NORMALIZE_JOB_FAILED', {
+    jobId: job?.id,
+    executionId: job?.data?.executionId,
+    sourceId: job?.data?.sourceId,
+    errorName: err.name,
+    errorMessage: err.message,
+    errorStack: err.stack?.slice(0, 500),
+    attemptsMade: job?.attemptsMade,
+    maxAttempts: job?.opts?.attempts ?? 3,
+    willRetry: (job?.attemptsMade ?? 0) < (job?.opts?.attempts ?? 3),
+  }, err)
 })

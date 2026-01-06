@@ -23,38 +23,52 @@ const DEFAULT_MAX_FILE_SIZE = 500 * 1024 * 1024 // 500 MB
  * Download feed file with change detection
  */
 export async function downloadFeed(feed: AffiliateFeed): Promise<DownloadResult> {
-  log.debug('Starting feed download', {
-    feedId: feed.id,
+  const feedLog = log.child({ feedId: feed.id })
+
+  feedLog.debug('DOWNLOAD_START', {
+    phase: 'init',
     transport: feed.transport,
     host: feed.host,
-    port: feed.port,
+    port: feed.port ?? (feed.transport === 'SFTP' ? 22 : 21),
     path: feed.path,
     compression: feed.compression,
     hasCredentials: !!feed.secretCiphertext,
+    hasLastMtime: !!feed.lastRemoteMtime,
+    hasLastSize: !!feed.lastRemoteSize,
+    hasLastHash: !!feed.lastContentHash,
   })
 
   // Decrypt credentials
   if (!feed.secretCiphertext) {
-    log.error('Feed credentials not configured', {
-      feedId: feed.id,
-      hasSecretCiphertext: !!feed.secretCiphertext,
+    feedLog.error('DOWNLOAD_NO_CREDENTIALS', {
+      phase: 'auth',
+      reason: 'Feed credentials not configured',
+      hasSecretCiphertext: false,
       hint: 'Was CREDENTIAL_ENCRYPTION_KEY_B64 set in admin .env when feed was created?',
     })
     throw new Error('Feed credentials not configured - re-save the feed credentials in admin.')
   }
 
-  log.debug('Decrypting feed credentials', { feedId: feed.id, hasKeyId: !!feed.secretKeyId })
+  feedLog.debug('DOWNLOAD_DECRYPTING_CREDENTIALS', {
+    phase: 'auth',
+    hasKeyId: !!feed.secretKeyId,
+  })
+
   let password: string
+  const decryptStart = Date.now()
   try {
     password = decryptSecret(
       Buffer.from(feed.secretCiphertext),
       feed.secretKeyId || undefined  // AAD (for future KMS migration)
     )
-    log.debug('Credentials decrypted successfully', { feedId: feed.id })
+    feedLog.debug('DOWNLOAD_CREDENTIALS_DECRYPTED', {
+      phase: 'auth',
+      durationMs: Date.now() - decryptStart,
+    })
   } catch (err) {
-    log.error('Failed to decrypt feed credentials', {
-      feedId: feed.id,
-      error: err instanceof Error ? err.message : String(err),
+    feedLog.error('DOWNLOAD_DECRYPT_FAILED', {
+      phase: 'auth',
+      errorMessage: err instanceof Error ? err.message : String(err),
       hint: 'Is CREDENTIAL_ENCRYPTION_KEY_B64 the same in admin and harvester?',
     })
     throw new Error(`Failed to decrypt feed credentials: ${err instanceof Error ? err.message : String(err)}`)
@@ -64,35 +78,57 @@ export async function downloadFeed(feed: AffiliateFeed): Promise<DownloadResult>
     ? Number(feed.maxFileSizeBytes)
     : DEFAULT_MAX_FILE_SIZE
 
-  log.debug('Download configuration', {
-    feedId: feed.id,
+  feedLog.debug('DOWNLOAD_CONFIG', {
+    phase: 'config',
     maxFileSizeBytes: maxFileSize,
     maxFileSizeMB: Math.round(maxFileSize / 1024 / 1024),
     lastRemoteMtime: feed.lastRemoteMtime?.toISOString(),
     lastRemoteSize: feed.lastRemoteSize?.toString(),
-    lastContentHash: feed.lastContentHash?.slice(0, 16),
+    lastContentHashPrefix: feed.lastContentHash?.slice(0, 16),
+    changeDetectionEnabled: !!(feed.lastRemoteMtime || feed.lastRemoteSize || feed.lastContentHash),
   })
 
   const downloadStart = Date.now()
   let result: DownloadResult
 
   if (feed.transport === 'SFTP') {
-    log.debug('Using SFTP transport', { feedId: feed.id, host: feed.host, port: feed.port || 22 })
-    result = await downloadViaSftp(feed, password, maxFileSize)
+    feedLog.debug('DOWNLOAD_TRANSPORT_SELECTED', {
+      phase: 'connect',
+      transport: 'SFTP',
+      host: feed.host,
+      port: feed.port || 22,
+    })
+    result = await downloadViaSftp(feed, password, maxFileSize, feedLog)
   } else {
-    log.debug('Using FTP transport', { feedId: feed.id, host: feed.host, port: feed.port || 21 })
-    result = await downloadViaFtp(feed, password, maxFileSize)
+    feedLog.debug('DOWNLOAD_TRANSPORT_SELECTED', {
+      phase: 'connect',
+      transport: 'FTP',
+      host: feed.host,
+      port: feed.port || 21,
+    })
+    result = await downloadViaFtp(feed, password, maxFileSize, feedLog)
   }
 
   const downloadDuration = Date.now() - downloadStart
-  log.debug('Download completed', {
-    feedId: feed.id,
-    durationMs: downloadDuration,
-    skipped: result.skipped,
-    skippedReason: result.skippedReason,
-    contentBytes: result.content.length,
-    contentHash: result.contentHash?.slice(0, 16),
-  })
+
+  if (result.skipped) {
+    feedLog.info('DOWNLOAD_SKIPPED', {
+      phase: 'complete',
+      durationMs: downloadDuration,
+      skippedReason: result.skippedReason,
+      changeDetectionMethod: result.skippedReason === 'UNCHANGED_MTIME' ? 'mtime_size' : 'content_hash',
+    })
+  } else {
+    feedLog.info('DOWNLOAD_COMPLETE', {
+      phase: 'complete',
+      durationMs: downloadDuration,
+      contentBytes: result.content.length,
+      contentMB: (result.content.length / 1024 / 1024).toFixed(2),
+      contentHashPrefix: result.contentHash?.slice(0, 16),
+      compressionApplied: feed.compression === 'GZIP',
+      throughputMBps: downloadDuration > 0 ? ((result.content.length / 1024 / 1024) / (downloadDuration / 1000)).toFixed(2) : null,
+    })
+  }
 
   return result
 }
@@ -103,22 +139,35 @@ export async function downloadFeed(feed: AffiliateFeed): Promise<DownloadResult>
 async function downloadViaSftp(
   feed: AffiliateFeed,
   password: string,
-  maxFileSize: number
+  maxFileSize: number,
+  feedLog: typeof log
 ): Promise<DownloadResult> {
   return new Promise((resolve, reject) => {
     const conn = new SftpClient()
     let resolved = false
+    const connectStart = Date.now()
 
     const timeout = setTimeout(() => {
       if (!resolved) {
         resolved = true
         conn.end()
+        feedLog.error('SFTP_TIMEOUT', {
+          phase: 'connect',
+          timeoutMs: 30000,
+          host: feed.host,
+        })
         reject(new Error('SFTP connection timeout (30s)'))
       }
     }, 30000)
 
     conn.on('ready', () => {
-      log.info('SFTP connected', { host: feed.host, feedId: feed.id })
+      const connectDurationMs = Date.now() - connectStart
+      feedLog.info('SFTP_CONNECTED', {
+        phase: 'connect',
+        host: feed.host,
+        port: feed.port || 22,
+        connectDurationMs,
+      })
 
       conn.sftp((err: Error | undefined, sftp: SFTPWrapper) => {
         if (err) {
@@ -151,6 +200,16 @@ async function downloadViaSftp(
             return
           }
 
+          feedLog.debug('SFTP_FILE_STATS', {
+            phase: 'stat',
+            path: feed.path,
+            remoteMtime: remoteMtime?.toISOString(),
+            remoteSize: remoteSize.toString(),
+            remoteSizeMB: (Number(remoteSize) / 1024 / 1024).toFixed(2),
+            lastMtime: feed.lastRemoteMtime?.toISOString(),
+            lastSize: feed.lastRemoteSize?.toString(),
+          })
+
           // Check for unchanged file (mtime + size)
           if (
             feed.lastRemoteMtime &&
@@ -162,7 +221,12 @@ async function downloadViaSftp(
             clearTimeout(timeout)
             resolved = true
             conn.end()
-            log.info('File unchanged (mtime+size match)', { feedId: feed.id })
+            feedLog.debug('SFTP_CHANGE_DETECTION_SKIP', {
+              phase: 'change_detection',
+              reason: 'mtime_and_size_unchanged',
+              remoteMtime: remoteMtime.toISOString(),
+              remoteSize: remoteSize.toString(),
+            })
             resolve({
               content: Buffer.alloc(0),
               mtime: remoteMtime,
@@ -175,7 +239,13 @@ async function downloadViaSftp(
           }
 
           // Download the file
-          log.info('Downloading file', { path: feed.path, size: remoteSize.toString() })
+          const downloadStart = Date.now()
+          feedLog.info('SFTP_DOWNLOAD_START', {
+            phase: 'download',
+            path: feed.path,
+            sizeBytes: remoteSize.toString(),
+            sizeMB: (Number(remoteSize) / 1024 / 1024).toFixed(2),
+          })
           const readStream = sftp.createReadStream(feed.path!)
           const chunks: Buffer[] = []
           let downloadedBytes = 0
@@ -198,28 +268,59 @@ async function downloadViaSftp(
             resolved = true
             conn.end()
 
+            const downloadDurationMs = Date.now() - downloadStart
+            feedLog.debug('SFTP_DOWNLOAD_COMPLETE', {
+              phase: 'download',
+              downloadedBytes,
+              downloadDurationMs,
+              throughputMBps: downloadDurationMs > 0 ? ((downloadedBytes / 1024 / 1024) / (downloadDurationMs / 1000)).toFixed(2) : null,
+            })
+
             let content = Buffer.concat(chunks)
 
             // Decompress if needed
             if (feed.compression === 'GZIP') {
+              const decompressStart = Date.now()
               try {
+                const compressedSize = content.length
                 content = gunzipSync(content)
-                log.debug('Decompressed GZIP content', {
-                  compressed: downloadedBytes,
-                  decompressed: content.length,
+                const decompressDurationMs = Date.now() - decompressStart
+                feedLog.debug('SFTP_GZIP_DECOMPRESSED', {
+                  phase: 'decompress',
+                  compressedBytes: compressedSize,
+                  decompressedBytes: content.length,
+                  compressionRatio: (compressedSize / content.length).toFixed(3),
+                  durationMs: decompressDurationMs,
                 })
               } catch (gzipErr) {
+                feedLog.error('SFTP_GZIP_FAILED', {
+                  phase: 'decompress',
+                  errorMessage: (gzipErr as Error).message,
+                  compressedBytes: content.length,
+                })
                 reject(new Error(`GZIP decompression failed: ${(gzipErr as Error).message}`))
                 return
               }
             }
 
             // Compute content hash
+            const hashStart = Date.now()
             const contentHash = createHash('sha256').update(content).digest('hex')
+            feedLog.debug('SFTP_CONTENT_HASH_COMPUTED', {
+              phase: 'hash',
+              contentBytes: content.length,
+              hashPrefix: contentHash.slice(0, 16),
+              durationMs: Date.now() - hashStart,
+            })
 
             // Check if content unchanged
             if (feed.lastContentHash && contentHash === feed.lastContentHash) {
-              log.info('File unchanged (content hash match)', { feedId: feed.id })
+              feedLog.info('SFTP_UNCHANGED_HASH', {
+                phase: 'change_detection',
+                reason: 'content_hash_unchanged',
+                hashPrefix: contentHash.slice(0, 16),
+                contentBytes: content.length,
+              })
               resolve({
                 content,
                 mtime: remoteMtime,
@@ -231,10 +332,12 @@ async function downloadViaSftp(
               return
             }
 
-            log.info('Download complete', {
-              feedId: feed.id,
-              bytes: content.length,
-              hash: contentHash.slice(0, 16),
+            feedLog.debug('SFTP_DOWNLOAD_SUCCESS', {
+              phase: 'complete',
+              contentBytes: content.length,
+              hashPrefix: contentHash.slice(0, 16),
+              isNewContent: !feed.lastContentHash,
+              hashChanged: feed.lastContentHash ? 'yes' : 'first_download',
             })
 
             resolve({
@@ -250,6 +353,12 @@ async function downloadViaSftp(
             clearTimeout(timeout)
             resolved = true
             conn.end()
+            feedLog.error('SFTP_READ_ERROR', {
+              phase: 'download',
+              errorMessage: readErr.message,
+              downloadedBytes,
+              path: feed.path,
+            })
             reject(new Error(`SFTP read error: ${readErr.message}`))
           })
         })
@@ -260,12 +369,24 @@ async function downloadViaSftp(
       clearTimeout(timeout)
       if (!resolved) {
         resolved = true
-        log.error('SFTP connection error', { host: feed.host }, connErr)
+        feedLog.error('SFTP_CONNECTION_ERROR', {
+          phase: 'connect',
+          host: feed.host,
+          port: feed.port || 22,
+          errorMessage: connErr.message,
+          errorName: connErr.name,
+        })
         reject(new Error(`SFTP connection error: ${connErr.message}`))
       }
     })
 
-    log.info('Connecting to SFTP server', { host: feed.host, port: feed.port })
+    feedLog.debug('SFTP_CONNECTING', {
+      phase: 'connect',
+      host: feed.host,
+      port: feed.port || 22,
+      username: feed.username,
+      readyTimeoutMs: 30000,
+    })
 
     conn.connect({
       host: feed.host!,
@@ -283,19 +404,32 @@ async function downloadViaSftp(
 async function downloadViaFtp(
   feed: AffiliateFeed,
   password: string,
-  maxFileSize: number
+  maxFileSize: number,
+  feedLog: typeof log
 ): Promise<DownloadResult> {
   // Check if FTP is allowed (database setting with env var fallback)
+  feedLog.debug('FTP_CHECKING_ALLOWED', { phase: 'init' })
   const ftpAllowed = await isPlainFtpAllowed()
   if (!ftpAllowed) {
+    feedLog.warn('FTP_DISABLED', {
+      phase: 'init',
+      reason: 'Plain FTP disabled in settings',
+      hint: 'Enable via admin settings or use SFTP',
+    })
     throw new Error('Plain FTP is disabled. Use SFTP instead or enable via admin settings.')
   }
 
   const client = new ftp.Client()
   client.ftp.verbose = false
 
+  const connectStart = Date.now()
   try {
-    log.info('Connecting to FTP server', { host: feed.host, port: feed.port })
+    feedLog.debug('FTP_CONNECTING', {
+      phase: 'connect',
+      host: feed.host,
+      port: feed.port || 21,
+      username: feed.username,
+    })
 
     await client.access({
       host: feed.host!,
@@ -305,31 +439,62 @@ async function downloadViaFtp(
       secure: false,
     })
 
+    const connectDurationMs = Date.now() - connectStart
+    feedLog.info('FTP_CONNECTED', {
+      phase: 'connect',
+      host: feed.host,
+      port: feed.port || 21,
+      connectDurationMs,
+    })
+
     // Get file size for change detection (FTP doesn't reliably provide mtime)
+    feedLog.debug('FTP_GETTING_SIZE', { phase: 'stat', path: feed.path })
+    const sizeStart = Date.now()
     const remoteSize = await client.size(feed.path!)
+    feedLog.debug('FTP_FILE_SIZE', {
+      phase: 'stat',
+      path: feed.path,
+      remoteSize,
+      remoteSizeMB: (remoteSize / 1024 / 1024).toFixed(2),
+      durationMs: Date.now() - sizeStart,
+      lastSize: feed.lastRemoteSize?.toString(),
+    })
 
     if (remoteSize > maxFileSize) {
+      feedLog.error('FTP_FILE_TOO_LARGE', {
+        phase: 'stat',
+        remoteSize,
+        maxFileSize,
+        remoteSizeMB: (remoteSize / 1024 / 1024).toFixed(2),
+        maxFileSizeMB: (maxFileSize / 1024 / 1024).toFixed(2),
+      })
       throw new Error(`File size ${remoteSize} exceeds limit ${maxFileSize}`)
     }
 
     // Check if size matches (less reliable than SFTP mtime check)
-    if (
-      feed.lastRemoteSize &&
-      BigInt(remoteSize) === feed.lastRemoteSize &&
-      feed.lastContentHash
-    ) {
-      // Size matches - still need to download and check hash
-      // (FTP mtime is unreliable, so we can't skip based on size alone)
-    }
+    const sizeMatches = feed.lastRemoteSize && BigInt(remoteSize) === feed.lastRemoteSize && feed.lastContentHash
+    feedLog.debug('FTP_SIZE_CHECK', {
+      phase: 'change_detection',
+      sizeMatches,
+      reason: 'FTP_mtime_unreliable_must_download_and_hash',
+    })
 
     // Download the file
-    log.info('Downloading file', { path: feed.path, size: remoteSize })
+    feedLog.info('FTP_DOWNLOAD_START', {
+      phase: 'download',
+      path: feed.path,
+      sizeBytes: remoteSize,
+      sizeMB: (remoteSize / 1024 / 1024).toFixed(2),
+    })
 
+    const downloadStart = Date.now()
     const chunks: Buffer[] = []
+    let downloadedBytes = 0
     const { Writable } = await import('stream')
 
     const writable = new Writable({
       write(chunk: Buffer, _encoding: string, callback: () => void) {
+        downloadedBytes += chunk.length
         chunks.push(chunk)
         callback()
       },
@@ -337,27 +502,58 @@ async function downloadViaFtp(
 
     await client.downloadTo(writable, feed.path!)
 
+    const downloadDurationMs = Date.now() - downloadStart
+    feedLog.debug('FTP_DOWNLOAD_COMPLETE', {
+      phase: 'download',
+      downloadedBytes,
+      downloadDurationMs,
+      throughputMBps: downloadDurationMs > 0 ? ((downloadedBytes / 1024 / 1024) / (downloadDurationMs / 1000)).toFixed(2) : null,
+    })
+
     let content = Buffer.concat(chunks)
 
     // Decompress if needed
     if (feed.compression === 'GZIP') {
+      const decompressStart = Date.now()
       try {
+        const compressedSize = content.length
         content = gunzipSync(content)
-        log.debug('Decompressed GZIP content', {
-          compressed: chunks.reduce((a, b) => a + b.length, 0),
-          decompressed: content.length,
+        const decompressDurationMs = Date.now() - decompressStart
+        feedLog.debug('FTP_GZIP_DECOMPRESSED', {
+          phase: 'decompress',
+          compressedBytes: compressedSize,
+          decompressedBytes: content.length,
+          compressionRatio: (compressedSize / content.length).toFixed(3),
+          durationMs: decompressDurationMs,
         })
       } catch (gzipErr) {
+        feedLog.error('FTP_GZIP_FAILED', {
+          phase: 'decompress',
+          errorMessage: (gzipErr as Error).message,
+          compressedBytes: content.length,
+        })
         throw new Error(`GZIP decompression failed: ${(gzipErr as Error).message}`)
       }
     }
 
     // Compute content hash
+    const hashStart = Date.now()
     const contentHash = createHash('sha256').update(content).digest('hex')
+    feedLog.debug('FTP_CONTENT_HASH_COMPUTED', {
+      phase: 'hash',
+      contentBytes: content.length,
+      hashPrefix: contentHash.slice(0, 16),
+      durationMs: Date.now() - hashStart,
+    })
 
     // Check if content unchanged
     if (feed.lastContentHash && contentHash === feed.lastContentHash) {
-      log.info('File unchanged (content hash match)', { feedId: feed.id })
+      feedLog.info('FTP_UNCHANGED_HASH', {
+        phase: 'change_detection',
+        reason: 'content_hash_unchanged',
+        hashPrefix: contentHash.slice(0, 16),
+        contentBytes: content.length,
+      })
       return {
         content,
         mtime: null, // FTP doesn't provide reliable mtime
@@ -368,10 +564,12 @@ async function downloadViaFtp(
       }
     }
 
-    log.info('Download complete', {
-      feedId: feed.id,
-      bytes: content.length,
-      hash: contentHash.slice(0, 16),
+    feedLog.debug('FTP_DOWNLOAD_SUCCESS', {
+      phase: 'complete',
+      contentBytes: content.length,
+      hashPrefix: contentHash.slice(0, 16),
+      isNewContent: !feed.lastContentHash,
+      hashChanged: feed.lastContentHash ? 'yes' : 'first_download',
     })
 
     return {
@@ -381,7 +579,17 @@ async function downloadViaFtp(
       contentHash,
       skipped: false,
     }
+  } catch (err) {
+    feedLog.error('FTP_ERROR', {
+      phase: 'error',
+      errorMessage: err instanceof Error ? err.message : String(err),
+      errorName: err instanceof Error ? err.name : 'Unknown',
+      host: feed.host,
+      path: feed.path,
+    })
+    throw err
   } finally {
+    feedLog.debug('FTP_DISCONNECTING', { phase: 'cleanup' })
     client.close()
   }
 }
