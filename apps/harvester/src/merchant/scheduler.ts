@@ -19,7 +19,6 @@ import { Worker, Job, Queue } from 'bullmq'
 import { redisConnection } from '../config/redis'
 import {
   merchantFeedIngestQueue,
-  merchantBenchmarkQueue,
   QUEUE_NAMES,
 } from '../config/queues'
 import { logger } from '../config/logger'
@@ -381,34 +380,12 @@ function getBenchmarkWindow(): string {
 }
 
 /**
- * Schedule benchmark recalculation for all canonical SKUs
- * Idempotent: only one benchmark job per 2-hour window
+ * Schedule benchmark recalculation - STUB for v1
+ * Note: Benchmark subsystem removed for v1
  */
-export async function scheduleBenchmarkRecalc(fullRecalc: boolean = false): Promise<boolean> {
-  const benchmarkWindow = getBenchmarkWindow()
-  // BullMQ job IDs cannot contain colons, so sanitize the ISO timestamp
-  const sanitizedWindow = benchmarkWindow.replace(/[:.]/g, '-')
-  const jobId = `benchmark-${fullRecalc ? 'full' : 'incremental'}-${sanitizedWindow}`
-
-  // Check if job already exists (idempotency check)
-  const existingJob = await merchantBenchmarkQueue.getJob(jobId)
-  if (existingJob) {
-    log.debug('Benchmark already scheduled for window', { benchmarkWindow })
-    return false
-  }
-
-  await merchantBenchmarkQueue.add(
-    'recalc',
-    { fullRecalc },
-    {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 30000 },
-      jobId,
-    }
-  )
-
-  log.info('Scheduled benchmark recalculation', { fullRecalc })
-  return true
+export async function scheduleBenchmarkRecalc(_fullRecalc: boolean = false): Promise<boolean> {
+  // Benchmark subsystem removed for v1
+  return false
 }
 
 // ============================================================================

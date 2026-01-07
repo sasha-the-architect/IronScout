@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSession, requireRetailerContext, RetailerContextError } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import type { FeedFormatType } from '@ironscout/db';
 import { logger } from '@/lib/logger';
+import { z } from 'zod';
 
 // Force dynamic rendering - this route uses cookies for auth
 export const dynamic = 'force-dynamic';
+
+const testRunSchema = z.object({
+  retailerId: z.string().optional(), // Optional: for multi-retailer merchants
+});
 
 /**
  * POST /api/feed/test-run
@@ -22,9 +27,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get merchant's feed
+    // Parse optional retailerId from body
+    let inputRetailerId: string | undefined;
+    try {
+      const body = await request.clone().json();
+      const validation = testRunSchema.safeParse(body);
+      if (validation.success) {
+        inputRetailerId = validation.data.retailerId;
+      }
+    } catch {
+      // Body parsing is optional for backward compatibility
+    }
+
+    // Resolve retailer context (supports multi-retailer merchants)
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
+
+    // Get retailer's feed
     const feed = await prisma.retailer_feeds.findFirst({
-      where: { retailerId: session.merchantId },
+      where: { retailerId },
     });
 
     if (!feed) {
@@ -145,7 +166,7 @@ export async function POST(request: Request) {
     // Save test run result
     const testRun = await prisma.retailer_feed_test_runs.create({
       data: {
-        retailerId: session.merchantId,
+        retailerId,
         feedId: feed.id,
         sampleSize,
         status,
@@ -187,8 +208,13 @@ export async function POST(request: Request) {
         connectorUsed: connector.name,
         duration: Date.now() - startTime,
       },
+      retailerContext,
     });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Test run failed', {}, error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }
@@ -208,14 +234,24 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Resolve retailer context from query param
+    const url = new URL(request.url);
+    const inputRetailerId = url.searchParams.get('retailerId') || undefined;
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
+
     const testRuns = await prisma.retailer_feed_test_runs.findMany({
-      where: { retailerId: session.merchantId },
+      where: { retailerId },
       orderBy: { startedAt: 'desc' },
       take: 10,
     });
 
-    return NextResponse.json({ testRuns });
+    return NextResponse.json({ testRuns, retailerContext });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to fetch test runs', {}, error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }

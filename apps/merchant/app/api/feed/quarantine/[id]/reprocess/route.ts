@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSession, requireRetailerContext, RetailerContextError } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { logger } from '@/lib/logger';
 import { createHash } from 'crypto';
+import { z } from 'zod';
 
 // Force dynamic rendering - this route uses cookies for auth
 export const dynamic = 'force-dynamic';
+
+const reprocessSchema = z.object({
+  retailerId: z.string().optional(), // Optional: for multi-retailer merchants
+});
 
 /**
  * POST /api/feed/quarantine/[id]/reprocess
@@ -25,16 +30,21 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Look up retailerId via merchant_retailers
-    const merchantRetailer = await prisma.merchant_retailers.findFirst({
-      where: { merchantId: session.merchantId },
-      select: { retailerId: true }
-    });
-    const retailerId = merchantRetailer?.retailerId;
-
-    if (!retailerId) {
-      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
+    // Parse optional retailerId from body
+    let inputRetailerId: string | undefined;
+    try {
+      const body = await request.clone().json();
+      const validation = reprocessSchema.safeParse(body);
+      if (validation.success) {
+        inputRetailerId = validation.data.retailerId;
+      }
+    } catch {
+      // Body parsing is optional for backward compatibility
     }
+
+    // Resolve retailer context (supports multi-retailer merchants)
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
 
     // Get the quarantine record with corrections
     const record = await prisma.quarantined_records.findFirst({
@@ -155,8 +165,13 @@ export async function POST(
       success: true,
       retailerSku,
       message: 'Record successfully promoted to indexed SKUs',
+      retailerContext,
     });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to reprocess quarantine record', {}, error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }

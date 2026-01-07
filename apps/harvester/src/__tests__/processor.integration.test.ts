@@ -65,13 +65,22 @@ describeIntegration('Processor Integration Tests', () => {
       const sourceProduct = await prisma.source_products.create({
         data: {
           sourceId: testSourceId,
-          identityType: 'SKU',
-          identityValue: `TEST-SKU-${Date.now()}`,
           title: 'Test Product',
           url: 'https://test.example.com/product',
         },
       })
       testSourceProductId = sourceProduct.id
+
+      // Create identifier in child table
+      await prisma.source_product_identifiers.create({
+        data: {
+          sourceProductId: sourceProduct.id,
+          idType: 'SKU',
+          idValue: `TEST-SKU-${Date.now()}`,
+          namespace: '',
+          isCanonical: true,
+        },
+      })
     })
 
     it('should insert into source_product_presence with correct columns', async () => {

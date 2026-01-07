@@ -21,8 +21,10 @@
 
 import { prisma } from '@ironscout/db'
 import { createHash } from 'crypto'
+import { createId } from '@paralleldrive/cuid2'
 import { logger } from '../config/logger'
 import { computeUrlHash, normalizeUrl } from './parser'
+import { ProductMatcher, batchUpdateSourceProductIds } from './product-matcher'
 import type {
   FeedRunContext,
   ParsedFeedProduct,
@@ -61,6 +63,7 @@ interface LastPriceEntry {
 interface NewPriceRecord {
   retailerId: string
   sourceProductId: string
+  productId: string | null // FK to canonical product (from UPC matching)
   affiliateFeedRunId: string
   priceSignatureHash: string
   price: number
@@ -71,10 +74,19 @@ interface NewPriceRecord {
   priceType: 'REGULAR' | 'SALE'
 }
 
-/** Resolved identity for a product */
+/** Resolved identity for a product (canonical identity for backward compat) */
 interface ResolvedIdentity {
   type: IdentityType
   value: string
+}
+
+/** Identifier extracted from a product for the new identifiers table */
+interface ExtractedIdentifier {
+  idType: 'NETWORK_ITEM_ID' | 'SKU' | 'UPC' | 'URL_HASH' | 'URL'
+  idValue: string
+  namespace: string // Empty string for no namespace (not null, for unique constraint compat)
+  isCanonical: boolean
+  normalizedValue: string | null
 }
 
 /** Product with resolved identity for batch processing */
@@ -82,6 +94,7 @@ interface ProductWithIdentity {
   product: ParsedFeedProduct
   identity: ResolvedIdentity
   identityKey: string
+  allIdentifiers: ExtractedIdentifier[]
 }
 
 /** Result of upserting source products */
@@ -111,7 +124,7 @@ export async function processProducts(
   const { feed, run, sourceId, retailerId, t0 } = context
   const maxRowCount = feed.maxRowCount ?? DEFAULT_MAX_ROW_COUNT
 
-  log.debug('Starting product processing', {
+  log.info('PROCESS_START', {
     runId: run.id,
     feedId: feed.id,
     sourceId,
@@ -128,11 +141,16 @@ export async function processProducts(
   let productsRejected = 0
   let duplicateKeyCount = 0
   let urlHashFallbackCount = 0
+  let productsMatched = 0
   const errors: ParseError[] = []
 
   // Run-local price cache - maintained across all chunks
   // Per spec §4.2.1: This prevents cross-chunk staleness
   const lastPriceCache = new Map<string, LastPriceEntry>()
+
+  // Product matcher for UPC-based canonicalization
+  // Creates/maintains run-local cache for efficient matching
+  const productMatcher = new ProductMatcher()
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PRE-SCAN: Identify "winning" row for each identity
@@ -145,9 +163,9 @@ export async function processProducts(
   duplicateKeyCount = totalDuplicates
   urlHashFallbackCount = totalUrlHashFallbacks
 
-  log.debug('Identity pre-scan complete', {
+  log.info('PRESCAN_OK', {
     runId: run.id,
-    prescanDurationMs: Date.now() - prescanStart,
+    durationMs: Date.now() - prescanStart,
     totalRows: products.length,
     uniqueIdentities: winningRows.size,
     duplicatesSkipped: totalDuplicates,
@@ -211,6 +229,55 @@ export async function processProducts(
       })
 
       const sourceProductIds = upsertedProducts.map((sp) => sp.id)
+
+      // Step 2b: Match source products to canonical products via UPC
+      // Build lookup from identityKey to product (for UPC access)
+      const identityKeyToProduct = new Map<string, ParsedFeedProduct>()
+      for (const { product, identityKey } of deduped) {
+        identityKeyToProduct.set(identityKey, product)
+      }
+
+      // Build source products with UPCs for matching
+      const sourceProductsForMatching = upsertedProducts.map((sp) => ({
+        id: sp.id,
+        upc: identityKeyToProduct.get(sp.identityKey)?.upc ?? null,
+      }))
+
+      log.debug('Matching source products to canonical products', {
+        runId: run.id,
+        chunkNum,
+        count: sourceProductsForMatching.length,
+      })
+      const matchStart = Date.now()
+      const matchResults = await productMatcher.batchMatchByUpc(sourceProductsForMatching)
+
+      // Build lookup: sourceProductId -> productId for price writes
+      const sourceProductIdToProductId = new Map<string, string | null>()
+      const matchesToUpdate: Array<{ sourceProductId: string; productId: string }> = []
+
+      for (const result of matchResults) {
+        sourceProductIdToProductId.set(result.sourceProductId, result.productId)
+        if (result.productId) {
+          matchesToUpdate.push({
+            sourceProductId: result.sourceProductId,
+            productId: result.productId,
+          })
+        }
+      }
+
+      // Batch update source_products.productId for matches
+      if (matchesToUpdate.length > 0) {
+        await batchUpdateSourceProductIds(matchesToUpdate)
+        productsMatched += matchesToUpdate.length
+      }
+
+      log.info('MATCH_OK', {
+        runId: run.id,
+        chunkNum,
+        matchedCount: matchesToUpdate.length,
+        unmatchedCount: sourceProductsForMatching.length - matchesToUpdate.length,
+        durationMs: Date.now() - matchStart,
+      })
 
       // Step 3: Batch update presence and seen records
       log.debug('Updating presence and seen records', { runId: run.id, chunkNum, count: sourceProductIds.length })
@@ -278,7 +345,8 @@ export async function processProducts(
         retailerId,
         run.id,
         t0,
-        lastPriceCache
+        lastPriceCache,
+        sourceProductIdToProductId
       )
       log.debug('Price write decisions made', {
         runId: run.id,
@@ -318,19 +386,16 @@ export async function processProducts(
       pricesWritten += actualInserted
 
       const chunkDuration = Date.now() - chunkStartTime
-      // Log batch progress (every 5 batches or on large feeds or if slow)
-      if (chunkNum % 5 === 0 || products.length > 10000 || chunkDuration > 5000) {
-        log.debug('Chunk progress', {
-          runId: run.id,
-          chunkNum,
-          totalChunks,
-          chunkDurationMs: chunkDuration,
-          productsUpserted,
-          pricesWritten,
-          cacheSize: lastPriceCache.size,
-          percentComplete: ((chunkNum / totalChunks) * 100).toFixed(1),
-        })
-      }
+      log.info('CHUNK_OK', {
+        runId: run.id,
+        chunkNum,
+        totalChunks,
+        chunkDurationMs: chunkDuration,
+        productsUpserted: upsertedProducts.length,
+        pricesWritten: actualInserted,
+        cacheSize: lastPriceCache.size,
+        percentComplete: ((chunkNum / totalChunks) * 100).toFixed(1),
+      })
     } catch (err) {
       // Chunk failed - log error and continue with next chunk
       // Per spec §7.4: Partial failures keep successful data
@@ -357,14 +422,17 @@ export async function processProducts(
   }
 
   // Log final progress
+  const matcherStats = productMatcher.getStats()
   log.info('Processing complete', {
     runId: run.id,
     productsUpserted,
     pricesWritten,
+    productsMatched,
     duplicateKeyCount,
     urlHashFallbackCount,
     errors: errors.length,
     uniqueProductsSeen: lastPriceCache.size,
+    productMatchStats: matcherStats,
   })
 
   return {
@@ -382,9 +450,9 @@ export async function processProducts(
 // ============================================================================
 
 /**
- * Resolve identity for a product
+ * Resolve canonical identity for a product (backward compatibility)
  * Priority per spec: IMPACT_ITEM_ID > SKU > URL_HASH
- * Note: UPC is not used for identity in v1 (stored on SourceProduct for reference only)
+ * Note: UPC is not used for canonical identity in v1 (stored for reference only)
  */
 function resolveIdentity(product: ParsedFeedProduct): ResolvedIdentity {
   // IMPACT_ITEM_ID has highest priority
@@ -400,6 +468,85 @@ function resolveIdentity(product: ParsedFeedProduct): ResolvedIdentity {
   // Fallback to URL_HASH (UPC not used for identity in v1 per spec)
   const urlHash = computeUrlHash(product.url)
   return { type: 'URL_HASH', value: urlHash }
+}
+
+/**
+ * Extract ALL identifiers from a product for the new identifiers table
+ * This enables "find by any identifier" upsert strategy.
+ *
+ * Priority for canonical marking (highest wins):
+ * 1. NETWORK_ITEM_ID (e.g., Impact's catalogItemId)
+ * 2. SKU
+ * 3. UPC
+ * 4. URL_HASH
+ */
+function extractAllIdentifiers(product: ParsedFeedProduct): ExtractedIdentifier[] {
+  const identifiers: ExtractedIdentifier[] = []
+  const urlHash = computeUrlHash(product.url)
+
+  // Determine canonical type based on priority
+  let canonicalType: ExtractedIdentifier['idType'] | null = null
+  if (product.impactItemId?.trim()) {
+    canonicalType = 'NETWORK_ITEM_ID'
+  } else if (product.sku?.trim()) {
+    canonicalType = 'SKU'
+  } else {
+    canonicalType = 'URL_HASH'
+  }
+
+  // 1. Network Item ID (Impact's catalogItemId)
+  if (product.impactItemId?.trim()) {
+    identifiers.push({
+      idType: 'NETWORK_ITEM_ID',
+      idValue: product.impactItemId.trim(),
+      namespace: 'IMPACT', // Hardcoded for now; will be dynamic per-feed later
+      isCanonical: canonicalType === 'NETWORK_ITEM_ID',
+      normalizedValue: product.impactItemId.trim().toUpperCase(),
+    })
+  }
+
+  // 2. SKU (namespace empty string for consistency - PostgreSQL NULL != NULL in unique)
+  if (product.sku?.trim()) {
+    identifiers.push({
+      idType: 'SKU',
+      idValue: product.sku.trim(),
+      namespace: '', // Empty string, not null (for unique constraint compatibility)
+      isCanonical: canonicalType === 'SKU',
+      normalizedValue: product.sku.trim().toUpperCase(),
+    })
+  }
+
+  // 3. UPC (never canonical in current system, but useful for matching)
+  if (product.upc?.trim()) {
+    identifiers.push({
+      idType: 'UPC',
+      idValue: product.upc.trim(),
+      namespace: '', // Empty string, not null
+      isCanonical: false, // UPC is never canonical identity
+      normalizedValue: product.upc.trim().replace(/^0+/, ''), // Strip leading zeros
+    })
+  }
+
+  // 4. URL_HASH (fallback identity)
+  identifiers.push({
+    idType: 'URL_HASH',
+    idValue: urlHash,
+    namespace: '', // Empty string, not null
+    isCanonical: canonicalType === 'URL_HASH',
+    normalizedValue: urlHash,
+  })
+
+  // 5. URL (never canonical, but useful for lookups)
+  const normalizedUrl = normalizeUrl(product.url)
+  identifiers.push({
+    idType: 'URL',
+    idValue: product.url,
+    namespace: '', // Empty string, not null
+    isCanonical: false,
+    normalizedValue: normalizedUrl,
+  })
+
+  return identifiers
 }
 
 /**
@@ -431,7 +578,12 @@ function prescanIdentities(products: ParsedFeedProduct[]): {
   // Track last occurrence of each identity (identityKey -> array index)
   const lastOccurrence = new Map<string, number>()
   // Track identity info for each index
-  const identityByIndex = new Map<number, { product: ParsedFeedProduct; identity: ResolvedIdentity; identityKey: string }>()
+  const identityByIndex = new Map<number, {
+    product: ParsedFeedProduct
+    identity: ResolvedIdentity
+    identityKey: string
+    allIdentifiers: ExtractedIdentifier[]
+  }>()
   let totalUrlHashFallbacks = 0
 
   // First pass: identify last occurrence of each identity
@@ -439,6 +591,7 @@ function prescanIdentities(products: ParsedFeedProduct[]): {
     const product = products[i]
     const identity = resolveIdentity(product)
     const identityKey = `${identity.type}:${identity.value}`
+    const allIdentifiers = extractAllIdentifiers(product)
 
     if (identity.type === 'URL_HASH') {
       totalUrlHashFallbacks++
@@ -446,7 +599,7 @@ function prescanIdentities(products: ParsedFeedProduct[]): {
 
     // Always update - "last row wins"
     lastOccurrence.set(identityKey, i)
-    identityByIndex.set(i, { product, identity, identityKey })
+    identityByIndex.set(i, { product, identity, identityKey, allIdentifiers })
   }
 
   // Second pass: build winning rows map (only indices that are the last occurrence)
@@ -459,6 +612,7 @@ function prescanIdentities(products: ParsedFeedProduct[]): {
       product: info.product,
       identity: info.identity,
       identityKey: info.identityKey,
+      allIdentifiers: info.allIdentifiers,
     })
     winningIdentities.add(identityKey)
   }
@@ -500,8 +654,16 @@ function filterToWinningRows(
 }
 
 /**
- * Batch upsert SourceProducts
- * Uses raw SQL with unnest() for efficient bulk upsert with ON CONFLICT
+ * Batch upsert SourceProducts using "find by any identifier" strategy
+ *
+ * Algorithm:
+ * 1. Build candidate identifiers for each incoming product
+ * 2. Query source_product_identifiers for matches within same source scope
+ * 3. If match found, use that source_product_id
+ * 4. If multiple matches return different source_product_ids, pick deterministic winner
+ * 5. If no match, create new source_products row
+ * 6. Insert any missing identifiers for that source_product_id
+ * 7. Continue dual-writing to old columns for backward compatibility
  */
 async function batchUpsertSourceProducts(
   sourceId: string,
@@ -510,58 +672,296 @@ async function batchUpsertSourceProducts(
 ): Promise<UpsertedSourceProduct[]> {
   if (products.length === 0) return []
 
-  // Extract arrays for unnest - parallel arrays for each field
-  const identityTypes = products.map((p) => p.identity.type)
-  const identityValues = products.map((p) => p.identity.value)
-  const titles = products.map((p) => p.product.name)
-  const urls = products.map((p) => p.product.url)
-  const imageUrls = products.map((p) => p.product.imageUrl ?? null)
-  const skus = products.map((p) => p.product.sku ?? null)
-  const upcs = products.map((p) => p.product.upc ?? null)
-  const urlHashes = products.map((p) => computeUrlHash(p.product.url))
-  const normalizedUrls = products.map((p) => normalizeUrl(p.product.url))
-  const impactItemIds = products.map((p) => p.product.impactItemId ?? null)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 1: Build all candidate identifiers for lookup
+  // ═══════════════════════════════════════════════════════════════════════════
+  const allLookupIdentifiers: Array<{
+    productIndex: number
+    idType: string
+    idValue: string
+    namespace: string
+  }> = []
 
-  // Bulk upsert with ON CONFLICT DO UPDATE
-  // Returns id and constructed identityKey for mapping back to products
-  const results = await prisma.$queryRaw<UpsertedSourceProduct[]>`
-    INSERT INTO source_products (
-      "id", "sourceId", "identityType", "identityValue", "title", "url",
-      "imageUrl", "sku", "upc", "urlHash", "normalizedUrl", "impactItemId",
-      "createdByRunId", "lastUpdatedByRunId", "createdAt", "updatedAt"
-    )
-    SELECT
-      gen_random_uuid(),
-      ${sourceId},
-      unnest(${identityTypes}::text[])::"SourceProductIdentityType",
-      unnest(${identityValues}::text[]),
-      unnest(${titles}::text[]),
-      unnest(${urls}::text[]),
-      unnest(${imageUrls}::text[]),
-      unnest(${skus}::text[]),
-      unnest(${upcs}::text[]),
-      unnest(${urlHashes}::text[]),
-      unnest(${normalizedUrls}::text[]),
-      unnest(${impactItemIds}::text[]),
-      ${runId},
-      ${runId},
-      NOW(),
-      NOW()
-    ON CONFLICT ("sourceId", "identityType", "identityValue") DO UPDATE SET
-      "title" = EXCLUDED."title",
-      "url" = EXCLUDED."url",
-      "imageUrl" = EXCLUDED."imageUrl",
-      "sku" = EXCLUDED."sku",
-      "upc" = EXCLUDED."upc",
-      "urlHash" = EXCLUDED."urlHash",
-      "normalizedUrl" = EXCLUDED."normalizedUrl",
-      "impactItemId" = EXCLUDED."impactItemId",
-      "lastUpdatedByRunId" = EXCLUDED."lastUpdatedByRunId",
-      "updatedAt" = NOW()
-    RETURNING "id", "identityType" || ':' || "identityValue" AS "identityKey"
+  for (let i = 0; i < products.length; i++) {
+    for (const id of products[i].allIdentifiers) {
+      allLookupIdentifiers.push({
+        productIndex: i,
+        idType: id.idType,
+        idValue: id.idValue,
+        namespace: id.namespace,
+      })
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 2: Query existing identifiers in one batch
+  // We join with source_products to filter by sourceId (same source scope)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const idTypes = allLookupIdentifiers.map((id) => id.idType)
+  const idValues = allLookupIdentifiers.map((id) => id.idValue)
+  const namespaces = allLookupIdentifiers.map((id) => id.namespace)
+
+  const existingMatches = await prisma.$queryRaw<Array<{
+    sourceProductId: string
+    idType: string
+    idValue: string
+    namespace: string
+  }>>`
+    SELECT spi."sourceProductId", spi."idType"::text, spi."idValue", COALESCE(spi."namespace", '') as namespace
+    FROM source_product_identifiers spi
+    JOIN source_products sp ON sp.id = spi."sourceProductId"
+    WHERE sp."sourceId" = ${sourceId}
+      AND (spi."idType"::text, spi."idValue", COALESCE(spi."namespace", '')) IN (
+        SELECT
+          unnest(${idTypes}::text[]),
+          unnest(${idValues}::text[]),
+          unnest(${namespaces}::text[])
+      )
   `
 
+  // Build lookup map: "idType:idValue:namespace" -> sourceProductId
+  const identifierToSourceProductId = new Map<string, string>()
+  for (const match of existingMatches) {
+    const key = `${match.idType}:${match.idValue}:${match.namespace}`
+    identifierToSourceProductId.set(key, match.sourceProductId)
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 3: Resolve each product to existing or new source_product_id
+  // ═══════════════════════════════════════════════════════════════════════════
+  const productResolutions: Array<{
+    productIndex: number
+    existingSourceProductId: string | null
+    matchedBy: string | null // For logging collision detection
+    collisions: string[] // Multiple different source_product_ids found
+  }> = []
+
+  for (let i = 0; i < products.length; i++) {
+    const product = products[i]
+    const foundIds = new Set<string>()
+    let matchedBy: string | null = null
+
+    for (const id of product.allIdentifiers) {
+      const key = `${id.idType}:${id.idValue}:${id.namespace}`
+      const existingId = identifierToSourceProductId.get(key)
+      if (existingId) {
+        foundIds.add(existingId)
+        if (!matchedBy) {
+          matchedBy = key
+        }
+      }
+    }
+
+    const foundIdsArray = Array.from(foundIds)
+    if (foundIdsArray.length > 1) {
+      // Collision: multiple identifiers point to different source_products
+      // Log for remediation and pick deterministic winner (first alphabetically)
+      foundIdsArray.sort()
+      log.warn('IDENTIFIER_COLLISION', {
+        runId,
+        productIndex: i,
+        identityKey: product.identityKey,
+        matchedSourceProductIds: foundIdsArray,
+        selectedWinner: foundIdsArray[0],
+      })
+    }
+
+    productResolutions.push({
+      productIndex: i,
+      existingSourceProductId: foundIdsArray[0] ?? null,
+      matchedBy,
+      collisions: foundIdsArray.length > 1 ? foundIdsArray : [],
+    })
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 4: Split into existing (update) vs new (insert)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const toUpdate: Array<{ resolution: typeof productResolutions[0]; product: ProductWithIdentity }> = []
+  const toInsert: Array<{ productIndex: number; product: ProductWithIdentity }> = []
+
+  for (const resolution of productResolutions) {
+    const product = products[resolution.productIndex]
+    if (resolution.existingSourceProductId) {
+      toUpdate.push({ resolution, product })
+    } else {
+      toInsert.push({ productIndex: resolution.productIndex, product })
+    }
+  }
+
+  log.debug('Upsert resolution', {
+    runId,
+    total: products.length,
+    existing: toUpdate.length,
+    new: toInsert.length,
+    collisions: productResolutions.filter((r) => r.collisions.length > 0).length,
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 5: Update existing source_products
+  // ═══════════════════════════════════════════════════════════════════════════
+  const results: UpsertedSourceProduct[] = []
+
+  if (toUpdate.length > 0) {
+    const updateIds = toUpdate.map((u) => u.resolution.existingSourceProductId!)
+    const updateTitles = toUpdate.map((u) => u.product.product.name)
+    const updateUrls = toUpdate.map((u) => u.product.product.url)
+    const updateImageUrls = toUpdate.map((u) => u.product.product.imageUrl ?? null)
+    const updateNormalizedUrls = toUpdate.map((u) => normalizeUrl(u.product.product.url))
+
+    // Batch update using unnest pattern
+    await prisma.$executeRaw`
+      UPDATE source_products AS sp SET
+        "title" = u.title,
+        "url" = u.url,
+        "imageUrl" = u."imageUrl",
+        "normalizedUrl" = u."normalizedUrl",
+        "lastUpdatedByRunId" = ${runId},
+        "updatedAt" = NOW()
+      FROM (
+        SELECT
+          unnest(${updateIds}::text[]) AS id,
+          unnest(${updateTitles}::text[]) AS title,
+          unnest(${updateUrls}::text[]) AS url,
+          unnest(${updateImageUrls}::text[]) AS "imageUrl",
+          unnest(${updateNormalizedUrls}::text[]) AS "normalizedUrl"
+      ) AS u
+      WHERE sp.id = u.id
+    `
+
+    // Add to results
+    for (const u of toUpdate) {
+      results.push({
+        id: u.resolution.existingSourceProductId!,
+        identityKey: u.product.identityKey,
+      })
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 6: Insert new source_products
+  // Generate IDs client-side so we can track them for identifier insertion
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (toInsert.length > 0) {
+    // Generate IDs client-side using cuid pattern (matches Prisma default)
+    const insertIds = toInsert.map(() => createId())
+    const insertTitles = toInsert.map((i) => i.product.product.name)
+    const insertUrls = toInsert.map((i) => i.product.product.url)
+    const insertImageUrls = toInsert.map((i) => i.product.product.imageUrl ?? null)
+    const insertNormalizedUrls = toInsert.map((i) => normalizeUrl(i.product.product.url))
+
+    // Bulk insert - no ON CONFLICT needed since we're generating unique IDs
+    await prisma.$executeRaw`
+      INSERT INTO source_products (
+        "id", "sourceId", "title", "url", "imageUrl", "normalizedUrl",
+        "createdByRunId", "lastUpdatedByRunId", "createdAt", "updatedAt"
+      )
+      SELECT
+        unnest(${insertIds}::text[]),
+        ${sourceId},
+        unnest(${insertTitles}::text[]),
+        unnest(${insertUrls}::text[]),
+        unnest(${insertImageUrls}::text[]),
+        unnest(${insertNormalizedUrls}::text[]),
+        ${runId},
+        ${runId},
+        NOW(),
+        NOW()
+    `
+
+    // Add to results with the IDs we generated
+    for (let i = 0; i < toInsert.length; i++) {
+      results.push({
+        id: insertIds[i],
+        identityKey: toInsert[i].product.identityKey,
+      })
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STEP 7: Insert identifiers into source_product_identifiers (new table)
+  // This enables future "find by any identifier" lookups
+  // ═══════════════════════════════════════════════════════════════════════════
+  await batchInsertIdentifiers(products, results, runId)
+
   return results
+}
+
+/**
+ * Insert identifiers into source_product_identifiers table
+ * Uses ON CONFLICT DO NOTHING for idempotency
+ */
+async function batchInsertIdentifiers(
+  products: ProductWithIdentity[],
+  upsertedProducts: UpsertedSourceProduct[],
+  runId: string
+): Promise<void> {
+  // Build lookup from identityKey to sourceProductId
+  const idLookup = new Map<string, string>()
+  for (const sp of upsertedProducts) {
+    idLookup.set(sp.identityKey, sp.id)
+  }
+
+  // Collect all identifiers to insert
+  const identifiersToInsert: Array<{
+    sourceProductId: string
+    idType: string
+    idValue: string
+    namespace: string
+    isCanonical: boolean
+    normalizedValue: string | null
+  }> = []
+
+  for (const { identityKey, allIdentifiers } of products) {
+    const sourceProductId = idLookup.get(identityKey)
+    if (!sourceProductId) continue
+
+    for (const id of allIdentifiers) {
+      identifiersToInsert.push({
+        sourceProductId,
+        idType: id.idType,
+        idValue: id.idValue,
+        namespace: id.namespace,
+        isCanonical: id.isCanonical,
+        normalizedValue: id.normalizedValue,
+      })
+    }
+  }
+
+  if (identifiersToInsert.length === 0) return
+
+  // Extract arrays for unnest
+  const sourceProductIds = identifiersToInsert.map((i) => i.sourceProductId)
+  const idTypes = identifiersToInsert.map((i) => i.idType)
+  const idValues = identifiersToInsert.map((i) => i.idValue)
+  const namespaces = identifiersToInsert.map((i) => i.namespace)
+  const isCanonicals = identifiersToInsert.map((i) => i.isCanonical)
+  const normalizedValues = identifiersToInsert.map((i) => i.normalizedValue)
+
+  // Bulk insert with ON CONFLICT DO NOTHING
+  const inserted = await prisma.$executeRaw`
+    INSERT INTO source_product_identifiers (
+      "id", "sourceProductId", "idType", "idValue", "namespace",
+      "isCanonical", "normalizedValue", "createdAt", "updatedAt"
+    )
+    SELECT
+      gen_random_uuid()::text,
+      unnest(${sourceProductIds}::text[]),
+      unnest(${idTypes}::text[])::"IdentifierType",
+      unnest(${idValues}::text[]),
+      unnest(${namespaces}::text[]),
+      unnest(${isCanonicals}::boolean[]),
+      unnest(${normalizedValues}::text[]),
+      NOW(),
+      NOW()
+    ON CONFLICT ("sourceProductId", "idType", "idValue", "namespace") DO NOTHING
+  `
+
+  log.debug('Identifiers inserted', {
+    runId,
+    requested: identifiersToInsert.length,
+    inserted,
+  })
 }
 
 /**
@@ -642,7 +1042,8 @@ function decidePriceWrites(
   retailerId: string,
   runId: string,
   t0: Date,
-  lastPriceCache: Map<string, LastPriceEntry>
+  lastPriceCache: Map<string, LastPriceEntry>,
+  sourceProductIdToProductId: Map<string, string | null>
 ): NewPriceRecord[] {
   const pricesToWrite: NewPriceRecord[] = []
 
@@ -670,9 +1071,13 @@ function decidePriceWrites(
       continue
     }
 
+    // Get productId from UPC matching (may be null if no match)
+    const productId = sourceProductIdToProductId.get(sourceProductId) ?? null
+
     pricesToWrite.push({
       retailerId,
       sourceProductId,
+      productId,
       affiliateFeedRunId: runId,
       priceSignatureHash,
       price: product.price,
@@ -709,6 +1114,7 @@ async function bulkInsertPrices(
 
   // Extract arrays for unnest - per spec pattern
   const sourceProductIds = pricesToWrite.map((p) => p.sourceProductId)
+  const productIds = pricesToWrite.map((p) => p.productId) // FK to canonical product
   const retailerIds = pricesToWrite.map((p) => p.retailerId)
   const prices = pricesToWrite.map((p) => p.price)
   const currencies = pricesToWrite.map((p) => p.currency)
@@ -727,6 +1133,7 @@ async function bulkInsertPrices(
     INSERT INTO prices (
       "id",
       "sourceProductId",
+      "productId",
       "retailerId",
       "price",
       "currency",
@@ -744,6 +1151,7 @@ async function bulkInsertPrices(
     SELECT
       gen_random_uuid(),
       unnest(${sourceProductIds}::text[]),
+      unnest(${productIds}::text[]),
       unnest(${retailerIds}::text[]),
       unnest(${prices}::numeric[]),
       unnest(${currencies}::text[]),

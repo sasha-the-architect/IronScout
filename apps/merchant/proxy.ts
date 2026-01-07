@@ -4,7 +4,7 @@ import { jwtVerify } from 'jose';
 
 // JWT secret for merchant portal tokens
 // CRITICAL: At least one of these must be set in production
-const jwtSecretString = process.env.MERCHANT_JWT_SECRET || process.env.DEALER_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+const jwtSecretString = process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
 if (!jwtSecretString && process.env.NODE_ENV === 'production') {
   throw new Error('CRITICAL: No JWT secret configured for merchant proxy.');
 }

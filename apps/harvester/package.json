@@ -26,6 +26,7 @@
     "@ironscout/db": "workspace:*",
     "@ironscout/logger": "workspace:*",
     "@ironscout/notifications": "workspace:*",
+    "@paralleldrive/cuid2": "^3.0.6",
     "axios": "^1.13.2",
     "basic-ftp": "^5.1.0",
     "bullmq": "^5.66.4",

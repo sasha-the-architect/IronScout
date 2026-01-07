@@ -3,21 +3,20 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@ironscout/db';
 import {
   Package,
-  TrendingUp,
-  AlertTriangle,
   CheckCircle,
   Rss,
-  Clock
+  Clock,
+  TrendingUp
 } from 'lucide-react';
 import { PlanSummary } from '@/components/plan-summary';
 
 export default async function DashboardPage() {
   const session = await getSession();
-  
+
   if (!session) {
     redirect('/login');
   }
-  
+
   // Admin redirect
   if (session.type === 'admin') {
     redirect('/admin/merchants');
@@ -36,22 +35,18 @@ export default async function DashboardPage() {
   const [
     skuCount,
     activeSkuCount,
-    needsReviewCount,
-    insightCount,
     feed,
     recentRun
   ] = await Promise.all([
     retailerId ? prisma.retailer_skus.count({ where: { retailerId } }) : Promise.resolve(0),
     retailerId ? prisma.retailer_skus.count({ where: { retailerId, isActive: true } }) : Promise.resolve(0),
-    retailerId ? prisma.retailer_skus.count({ where: { retailerId, needsReview: true } }) : Promise.resolve(0),
-    prisma.merchant_insights.count({ where: { merchantId, isActive: true } }),
     retailerId ? prisma.retailer_feeds.findFirst({ where: { retailerId } }) : Promise.resolve(null),
     retailerId ? prisma.retailer_feed_runs.findFirst({
       where: { retailerId },
       orderBy: { startedAt: 'desc' }
     }) : Promise.resolve(null),
   ]);
-  
+
   const stats = [
     {
       name: 'Total SKUs',
@@ -64,20 +59,6 @@ export default async function DashboardPage() {
       value: activeSkuCount.toLocaleString(),
       icon: CheckCircle,
       color: 'bg-green-500',
-    },
-    {
-      name: 'Needs Review',
-      value: needsReviewCount.toLocaleString(),
-      icon: AlertTriangle,
-      color: 'bg-yellow-500',
-      href: '/skus?filter=needs-review',
-    },
-    {
-      name: 'Active Insights',
-      value: insightCount.toLocaleString(),
-      icon: TrendingUp,
-      color: 'bg-purple-500',
-      href: '/insights',
     },
   ];
 
@@ -92,7 +73,7 @@ export default async function DashboardPage() {
           Here's an overview of your merchant portal activity.
         </p>
       </div>
-      
+
       {/* Stats */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
@@ -114,7 +95,7 @@ export default async function DashboardPage() {
           </div>
         ))}
       </div>
-      
+
       {/* Feed Status */}
       <div className="rounded-lg bg-white shadow">
         <div className="px-4 py-5 sm:p-6">
@@ -122,7 +103,7 @@ export default async function DashboardPage() {
             <Rss className="h-5 w-5 text-gray-400" />
             Feed Status
           </h3>
-          
+
           {!feed ? (
             <div className="mt-4">
               <p className="text-sm text-gray-500">
@@ -148,7 +129,7 @@ export default async function DashboardPage() {
                   {feed.status}
                 </span>
               </div>
-              
+
               {recentRun && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500 flex items-center gap-1">
@@ -160,7 +141,7 @@ export default async function DashboardPage() {
                   </span>
                 </div>
               )}
-              
+
               {recentRun && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">Products Indexed</span>
@@ -169,7 +150,7 @@ export default async function DashboardPage() {
                   </span>
                 </div>
               )}
-              
+
               <div className="pt-2">
                 <a
                   href="/feed"
@@ -182,48 +163,34 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
-      
+
       {/* Quick Actions */}
       <div className="rounded-lg bg-white shadow">
         <div className="px-4 py-5 sm:p-6">
           <h3 className="text-base font-semibold leading-6 text-gray-900">
             Quick Actions
           </h3>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <a
-              href="/skus?filter=needs-review"
+              href="/feed"
               className="relative flex items-center space-x-3 rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm hover:border-gray-400"
             >
               <div className="flex-shrink-0">
-                <AlertTriangle className="h-6 w-6 text-yellow-500" />
+                <Rss className="h-6 w-6 text-blue-500" />
               </div>
               <div className="min-w-0 flex-1">
                 <span className="absolute inset-0" aria-hidden="true" />
-                <p className="text-sm font-medium text-gray-900">Review SKUs</p>
-                <p className="truncate text-sm text-gray-500">{needsReviewCount} need attention</p>
+                <p className="text-sm font-medium text-gray-900">Manage Feed</p>
+                <p className="truncate text-sm text-gray-500">Configure your product feed</p>
               </div>
             </a>
-            
-            <a
-              href="/insights"
-              className="relative flex items-center space-x-3 rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm hover:border-gray-400"
-            >
-              <div className="flex-shrink-0">
-                <TrendingUp className="h-6 w-6 text-purple-500" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <span className="absolute inset-0" aria-hidden="true" />
-                <p className="text-sm font-medium text-gray-900">View Insights</p>
-                <p className="truncate text-sm text-gray-500">{insightCount} active insights</p>
-              </div>
-            </a>
-            
+
             <a
               href="/analytics"
               className="relative flex items-center space-x-3 rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm hover:border-gray-400"
             >
               <div className="flex-shrink-0">
-                <TrendingUp className="h-6 w-6 text-blue-500" />
+                <TrendingUp className="h-6 w-6 text-purple-500" />
               </div>
               <div className="min-w-0 flex-1">
                 <span className="absolute inset-0" aria-hidden="true" />

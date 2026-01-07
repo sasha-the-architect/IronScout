@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import NextLink from 'next/link';
 import {
   Store,
   CheckCircle,
@@ -365,13 +366,18 @@ export function RetailersSection({ merchantId, subscriptionStatus }: RetailersSe
                   <tr key={retailer.id} className={retailer.listingStatus === 'UNLISTED' ? 'bg-gray-50' : ''}>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{retailer.retailerName}</div>
+                        <NextLink
+                          href={`/retailers/${retailer.retailerId}`}
+                          className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          {retailer.retailerName}
+                        </NextLink>
                         {retailer.retailerUrl && (
                           <a
                             href={retailer.retailerUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                            className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
                           >
                             {retailer.retailerUrl.replace(/^https?:\/\//, '').slice(0, 30)}
                             <ExternalLink className="h-3 w-3" />

@@ -380,21 +380,6 @@ export function visibleDealerPriceWhere(): Prisma.pricesWhereInput {
  * ```
  */
 export function visibleRetailerPriceWhere(): Prisma.pricesWhereInput {
-  // In development, allow bypassing merchant_retailer checks for simpler test data
-  // NODE_ENV is 'development' or undefined in local dev
-  const isDev = !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
-  const skipMerchantCheck = isDev && process.env.SKIP_MERCHANT_RETAILER_CHECK === 'true'
-
-  if (skipMerchantCheck) {
-    return {
-      retailers: {
-        is: {
-          visibilityStatus: 'ELIGIBLE',
-        },
-      },
-    }
-  }
-
   // Use shared A1 visibility predicate from @ironscout/db
   // See packages/db/visibility.js for truth table and semantics
   return sharedVisibleRetailerPriceWhere()

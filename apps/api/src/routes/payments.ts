@@ -353,8 +353,8 @@ router.get('/health', async (req: Request, res: Response) => {
         priceIds: {
           premiumMonthly: !!process.env.STRIPE_PRICE_ID_PREMIUM_MONTHLY,
           premiumAnnually: !!process.env.STRIPE_PRICE_ID_PREMIUM_ANNUALLY,
-          merchantStandard: !!(process.env.STRIPE_PRICE_ID_MERCHANT_STANDARD_MONTHLY || process.env.STRIPE_PRICE_ID_DEALER_STANDARD_MONTHLY),
-          merchantPro: !!(process.env.STRIPE_PRICE_ID_MERCHANT_PRO_MONTHLY || process.env.STRIPE_PRICE_ID_DEALER_PRO_MONTHLY)
+          merchantStandard: !!process.env.STRIPE_PRICE_ID_MERCHANT_STANDARD_MONTHLY,
+          merchantPro: !!process.env.STRIPE_PRICE_ID_MERCHANT_PRO_MONTHLY
         }
       },
       database: {
@@ -1905,7 +1905,7 @@ router.get('/merchant/plans', requirePremiumApi(), async (req: Request, res: Res
   try {
     const merchantPlans = [
       {
-        id: process.env.STRIPE_PRICE_ID_MERCHANT_STANDARD_MONTHLY || process.env.STRIPE_PRICE_ID_DEALER_STANDARD_MONTHLY || 'price_dealer_standard',
+        id: process.env.STRIPE_PRICE_ID_MERCHANT_STANDARD_MONTHLY || 'price_merchant_standard',
         name: 'Standard',
         tier: 'STANDARD',
         price: 99,
@@ -1913,7 +1913,7 @@ router.get('/merchant/plans', requirePremiumApi(), async (req: Request, res: Res
         interval: 'month',
         features: [
           'Product listing inclusion on IronScout.ai',
-          'Dealer feed ingestion and SKU matching',
+          'Merchant feed ingestion and SKU matching',
           'Market price benchmarks by caliber',
           'Basic pricing insights',
           'Email alerts for market changes',
@@ -1922,7 +1922,7 @@ router.get('/merchant/plans', requirePremiumApi(), async (req: Request, res: Res
         ]
       },
       {
-        id: process.env.STRIPE_PRICE_ID_MERCHANT_PRO_MONTHLY || process.env.STRIPE_PRICE_ID_DEALER_PRO_MONTHLY || 'price_dealer_pro',
+        id: process.env.STRIPE_PRICE_ID_MERCHANT_PRO_MONTHLY || 'price_merchant_pro',
         name: 'Pro',
         tier: 'PRO',
         price: 299,

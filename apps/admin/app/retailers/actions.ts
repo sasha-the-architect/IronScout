@@ -617,16 +617,18 @@ export async function linkMerchantToRetailer(
       return { success: false, error: 'Merchant not found' };
     }
 
-    // Check if retailer already has a merchant linked (1 retailer = 1 merchant)
+    // Check if this specific merchant-retailer pair already exists
     const existingLink = await prisma.merchant_retailers.findFirst({
-      where: { retailerId },
+      where: { merchantId, retailerId },
     });
 
     if (existingLink) {
-      return { success: false, error: 'This retailer is already linked to a merchant' };
+      return { success: false, error: 'This merchant is already linked to this retailer' };
     }
 
-    // Note: A merchant CAN have multiple retailers, so we don't check merchantId
+    // Note: Both 1:many relationships are now allowed:
+    // - A merchant CAN have multiple retailers
+    // - A retailer CAN have multiple merchants
 
     // Create the link
     await prisma.merchant_retailers.create({
@@ -665,9 +667,12 @@ export async function linkMerchantToRetailer(
 /**
  * Unlink a merchant from a retailer
  * Deletes the merchant_retailers record
+ * @param retailerId - The retailer to unlink
+ * @param merchantId - The merchant to unlink (required for 1:many support)
  */
 export async function unlinkMerchantFromRetailer(
-  retailerId: string
+  retailerId: string,
+  merchantId: string
 ): Promise<{ success: boolean; error?: string }> {
   const session = await getAdminSession();
   if (!session) {
@@ -675,9 +680,9 @@ export async function unlinkMerchantFromRetailer(
   }
 
   try {
-    // Find the link
+    // Find the specific link
     const link = await prisma.merchant_retailers.findFirst({
-      where: { retailerId },
+      where: { retailerId, merchantId },
       include: {
         merchants: { select: { id: true, businessName: true } },
         retailers: { select: { id: true, name: true } },
@@ -685,7 +690,7 @@ export async function unlinkMerchantFromRetailer(
     });
 
     if (!link) {
-      return { success: false, error: 'No merchant linked to this retailer' };
+      return { success: false, error: 'No link found between this merchant and retailer' };
     }
 
     // Delete the link
@@ -707,7 +712,7 @@ export async function unlinkMerchantFromRetailer(
     revalidatePath('/retailers');
     revalidatePath(`/retailers/${retailerId}`);
     revalidatePath('/merchants');
-    revalidatePath(`/merchants/${link.merchants.id}`);
+    revalidatePath(`/merchants/${merchantId}`);
 
     return { success: true };
   } catch (error) {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSession, requireRetailerContext, RetailerContextError } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { logger } from '@/lib/logger';
 
@@ -24,21 +24,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Look up retailerId via merchant_retailers
-    const merchantRetailer = await prisma.merchant_retailers.findFirst({
-      where: { merchantId: session.merchantId },
-      select: { retailerId: true }
-    });
-
-    if (!merchantRetailer?.retailerId) {
-      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
-    }
+    // Resolve retailer context from query param
+    const url = new URL(request.url);
+    const inputRetailerId = url.searchParams.get('retailerId') || undefined;
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
 
     // Verify ownership
     const correction = await prisma.feed_corrections.findFirst({
       where: {
         id,
-        retailerId: merchantRetailer.retailerId,
+        retailerId,
       },
     });
 
@@ -52,8 +48,12 @@ export async function DELETE(
 
     reqLogger.info('Correction deleted', { correctionId: id });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, retailerContext });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to delete correction', {}, error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }

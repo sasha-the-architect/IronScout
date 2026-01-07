@@ -132,7 +132,7 @@ async function main() {
   });
   console.log(`Prices with visible retailers: ${visiblePrices}`);
 
-  console.log('\nDone! You can now remove SKIP_MERCHANT_RETAILER_CHECK from .env');
+  console.log('\nDone! Retailer data has been fixed.');
 }
 
 main()

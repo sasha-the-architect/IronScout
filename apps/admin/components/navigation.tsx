@@ -6,11 +6,10 @@ import { usePathname } from 'next/navigation';
 import {
   Users,
   Store,
-  BarChart3,
   Settings,
   LogOut,
   Rss,
-  Package,
+  Activity,
 } from 'lucide-react';
 import type { AdminSession } from '@/lib/auth';
 
@@ -22,8 +21,7 @@ const navItems = [
   { name: 'Merchants', href: '/merchants', icon: Users },
   { name: 'Retailers', href: '/retailers', icon: Store },
   { name: 'Affiliate Feeds', href: '/affiliate-feeds', icon: Rss },
-  { name: 'Product Suggestions', href: '/product-suggestions', icon: Package },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Resolver Metrics', href: '/resolver-metrics', icon: Activity },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

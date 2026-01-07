@@ -143,6 +143,22 @@ export async function getStringSetting(key: SettingKey): Promise<string> {
 }
 
 /**
+ * Get a string setting value without falling back to defaults.
+ * Returns the env override if set, otherwise the DB value, otherwise null.
+ * Useful when callers need to avoid overwriting an explicit runtime configuration.
+ */
+export async function getOptionalStringSetting(key: SettingKey): Promise<string | null> {
+  const envValue = process.env[key]
+  if (envValue) return envValue
+
+  const setting = await prisma.system_settings.findUnique({
+    where: { key },
+  })
+
+  return setting ? (setting.value as string) : null
+}
+
+/**
  * Check if a feature is enabled
  */
 export async function isFeatureEnabled(key: SettingKey): Promise<boolean> {
@@ -166,6 +182,8 @@ export const getAffiliateBatchSize = () => getNumberSetting(SETTING_KEYS.AFFILIA
 export const getPriceHeartbeatHours = () => getNumberSetting(SETTING_KEYS.PRICE_HEARTBEAT_HOURS)
 export const getAffiliateRunRetentionDays = () => getNumberSetting(SETTING_KEYS.AFFILIATE_RUN_RETENTION_DAYS)
 export const getHarvesterLogLevel = () => getStringSetting(SETTING_KEYS.HARVESTER_LOG_LEVEL)
+export const getHarvesterLogLevelOptional = () =>
+  getOptionalStringSetting(SETTING_KEYS.HARVESTER_LOG_LEVEL)
 
 /**
  * Queue history settings - maps queue name to setting key

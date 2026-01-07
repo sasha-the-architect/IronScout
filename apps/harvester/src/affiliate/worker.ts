@@ -47,7 +47,7 @@ export function createAffiliateFeedWorker() {
     },
     {
       connection: redisConnection,
-      concurrency: 5, // Process up to 5 feeds concurrently
+      concurrency: 2, // Process up to 2 feeds concurrently (limited by SFTP server connection limit)
       limiter: {
         max: 10,
         duration: 60000, // 10 jobs per minute max
@@ -351,10 +351,10 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
     const result = await executePhase1(context)
     const phase1Duration = Date.now() - phase1Start
 
-    log.debug('Phase 1 completed', {
+    log.info('PHASE1_OK', {
       feedId: feed.id,
       runId: run.id,
-      phase1DurationMs: phase1Duration,
+      durationMs: phase1Duration,
       skipped: result.skipped,
       skippedReason: result.skippedReason,
       metrics: result.skipped ? null : result.metrics,
@@ -382,10 +382,10 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
       const phase2Result = await executePhase2(context, result)
       const phase2Duration = Date.now() - phase2Start
 
-      log.debug('Phase 2 completed', {
+      log.info('PHASE2_OK', {
         feedId: feed.id,
         runId: run.id,
-        phase2DurationMs: phase2Duration,
+        durationMs: phase2Duration,
         productsPromoted: phase2Result.productsPromoted,
         circuitBreakerBlocked: phase2Result.circuitBreakerBlocked,
       })

@@ -543,7 +543,7 @@ export async function resendVerificationEmail(merchantId: string) {
 // =============================================================================
 
 const MERCHANT_JWT_SECRET = new TextEncoder().encode(
-  process.env.MERCHANT_JWT_SECRET || process.env.DEALER_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'merchant-secret-change-me'
+  process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'merchant-secret-change-me'
 );
 
 export async function impersonateMerchant(merchantId: string) {
@@ -1517,16 +1517,15 @@ export async function linkRetailerToMerchant(
       return { success: false, error: 'Retailer not found' };
     }
 
-    // Check if already linked (V1: 1 retailer = 1 merchant)
+    // Check if this specific merchant-retailer pair already exists
     const existingLink = await prisma.merchant_retailers.findFirst({
-      where: { retailerId },
-      include: { merchants: { select: { businessName: true } } },
+      where: { merchantId, retailerId },
     });
 
     if (existingLink) {
       return {
         success: false,
-        error: `This retailer is already linked to ${existingLink.merchants.businessName}`,
+        error: 'This merchant is already linked to this retailer',
       };
     }
 

@@ -2,17 +2,10 @@
  * Merchant Portal Workers - Index
  *
  * Exports all merchant-related workers for the harvester.
+ * Note: benchmark, insight, and sku-match workers removed for v1 (benchmark subsystem removed)
  */
 
 export { merchantFeedIngestWorker } from './feed-ingest'
-export { merchantSkuMatchWorker } from './sku-match'
-export { merchantBenchmarkWorker } from './benchmark'
-export { merchantInsightWorker } from './insight'
 
 // Re-export queue references for scheduling
-export {
-  merchantFeedIngestQueue,
-  merchantSkuMatchQueue,
-  merchantBenchmarkQueue,
-  merchantInsightQueue,
-} from '../config/queues'
+export { merchantFeedIngestQueue } from '../config/queues'

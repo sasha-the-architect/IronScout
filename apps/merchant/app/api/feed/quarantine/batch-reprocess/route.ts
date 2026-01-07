@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSession, requireRetailerContext, RetailerContextError } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 
 const batchSchema = z.object({
   recordIds: z.array(z.string()).min(1).max(100),
+  retailerId: z.string().optional(), // Optional: for multi-retailer merchants
 });
 
 /**
@@ -38,18 +39,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid record IDs' }, { status: 400 });
     }
 
-    const { recordIds } = validation.data;
+    const { recordIds, retailerId: inputRetailerId } = validation.data;
 
-    // Look up retailerId via merchant_retailers
-    const merchantRetailer = await prisma.merchant_retailers.findFirst({
-      where: { merchantId: session.merchantId },
-      select: { retailerId: true }
-    });
-    const retailerId = merchantRetailer?.retailerId;
-
-    if (!retailerId) {
-      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
-    }
+    // Resolve retailer context (supports multi-retailer merchants)
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
 
     // Get all records with their corrections
     const records = await prisma.quarantined_records.findMany({
@@ -189,8 +183,13 @@ export async function POST(request: Request) {
       succeeded: successCount,
       failed: failureCount,
       results,
+      retailerContext,
     });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Batch reprocess failed', {}, error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }

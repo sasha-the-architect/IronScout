@@ -12,12 +12,12 @@ export const QUEUE_NAMES = {
   ALERT: 'alert',
   // Merchant Portal queues
   MERCHANT_FEED_INGEST: 'merchant-feed-ingest',
-  MERCHANT_SKU_MATCH: 'merchant-sku-match',
-  MERCHANT_BENCHMARK: 'merchant-benchmark',
-  MERCHANT_INSIGHT: 'merchant-insight',
+  // Note: sku-match, benchmark, insight queues removed for v1 (benchmark subsystem removed)
   // Affiliate Feed queues
   AFFILIATE_FEED: 'affiliate-feed',
   AFFILIATE_FEED_SCHEDULER: 'affiliate-feed-scheduler',
+  // Product Resolver queue (Spec v1.2)
+  PRODUCT_RESOLVE: 'product-resolve',
 } as const
 
 // Job data interfaces
@@ -136,9 +136,6 @@ export async function initQueueSettings(): Promise<void> {
         write: true,
         alert: true,
         'merchant-feed-ingest': true,
-        'merchant-sku-match': true,
-        'merchant-benchmark': true,
-        'merchant-insight': true,
         'affiliate-feed': true,
         'affiliate-feed-scheduler': true,
       },
@@ -198,51 +195,14 @@ export interface MerchantFeedIngestJobData {
   adminId?: string // For audit logging
 }
 
-export interface MerchantSkuMatchJobData {
-  retailerId: string
-  feedRunId: string
-  merchantSkuIds: string[] // Batch of SKU IDs to process
-}
-
-export interface MerchantBenchmarkJobData {
-  canonicalSkuIds?: string[] // Optional: specific SKUs to recalculate
-  fullRecalc?: boolean // If true, recalculate all benchmarks
-}
-
-export interface MerchantInsightJobData {
-  merchantId: string
-  merchantSkuIds?: string[] // Optional: specific SKUs to analyze
-}
+// Note: MerchantSkuMatchJobData, MerchantBenchmarkJobData, MerchantInsightJobData removed for v1
 
 export const merchantFeedIngestQueue = new Queue<MerchantFeedIngestJobData>(
   QUEUE_NAMES.MERCHANT_FEED_INGEST,
   { connection: redisConnection, defaultJobOptions: getJobOptions('merchant-feed-ingest') }
 )
 
-export const merchantSkuMatchQueue = new Queue<MerchantSkuMatchJobData>(
-  QUEUE_NAMES.MERCHANT_SKU_MATCH,
-  { connection: redisConnection, defaultJobOptions: getJobOptions('merchant-sku-match') }
-)
-
-export const merchantBenchmarkQueue = new Queue<MerchantBenchmarkJobData>(
-  QUEUE_NAMES.MERCHANT_BENCHMARK,
-  {
-    connection: redisConnection,
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 5000, // 5s, 15s, 45s
-      },
-      ...getJobOptions('merchant-benchmark'),
-    },
-  }
-)
-
-export const merchantInsightQueue = new Queue<MerchantInsightJobData>(
-  QUEUE_NAMES.MERCHANT_INSIGHT,
-  { connection: redisConnection, defaultJobOptions: getJobOptions('merchant-insight') }
-)
+// Note: merchantSkuMatchQueue, merchantBenchmarkQueue, merchantInsightQueue removed for v1
 
 // ============================================================================
 // AFFILIATE FEED QUEUES
@@ -284,6 +244,63 @@ export const affiliateFeedSchedulerQueue = new Queue<AffiliateFeedSchedulerJobDa
   }
 )
 
+// ============================================================================
+// PRODUCT RESOLVER QUEUE (Spec v1.2)
+// ============================================================================
+
+/**
+ * Product Resolver job data
+ * Per Spec v1.2 §0.3: Job contract for RESOLVE_SOURCE_PRODUCT
+ */
+export interface ProductResolveJobData {
+  sourceProductId: string
+  trigger: 'INGEST' | 'RECONCILE' | 'MANUAL'
+  resolverVersion: string
+}
+
+/**
+ * Product Resolver queue
+ * Per Spec v1.2:
+ * - JobId format: RESOLVE_SOURCE_PRODUCT:<sourceProductId>
+ * - Retry: system errors only, max 3 attempts
+ * - Debounce: 10-30s per sourceProductId (handled by jobId deduplication)
+ */
+export const productResolveQueue = new Queue<ProductResolveJobData>(
+  QUEUE_NAMES.PRODUCT_RESOLVE,
+  {
+    connection: redisConnection,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 1000, // 1s, 5s, 25s
+      },
+      ...getJobOptions('product-resolve'),
+    },
+  }
+)
+
+/**
+ * Enqueue a product resolution job with deduplication
+ * Per Spec v1.2 §0.3: JobId = RESOLVE_SOURCE_PRODUCT:<sourceProductId>
+ */
+export async function enqueueProductResolve(
+  sourceProductId: string,
+  trigger: ProductResolveJobData['trigger'],
+  resolverVersion: string,
+  options?: { delay?: number }
+): Promise<void> {
+  const jobId = `RESOLVE_SOURCE_PRODUCT:${sourceProductId}`
+  await productResolveQueue.add(
+    'RESOLVE_SOURCE_PRODUCT',
+    { sourceProductId, trigger, resolverVersion },
+    {
+      jobId,
+      delay: options?.delay ?? 10_000, // 10s debounce default
+    }
+  )
+}
+
 // Export all queues
 export const queues = {
   crawl: crawlQueue,
@@ -294,10 +311,10 @@ export const queues = {
   alert: alertQueue,
   // Merchant queues
   merchantFeedIngest: merchantFeedIngestQueue,
-  merchantSkuMatch: merchantSkuMatchQueue,
-  merchantBenchmark: merchantBenchmarkQueue,
-  merchantInsight: merchantInsightQueue,
+  // Note: merchantSkuMatch, merchantBenchmark, merchantInsight removed for v1
   // Affiliate queues
   affiliateFeed: affiliateFeedQueue,
   affiliateFeedScheduler: affiliateFeedSchedulerQueue,
+  // Product Resolver queue
+  productResolve: productResolveQueue,
 }

@@ -38,9 +38,6 @@ import {
   writeQueue,
   alertQueue,
   merchantFeedIngestQueue,
-  merchantSkuMatchQueue,
-  merchantBenchmarkQueue,
-  merchantInsightQueue,
   affiliateFeedQueue,
   affiliateFeedSchedulerQueue,
 } from '../config/queues'
@@ -113,9 +110,6 @@ createBullBoard({
     new BullMQAdapter(alertQueue),
     // Merchant portal queues
     new BullMQAdapter(merchantFeedIngestQueue),
-    new BullMQAdapter(merchantSkuMatchQueue),
-    new BullMQAdapter(merchantBenchmarkQueue),
-    new BullMQAdapter(merchantInsightQueue),
     // Affiliate feed queues
     new BullMQAdapter(affiliateFeedQueue),
     new BullMQAdapter(affiliateFeedSchedulerQueue),
@@ -164,7 +158,7 @@ const server = app.listen(config.port, () => {
     url: `http://localhost:${config.port}${config.basePath}`,
     queues: [
       'crawl', 'fetch', 'extract', 'normalize', 'write', 'alert',
-      'merchant-feed-ingest', 'merchant-sku-match', 'merchant-benchmark', 'merchant-insight',
+      'merchant-feed-ingest',
       'affiliate-feed', 'affiliate-feed-scheduler',
     ],
     warning: 'DO NOT EXPOSE TO PUBLIC INTERNET',

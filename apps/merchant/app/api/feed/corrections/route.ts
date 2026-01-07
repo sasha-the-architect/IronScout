@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSession, requireRetailerContext, getRetailerContext, RetailerContextError } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
@@ -11,11 +11,12 @@ const createCorrectionSchema = z.object({
   quarantinedRecordId: z.string(),
   field: z.string().min(1),
   newValue: z.string(),
+  retailerId: z.string().optional(), // Optional: for multi-retailer merchants
 });
 
 /**
  * GET /api/feed/corrections
- * List corrections for the merchant's feed
+ * List corrections for the retailer's feed
  */
 export async function GET(request: Request) {
   const reqLogger = logger.child({ endpoint: '/api/feed/corrections', method: 'GET' });
@@ -27,19 +28,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Look up retailerId via merchant_retailers
-    const merchantRetailer = await prisma.merchant_retailers.findFirst({
-      where: { merchantId: session.merchantId },
-      select: { retailerId: true }
-    });
+    // Resolve retailer context from query param (use getRetailerContext to allow empty result)
+    const { searchParams } = new URL(request.url);
+    const inputRetailerId = searchParams.get('retailerId') || undefined;
+    const retailerContext = await getRetailerContext(session, inputRetailerId);
 
-    if (!merchantRetailer?.retailerId) {
-      return NextResponse.json({ corrections: [] });
+    if (!retailerContext) {
+      return NextResponse.json({ corrections: [], retailerContext: null });
     }
 
-    const retailerId = merchantRetailer.retailerId;
+    const { retailerId } = retailerContext;
 
-    const { searchParams } = new URL(request.url);
     const quarantinedRecordId = searchParams.get('quarantinedRecordId');
     const feedId = searchParams.get('feedId');
 
@@ -79,8 +78,12 @@ export async function GET(request: Request) {
       },
     });
 
-    return NextResponse.json({ corrections });
+    return NextResponse.json({ corrections, retailerContext });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to fetch corrections', {}, error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }
@@ -100,18 +103,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Look up retailerId via merchant_retailers
-    const merchantRetailer = await prisma.merchant_retailers.findFirst({
-      where: { merchantId: session.merchantId },
-      select: { retailerId: true }
-    });
-
-    if (!merchantRetailer?.retailerId) {
-      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
-    }
-
-    const retailerId = merchantRetailer.retailerId;
-
     let body: unknown;
     try {
       body = await request.json();
@@ -127,7 +118,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const { quarantinedRecordId, field, newValue } = validation.data;
+    const { quarantinedRecordId, field, newValue, retailerId: inputRetailerId } = validation.data;
+
+    // Resolve retailer context (supports multi-retailer merchants)
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
 
     // Get the quarantined record and verify ownership
     const quarantinedRecord = await prisma.quarantined_records.findFirst({
@@ -170,8 +165,12 @@ export async function POST(request: Request) {
       field,
     });
 
-    return NextResponse.json({ correction });
+    return NextResponse.json({ correction, retailerContext });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to create correction', {}, error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }

@@ -20,9 +20,9 @@
  * - RESEND_API_KEY: Resend API key for email delivery
  * - EMAIL_FROM: From address for emails (default: IronScout <noreply@ironscout.ai>)
  * - ADMIN_NOTIFICATION_EMAIL: Admin email for notifications (default: operations@ironscout.ai)
- * - SLACK_MERCHANT_OPS_WEBHOOK_URL: Slack webhook URL for merchant operations notifications (legacy: SLACK_DEALER_OPS_WEBHOOK_URL)
+ * - SLACK_MERCHANT_OPS_WEBHOOK_URL: Slack webhook URL for merchant operations notifications
  * - SLACK_FEEDS_WEBHOOK_URL: Optional separate webhook for feed alerts
- * - NEXT_PUBLIC_MERCHANT_URL: Merchant portal URL (legacy: NEXT_PUBLIC_DEALER_URL)
+ * - NEXT_PUBLIC_MERCHANT_URL: Merchant portal URL
  * - ADMIN_PORTAL_URL: Admin portal URL
  */
 
@@ -66,10 +66,6 @@ export {
   notifyNewMerchantSignup,
   sendMerchantVerificationEmail,
   type NewMerchantInfo,
-  // Legacy aliases for backward compatibility
-  notifyNewMerchantSignup as notifyNewDealerSignup,
-  sendMerchantVerificationEmail as sendDealerVerificationEmail,
-  type NewMerchantInfo as NewDealerInfo,
 } from './notifications/merchant-signup.js';
 
 export {
@@ -78,11 +74,6 @@ export {
   notifyMerchantSuspended,
   notifyMerchantReactivated,
   type MerchantStatusInfo,
-  // Legacy aliases for backward compatibility
-  notifyMerchantApproved as notifyDealerApproved,
-  notifyMerchantSuspended as notifyDealerSuspended,
-  notifyMerchantReactivated as notifyDealerReactivated,
-  type MerchantStatusInfo as DealerStatusInfo,
 } from './notifications/merchant-status.js';
 
 export {
@@ -112,8 +103,6 @@ export {
   // Subscription Expired
   notifyMerchantSubscriptionExpired,
   type SubscriptionExpiredInfo,
-  // Legacy alias for backward compatibility
-  notifyMerchantSubscriptionExpired as notifyDealerSubscriptionExpired,
 } from './notifications/subscription-expired.js';
 
 // =============================================================================

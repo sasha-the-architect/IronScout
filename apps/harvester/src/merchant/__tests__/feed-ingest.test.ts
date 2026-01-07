@@ -36,7 +36,6 @@ vi.mock('../subscription', () => ({
 
 vi.mock('../../config/queues', () => ({
   QUEUE_NAMES: { MERCHANT_FEED_INGEST: 'merchant-feed-ingest' },
-  merchantSkuMatchQueue: { add: vi.fn() },
 }))
 
 vi.mock('../../config/redis', () => ({
@@ -58,7 +57,6 @@ global.fetch = mockFetch
 import { prisma } from '@ironscout/db'
 import { notifyFeedFailed, notifyFeedWarning, notifyFeedRecovered } from '@ironscout/notifications'
 import { checkMerchantSubscription, sendSubscriptionExpiryNotification } from '../subscription'
-import { merchantSkuMatchQueue } from '../../config/queues'
 
 // Import test fixtures
 import {
@@ -178,8 +176,7 @@ function setupDefaultMocks() {
     blockingErrors: [],
   } as never)
 
-  // Default: queue operations succeed
-  vi.mocked(merchantSkuMatchQueue.add).mockResolvedValue({} as never)
+  // Note: merchantSkuMatchQueue removed for v1 (benchmark subsystem removed)
 }
 
 // ============================================================================
@@ -688,49 +685,7 @@ describe('Feed Ingest Worker', () => {
     })
   })
 
-  // ==========================================================================
-  // BATCH QUEUE TESTS
-  // ==========================================================================
-
-  describe('SKU Match Queue Batching', () => {
-    it('queues SKUs in batches of 100', async () => {
-      const merchantSkuIds = Array.from({ length: 250 }, (_, i) => `sku-${i}`)
-      const BATCH_SIZE = 100
-
-      // Simulate batching logic
-      for (let i = 0; i < merchantSkuIds.length; i += BATCH_SIZE) {
-        const batch = merchantSkuIds.slice(i, i + BATCH_SIZE)
-        await merchantSkuMatchQueue.add('match-batch', {
-          retailerId: 'retailer-123',
-          feedRunId: 'run-789',
-          merchantSkuIds: batch,
-        })
-      }
-
-      expect(merchantSkuMatchQueue.add).toHaveBeenCalledTimes(3)
-
-      // First batch: 100 items
-      expect(vi.mocked(merchantSkuMatchQueue.add).mock.calls[0][1].merchantSkuIds).toHaveLength(100)
-      // Second batch: 100 items
-      expect(vi.mocked(merchantSkuMatchQueue.add).mock.calls[1][1].merchantSkuIds).toHaveLength(100)
-      // Third batch: 50 items
-      expect(vi.mocked(merchantSkuMatchQueue.add).mock.calls[2][1].merchantSkuIds).toHaveLength(50)
-    })
-
-    it('does not queue empty batches', async () => {
-      const merchantSkuIds: string[] = []
-
-      if (merchantSkuIds.length > 0) {
-        await merchantSkuMatchQueue.add('match-batch', {
-          retailerId: 'retailer-123',
-          feedRunId: 'run-789',
-          merchantSkuIds,
-        })
-      }
-
-      expect(merchantSkuMatchQueue.add).not.toHaveBeenCalled()
-    })
-  })
+  // Note: SKU Match Queue Batching tests removed for v1 (benchmark subsystem removed)
 })
 
 // ============================================================================

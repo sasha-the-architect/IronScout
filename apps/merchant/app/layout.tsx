@@ -5,7 +5,7 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'IronScout Dealer Portal',
+  title: 'IronScout Merchant Portal',
   description: 'Manage your ammunition listings, track pricing, and grow your business',
 };
 

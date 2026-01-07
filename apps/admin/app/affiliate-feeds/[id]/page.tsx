@@ -17,6 +17,7 @@ import {
 import { FeedStatusActions } from './feed-status-actions';
 import { RunsTable } from './runs-table';
 import { EditFeedSettings } from './edit-feed-settings';
+import { TestConnectionButton } from './test-connection-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -318,6 +319,9 @@ export default async function AffiliateFeedDetailPage({
               </dd>
             </div>
           </dl>
+
+          {/* Test Connection Button */}
+          <TestConnectionButton feedId={feed.id} />
         </div>
       </div>
 

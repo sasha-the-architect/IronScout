@@ -30,7 +30,7 @@ export default async function AnalyticsPage() {
   const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
   const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  // Get click stats
+  // Get click and revenue stats
   const [
     clicksToday,
     clicksWeek,
@@ -38,7 +38,6 @@ export default async function AnalyticsPage() {
     revenueToday,
     revenueWeek,
     revenueMonth,
-    topSkus,
     merchant
   ] = await Promise.all([
     prisma.click_events.count({
@@ -65,40 +64,11 @@ export default async function AnalyticsPage() {
       _sum: { orderValue: true },
       _count: true,
     }),
-    prisma.click_events.groupBy({
-      by: ['retailerSkuId'],
-      where: {
-        merchantId,
-        createdAt: { gte: monthAgo },
-        retailerSkuId: { not: null },
-      },
-      _count: true,
-      orderBy: { _count: { retailerSkuId: 'desc' } },
-      take: 10,
-    }),
     prisma.merchants.findUnique({
       where: { id: merchantId },
       select: { pixelEnabled: true, pixelApiKey: true },
     }),
   ]);
-
-  // Look up retailerId via merchant_retailers for retailer_skus query
-  const merchantRetailer = await prisma.merchant_retailers.findFirst({
-    where: { merchantId },
-    select: { retailerId: true }
-  });
-  const retailerId = merchantRetailer?.retailerId;
-
-  // Get SKU details for top clicked
-  const topSkuIds = topSkus.map(s => s.retailerSkuId).filter(Boolean) as string[];
-  const skuDetails = topSkuIds.length > 0 && retailerId
-    ? await prisma.retailer_skus.findMany({
-        where: { id: { in: topSkuIds }, retailerId },
-        select: { id: true, rawTitle: true },
-      })
-    : [];
-
-  const skuMap = new Map(skuDetails.map(s => [s.id, s.rawTitle]));
 
   return (
     <div className="space-y-6">
@@ -117,7 +87,7 @@ export default async function AnalyticsPage() {
             <MousePointerClick className="h-5 w-5 text-gray-400" />
             Click Performance
           </h3>
-          
+
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
             <div className="rounded-lg bg-gray-50 px-4 py-5">
               <div className="flex items-center justify-between">
@@ -159,14 +129,14 @@ export default async function AnalyticsPage() {
             <DollarSign className="h-5 w-5 text-gray-400" />
             Revenue Attribution
           </h3>
-          
+
           {!merchant?.pixelEnabled ? (
             <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
               <p className="text-sm text-yellow-800">
                 <strong>Pixel not enabled.</strong> Set up your tracking pixel to see revenue attribution.
               </p>
-              <a 
-                href="/settings/pixel" 
+              <a
+                href="/settings/pixel"
                 className="mt-2 inline-flex items-center text-sm font-medium text-yellow-700 hover:text-yellow-800"
               >
                 Set up pixel →
@@ -203,54 +173,6 @@ export default async function AnalyticsPage() {
                   <p className="text-xs text-green-600">{revenueMonth._count} orders</p>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Top Products */}
-      <div className="rounded-lg bg-white shadow">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-base font-semibold leading-6 text-gray-900 mb-4">
-            Top Clicked Products (30 days)
-          </h3>
-          
-          {topSkus.length === 0 ? (
-            <p className="text-sm text-gray-500">No click data yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Rank
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Product
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Clicks
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {topSkus.map((sku, index) => (
-                    <tr key={sku.retailerSkuId}>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        #{index + 1}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        <span className="truncate block max-w-md" title={skuMap.get(sku.retailerSkuId!) || 'Unknown'}>
-                          {skuMap.get(sku.retailerSkuId!) || 'Unknown Product'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
-                        {sku._count.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           )}
         </div>

@@ -14,7 +14,13 @@
 // Load environment variables first, before any other imports
 import 'dotenv/config'
 
-import { prisma, isHarvesterSchedulerEnabled, isAffiliateSchedulerEnabled, getHarvesterLogLevel } from '@ironscout/db'
+import {
+  prisma,
+  isHarvesterSchedulerEnabled,
+  isAffiliateSchedulerEnabled,
+  getHarvesterLogLevel,
+  getHarvesterLogLevelOptional,
+} from '@ironscout/db'
 import { setLogLevel, type LogLevel } from '@ironscout/logger'
 import { warmupRedis } from './config/redis'
 import { initQueueSettings } from './config/queues'
@@ -28,17 +34,22 @@ import { alerterWorker, delayedNotificationWorker } from './alerter'
 
 // Merchant Portal Workers
 import { merchantFeedIngestWorker } from './merchant/feed-ingest'
-import { merchantSkuMatchWorker } from './merchant/sku-match'
-import { merchantBenchmarkWorker } from './merchant/benchmark'
-import { merchantInsightWorker } from './merchant/insight'
+// Note: sku-match, benchmark, insight workers removed for v1 (benchmark subsystem removed)
 import { startMerchantScheduler, stopMerchantScheduler } from './merchant/scheduler'
 
 // Affiliate Feed Workers
 import { createAffiliateFeedWorker, createAffiliateFeedScheduler } from './affiliate'
 
+// Product Resolver Worker (Spec v1.2)
+import { startProductResolverWorker, stopProductResolverWorker } from './resolver'
+import type { Worker } from 'bullmq'
+
 // Create affiliate workers (lazy initialization)
 let affiliateFeedWorker: ReturnType<typeof createAffiliateFeedWorker> | null = null
 let affiliateFeedScheduler: ReturnType<typeof createAffiliateFeedScheduler> | null = null
+
+// Product resolver worker (lazy initialization)
+let resolverWorker: Worker | null = null
 
 /**
  * Scheduler enabled flags (set during startup from database/env)
@@ -52,12 +63,33 @@ let affiliateFeedScheduler: ReturnType<typeof createAffiliateFeedScheduler> | nu
 let harvesterSchedulerEnabled = false
 let affiliateSchedulerEnabled = false
 
+const log = logger.worker
+const dbLog = logger.database
+
 // Log level polling interval handle
 let logLevelPollInterval: NodeJS.Timeout | null = null
 const LOG_LEVEL_POLL_MS = 30_000 // Check every 30 seconds
 
-const log = logger.worker
-const dbLog = logger.database
+/**
+ * Resolve desired log level.
+ * Precedence:
+ *   1) LOG_LEVEL env (always wins)
+ *   2) HARVESTER_LOG_LEVEL env / DB (if explicitly set)
+ *   3) null (leave current logger level unchanged)
+ */
+async function resolveDesiredLogLevel(): Promise<{ level: LogLevel | null; source: string | null }> {
+  const envLevel = process.env.LOG_LEVEL?.toLowerCase() as LogLevel | undefined
+  if (envLevel) {
+    return { level: envLevel, source: 'LOG_LEVEL env' }
+  }
+
+  const dbLevel = (await getHarvesterLogLevelOptional()) as LogLevel | null
+  if (dbLevel) {
+    return { level: dbLevel, source: 'HARVESTER_LOG_LEVEL setting' }
+  }
+
+  return { level: null, source: null }
+}
 
 /**
  * Poll for log level changes from admin settings
@@ -65,9 +97,14 @@ const dbLog = logger.database
  */
 async function pollLogLevel(): Promise<void> {
   try {
-    const level = await getHarvesterLogLevel() as LogLevel
-    setLogLevel(level)
-    log.debug('Log level refreshed', { level })
+    const { level, source } = await resolveDesiredLogLevel()
+    if (level) {
+      setLogLevel(level)
+      // Info-level so we can see it even before debug is enabled
+      log.info('Log level applied', { level, source })
+    } else {
+      log.info('Log level unchanged (no explicit setting found)')
+    }
   } catch (error) {
     // Silently ignore errors - we'll retry next poll
     // Don't log errors here to avoid spam if DB is temporarily unavailable
@@ -77,9 +114,9 @@ async function pollLogLevel(): Promise<void> {
 /**
  * Start log level polling
  */
-function startLogLevelPolling(): void {
-  // Set initial level
-  pollLogLevel()
+async function startLogLevelPolling(): Promise<void> {
+  // Set initial level (await so we confirm once at startup)
+  await pollLogLevel()
 
   // Poll periodically for changes
   logLevelPollInterval = setInterval(pollLogLevel, LOG_LEVEL_POLL_MS)
@@ -130,12 +167,10 @@ log.info('Starting IronScout.ai Harvester Workers', {
     'normalizer',
     'writer',
     'alerter',
+    'resolver',
   ],
   merchantWorkers: [
     'feed-ingest',
-    'sku-match',
-    'benchmark',
-    'insight',
   ],
   affiliateWorkers: [
     'affiliate-feed',
@@ -173,12 +208,16 @@ async function startup() {
   })
 
   // Start log level polling for dynamic updates
-  startLogLevelPolling()
+  await startLogLevelPolling()
 
   // Always start affiliate feed worker to process jobs (including manual ones)
   // The worker must run regardless of scheduler state to process manually-triggered jobs
   log.info('Starting affiliate feed worker')
   affiliateFeedWorker = createAffiliateFeedWorker()
+
+  // Start product resolver worker (always on - processes RESOLVE jobs from writer)
+  log.info('Starting product resolver worker')
+  resolverWorker = startProductResolverWorker({ concurrency: 5 })
 
   // Start harvester/merchant scheduler if enabled
   if (harvesterSchedulerEnabled) {
@@ -234,12 +273,11 @@ const shutdown = async (signal: string) => {
       delayedNotificationWorker.close(),
       // Merchant workers
       merchantFeedIngestWorker.close(),
-      merchantSkuMatchWorker.close(),
-      merchantBenchmarkWorker.close(),
-      merchantInsightWorker.close(),
       // Affiliate workers (if started)
       affiliateFeedWorker?.close(),
       affiliateFeedScheduler?.close(),
+      // Product resolver worker
+      stopProductResolverWorker(),
     ])
     log.info('All workers closed')
 

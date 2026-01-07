@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSession, requireRetailerContext, requireRetailerPermission, RetailerContextError } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
@@ -9,11 +9,12 @@ export const dynamic = 'force-dynamic';
 
 const toggleSchema = z.object({
   enabled: z.boolean(),
+  retailerId: z.string().optional(), // Optional: for multi-retailer merchants
 });
 
 /**
  * POST /api/feed/toggle
- * Enable or disable the merchant's feed
+ * Enable or disable the retailer's feed
  */
 export async function POST(request: Request) {
   const reqLogger = logger.child({ endpoint: '/api/feed/toggle', method: 'POST' });
@@ -37,11 +38,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid data' }, { status: 400 });
     }
 
-    const { enabled } = validation.data;
+    const { enabled, retailerId: inputRetailerId } = validation.data;
 
-    // Get merchant's feed
+    // Resolve retailer context (supports multi-retailer merchants)
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
+
+    // Require EDITOR permission to toggle feeds
+    requireRetailerPermission(retailerContext, 'EDITOR', 'toggle feed status');
+
+    // Get retailer's feed
     const feed = await prisma.retailer_feeds.findFirst({
-      where: { retailerId: session.merchantId },
+      where: { retailerId },
     });
 
     if (!feed) {
@@ -62,14 +70,19 @@ export async function POST(request: Request) {
       },
     });
 
-    reqLogger.info('Feed toggle', { feedId: feed.id, enabled });
+    reqLogger.info('Feed toggle', { feedId: feed.id, retailerId, enabled });
 
     return NextResponse.json({
       success: true,
       enabled: updatedFeed.enabled,
       status: updatedFeed.status,
+      retailerContext,
     });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to toggle feed', {}, error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }

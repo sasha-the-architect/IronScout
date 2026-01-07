@@ -3,7 +3,7 @@ import { getAdminSession, logAdminAction } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { headers } from 'next/headers';
 import { logger } from '@/lib/logger';
-import { notifyDealerReactivated } from '@ironscout/notifications';
+import { notifyMerchantReactivated } from '@ironscout/notifications';
 
 export async function POST(
   request: Request,
@@ -67,7 +67,7 @@ export async function POST(
 
     if (ownerUser) {
       // Send reactivation notification (email + Slack)
-      const notifyResult = await notifyDealerReactivated({
+      const notifyResult = await notifyMerchantReactivated({
         id: merchant.id,
         email: ownerUser.email,
         businessName: merchant.businessName,

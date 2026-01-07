@@ -108,8 +108,10 @@ describeIntegration('A1 Visibility Predicate Integration', () => {
   async function createMerchant(suffix: string) {
     const merchant = await prisma.merchants.create({
       data: {
-        email: `test-a1-${suffix}-${Date.now()}@example.com`,
         businessName: `Test Merchant A1 ${suffix}`,
+        websiteUrl: `https://test-a1-${suffix}.example.com`,
+        contactFirstName: 'Test',
+        contactLastName: 'User',
         subscriptionStatus: 'ACTIVE',
       },
     })
@@ -124,7 +126,7 @@ describeIntegration('A1 Visibility Predicate Integration', () => {
     const product = await prisma.products.create({
       data: {
         name: `Test Product A1 ${suffix} ${Date.now()}`,
-        slug: `test-product-a1-${suffix}-${Date.now()}`,
+        category: 'ammunition',
       },
     })
     createdProductIds.push(product.id)

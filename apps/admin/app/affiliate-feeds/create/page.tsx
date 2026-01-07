@@ -4,7 +4,13 @@ import { CreateFeedForm } from './create-feed-form';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CreateAffiliateFeedPage() {
+export default async function CreateAffiliateFeedPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ retailerId?: string; retailerName?: string; retailerWebsite?: string }>;
+}) {
+  const { retailerId, retailerName, retailerWebsite } = await searchParams;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -23,7 +29,11 @@ export default async function CreateAffiliateFeedPage() {
         </div>
       </div>
 
-      <CreateFeedForm />
+      <CreateFeedForm
+        preselectedRetailerId={retailerId}
+        preselectedRetailerName={retailerName}
+        preselectedRetailerWebsite={retailerWebsite}
+      />
     </div>
   );
 }

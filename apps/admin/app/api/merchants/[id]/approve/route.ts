@@ -3,7 +3,7 @@ import { getAdminSession, logAdminAction } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { headers } from 'next/headers';
 import { logger } from '@/lib/logger';
-import { notifyDealerApproved } from '@ironscout/notifications';
+import { notifyMerchantApproved } from '@ironscout/notifications';
 
 export async function POST(
   request: Request,
@@ -77,7 +77,7 @@ export async function POST(
 
     if (ownerUser) {
       // Send approval notification (email + Slack)
-      const notifyResult = await notifyDealerApproved({
+      const notifyResult = await notifyMerchantApproved({
         id: merchant.id,
         email: ownerUser.email,
         businessName: merchant.businessName,

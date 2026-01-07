@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSession, requireRetailerContext, RetailerContextError } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger';
 export const dynamic = 'force-dynamic';
 
 const updateSchema = z.object({
+  retailerId: z.string().optional(), // Optional: for multi-retailer merchants
   status: z.enum(['RESOLVED', 'DISMISSED']).optional(),
 });
 
@@ -29,20 +30,16 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Look up retailerId via merchant_retailers
-    const merchantRetailer = await prisma.merchant_retailers.findFirst({
-      where: { merchantId: session.merchantId },
-      select: { retailerId: true }
-    });
-
-    if (!merchantRetailer?.retailerId) {
-      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
-    }
+    // Resolve retailer context from query param
+    const url = new URL(request.url);
+    const inputRetailerId = url.searchParams.get('retailerId') || undefined;
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
 
     const record = await prisma.quarantined_records.findFirst({
       where: {
         id,
-        retailerId: merchantRetailer.retailerId,
+        retailerId,
       },
       include: {
         feed_corrections: {
@@ -61,8 +58,12 @@ export async function GET(
       return NextResponse.json({ error: 'Record not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ record });
+    return NextResponse.json({ record, retailerContext });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to fetch quarantine record', {}, error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }
@@ -98,29 +99,23 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid update data' }, { status: 400 });
     }
 
-    // Look up retailerId via merchant_retailers
-    const merchantRetailer = await prisma.merchant_retailers.findFirst({
-      where: { merchantId: session.merchantId },
-      select: { retailerId: true }
-    });
+    const { retailerId: inputRetailerId, status } = validation.data;
 
-    if (!merchantRetailer?.retailerId) {
-      return NextResponse.json({ error: 'No retailer configured for this merchant' }, { status: 400 });
-    }
+    // Resolve retailer context (supports multi-retailer merchants)
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
 
     // Verify ownership
     const existing = await prisma.quarantined_records.findFirst({
       where: {
         id,
-        retailerId: merchantRetailer.retailerId,
+        retailerId,
       },
     });
 
     if (!existing) {
       return NextResponse.json({ error: 'Record not found' }, { status: 404 });
     }
-
-    const { status } = validation.data;
 
     if (status) {
       const record = await prisma.quarantined_records.update({
@@ -129,11 +124,15 @@ export async function PATCH(
       });
 
       reqLogger.info('Quarantine status updated', { recordId: id, status });
-      return NextResponse.json({ record });
+      return NextResponse.json({ record, retailerContext });
     }
 
-    return NextResponse.json({ record: existing });
+    return NextResponse.json({ record: existing, retailerContext });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to update quarantine record', {}, error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }

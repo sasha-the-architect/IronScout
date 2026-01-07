@@ -93,10 +93,12 @@ foreach ($service in $servicePorts) {
 # Method 2: Find and kill node processes running from IronScout folders
 Write-Info "Checking Node.js processes..."
 
-$nodeProcesses = Get-Process -Name "node" -ErrorAction SilentlyContinue
+# Broaden process scan to catch wrappers (pnpm/npm/bun/next/cmd/powershell)
+$procNames = @("node","pnpm","npm","bun","next","cmd","powershell")
+$procCandidates = Get-Process -Name $procNames -ErrorAction SilentlyContinue
 
-if ($nodeProcesses) {
-    foreach ($proc in $nodeProcesses) {
+if ($procCandidates) {
+    foreach ($proc in $procCandidates) {
         # Skip our own process
         if ($proc.Id -eq $myPID) {
             continue

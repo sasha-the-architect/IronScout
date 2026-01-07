@@ -13,7 +13,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
 import { cookies, headers } from 'next/headers';
 import { prisma } from '@ironscout/db';
-import type { merchants, merchant_users, MerchantStatus, MerchantUserRole } from '@ironscout/db';
+import type { merchants, merchant_users, MerchantStatus, MerchantUserRole, MerchantRetailerStatus, MerchantRetailerListingStatus, MerchantRetailerRole } from '@ironscout/db';
 import { logger } from './logger';
 
 // =============================================
@@ -22,7 +22,7 @@ import { logger } from './logger';
 
 // JWT secret for merchant portal tokens
 // CRITICAL: At least one of these must be set in production
-const jwtSecretString = process.env.MERCHANT_JWT_SECRET || process.env.DEALER_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+const jwtSecretString = process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
 if (!jwtSecretString && process.env.NODE_ENV === 'production') {
   throw new Error('CRITICAL: No JWT secret configured. Set MERCHANT_JWT_SECRET, JWT_SECRET, or NEXTAUTH_SECRET in production.');
 }
@@ -822,6 +822,319 @@ export async function logAdminAction(
   } catch (error) {
     logger.error('Failed to create admin audit log', { adminUserId, action }, error);
     throw error;
+  }
+}
+
+// =============================================
+// Retailer Context Resolution
+// =============================================
+
+/**
+ * Error thrown when retailer context cannot be resolved.
+ */
+export class RetailerContextError extends Error {
+  public readonly code: 'NO_RETAILERS' | 'RETAILER_NOT_FOUND' | 'RETAILER_NOT_ACTIVE' | 'MULTIPLE_RETAILERS' | 'USER_NOT_AUTHORIZED' | 'INSUFFICIENT_PERMISSION'
+  public readonly statusCode: number
+
+  constructor(
+    code: RetailerContextError['code'],
+    message: string,
+    statusCode: number = 403
+  ) {
+    super(message)
+    this.name = 'RetailerContextError'
+    this.code = code
+    this.statusCode = statusCode
+  }
+}
+
+export interface RetailerContext {
+  retailerId: string
+  retailerName: string
+  listingStatus: MerchantRetailerListingStatus
+  relationshipStatus: MerchantRetailerStatus
+  /**
+   * User's role on this specific retailer.
+   * - For OWNER/ADMIN merchant users: defaults to 'ADMIN' (full access to all retailers)
+   * - For others: from merchant_user_retailers assignment
+   */
+  userRole: MerchantRetailerRole
+  /**
+   * Whether this user has merchant-level admin access (OWNER or ADMIN role on merchant_users)
+   */
+  isMerchantAdmin: boolean
+}
+
+/**
+ * Resolve retailer context for merchant portal operations.
+ *
+ * Per Merchant-and-Retailer-Reference:
+ * - Merchants administer Retailers via merchant_retailers join table
+ * - session.merchantId is the merchant's ID, NOT a retailer ID
+ * - All retailer-scoped queries must resolve retailerId through this helper
+ * - User-level permissions are enforced via merchant_user_retailers
+ *
+ * Resolution logic:
+ * 1. Check if user is merchant-level admin (OWNER or ADMIN role)
+ * 2. Fetch all ACTIVE merchant_retailers for session.merchantId
+ * 3. For non-admin users: filter to only retailers they have explicit access to
+ * 4. If inputRetailerId provided: verify it's in the allowed list and return it
+ * 5. If exactly one allowed retailer: return it (single-retailer convenience)
+ * 6. If zero allowed retailers: throw NO_RETAILERS or USER_NOT_AUTHORIZED
+ * 7. If multiple allowed retailers and no inputRetailerId: throw MULTIPLE_RETAILERS
+ *
+ * @param session - The merchant session (must have merchantId and merchantUserId)
+ * @param inputRetailerId - Optional retailer ID from request (query param, body, etc.)
+ * @returns RetailerContext with retailerId, metadata, and user's role
+ * @throws RetailerContextError if context cannot be resolved or user lacks access
+ */
+export async function requireRetailerContext(
+  session: MerchantSession,
+  inputRetailerId?: string
+): Promise<RetailerContext> {
+  const contextLogger = logger.child({
+    action: 'requireRetailerContext',
+    merchantId: session.merchantId,
+    merchantUserId: session.merchantUserId,
+    userRole: session.role,
+    inputRetailerId,
+  })
+
+  contextLogger.debug('Resolving retailer context')
+
+  // Check if user is merchant-level admin (OWNER or ADMIN can access all retailers)
+  const isMerchantAdmin = session.role === 'OWNER' || session.role === 'ADMIN'
+
+  // Fetch all linked retailers for this merchant with user assignments
+  const linkedRetailers = await prisma.merchant_retailers.findMany({
+    where: {
+      merchantId: session.merchantId,
+    },
+    include: {
+      retailers: {
+        select: { id: true, name: true },
+      },
+      // Include user's specific assignment for this retailer
+      merchant_user_retailers: {
+        where: { merchantUserId: session.merchantUserId },
+        select: { role: true },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  // Filter to only ACTIVE relationships
+  const activeRetailers = linkedRetailers.filter(r => r.status === 'ACTIVE')
+
+  // For non-admin users, filter to only retailers they have explicit access to
+  let allowedRetailers: typeof activeRetailers
+  if (isMerchantAdmin) {
+    // Admins can access all active retailers
+    allowedRetailers = activeRetailers
+    contextLogger.debug('Merchant admin - access to all retailers', {
+      total: linkedRetailers.length,
+      active: activeRetailers.length,
+    })
+  } else {
+    // Non-admins need explicit merchant_user_retailers assignment
+    allowedRetailers = activeRetailers.filter(r => r.merchant_user_retailers.length > 0)
+    contextLogger.debug('Non-admin user - filtered to assigned retailers', {
+      total: linkedRetailers.length,
+      active: activeRetailers.length,
+      allowed: allowedRetailers.length,
+    })
+  }
+
+  /**
+   * Helper to get user's role on a specific retailer
+   */
+  function getUserRole(relationship: (typeof linkedRetailers)[0]): MerchantRetailerRole {
+    if (isMerchantAdmin) {
+      // Merchant admins get ADMIN role on all retailers
+      return 'ADMIN'
+    }
+    // Use the explicit assignment role
+    return relationship.merchant_user_retailers[0]?.role || 'VIEWER'
+  }
+
+  // Case: inputRetailerId provided - verify it's in the allowed list
+  if (inputRetailerId) {
+    const relationship = linkedRetailers.find(r => r.retailerId === inputRetailerId)
+
+    if (!relationship) {
+      contextLogger.warn('Retailer not found in merchant relationships', { inputRetailerId })
+      throw new RetailerContextError(
+        'RETAILER_NOT_FOUND',
+        'Retailer not found or not linked to your account',
+        404
+      )
+    }
+
+    if (relationship.status !== 'ACTIVE') {
+      contextLogger.warn('Retailer relationship not active', {
+        inputRetailerId,
+        status: relationship.status,
+      })
+      throw new RetailerContextError(
+        'RETAILER_NOT_ACTIVE',
+        `Retailer relationship is ${relationship.status.toLowerCase()}`,
+        403
+      )
+    }
+
+    // Check user authorization for this specific retailer
+    if (!isMerchantAdmin && relationship.merchant_user_retailers.length === 0) {
+      contextLogger.warn('User not authorized for retailer', {
+        inputRetailerId,
+        merchantUserId: session.merchantUserId,
+      })
+      throw new RetailerContextError(
+        'USER_NOT_AUTHORIZED',
+        'You do not have access to this retailer. Contact your administrator.',
+        403
+      )
+    }
+
+    contextLogger.debug('Retailer context resolved via explicit ID', {
+      retailerId: relationship.retailerId,
+      retailerName: relationship.retailers.name,
+      userRole: getUserRole(relationship),
+    })
+
+    return {
+      retailerId: relationship.retailerId,
+      retailerName: relationship.retailers.name,
+      listingStatus: relationship.listingStatus,
+      relationshipStatus: relationship.status,
+      userRole: getUserRole(relationship),
+      isMerchantAdmin,
+    }
+  }
+
+  // Case: No inputRetailerId - try to infer from allowed retailers
+  if (allowedRetailers.length === 0) {
+    // Check if there are active retailers the user doesn't have access to
+    if (activeRetailers.length > 0 && !isMerchantAdmin) {
+      contextLogger.warn('User has no retailer assignments', {
+        activeRetailers: activeRetailers.length,
+      })
+      throw new RetailerContextError(
+        'USER_NOT_AUTHORIZED',
+        'You have not been assigned to any retailers. Contact your administrator.',
+        403
+      )
+    }
+
+    // Check if there are any relationships at all (might be suspended/pending)
+    if (linkedRetailers.length > 0) {
+      const statuses = linkedRetailers.map(r => r.status).join(', ')
+      contextLogger.warn('No active retailer relationships', { statuses })
+      throw new RetailerContextError(
+        'NO_RETAILERS',
+        `No active retailer relationships. Current status: ${statuses}`,
+        403
+      )
+    }
+
+    contextLogger.warn('Merchant has no linked retailers')
+    throw new RetailerContextError(
+      'NO_RETAILERS',
+      'No retailers linked to your account. Please contact support.',
+      403
+    )
+  }
+
+  if (allowedRetailers.length === 1) {
+    // Single allowed retailer - convenience case, auto-select
+    const relationship = allowedRetailers[0]
+    contextLogger.debug('Retailer context resolved via single-retailer inference', {
+      retailerId: relationship.retailerId,
+      retailerName: relationship.retailers.name,
+      userRole: getUserRole(relationship),
+    })
+
+    return {
+      retailerId: relationship.retailerId,
+      retailerName: relationship.retailers.name,
+      listingStatus: relationship.listingStatus,
+      relationshipStatus: relationship.status,
+      userRole: getUserRole(relationship),
+      isMerchantAdmin,
+    }
+  }
+
+  // Multiple allowed retailers - must specify which one
+  const retailerNames = allowedRetailers.map(r => r.retailers.name).join(', ')
+  contextLogger.warn('Multiple retailers require explicit selection', {
+    count: allowedRetailers.length,
+    retailers: retailerNames,
+  })
+
+  throw new RetailerContextError(
+    'MULTIPLE_RETAILERS',
+    `Multiple retailers linked. Please specify retailerId. Available: ${retailerNames}`,
+    400
+  )
+}
+
+/**
+ * Require specific permission level for an operation.
+ * Call this AFTER requireRetailerContext to enforce role-based access.
+ *
+ * Role hierarchy: ADMIN > EDITOR > VIEWER
+ * - ADMIN: Can manage feeds, approve SKUs, manage settings
+ * - EDITOR: Can edit feeds, approve/map SKUs
+ * - VIEWER: Read-only access
+ *
+ * @param context - The retailer context from requireRetailerContext
+ * @param requiredRole - Minimum role required ('ADMIN', 'EDITOR', or 'VIEWER')
+ * @param operation - Description of the operation for error messages
+ * @throws RetailerContextError if user lacks sufficient permission
+ */
+export function requireRetailerPermission(
+  context: RetailerContext,
+  requiredRole: MerchantRetailerRole,
+  operation: string
+): void {
+  const roleHierarchy: Record<MerchantRetailerRole, number> = {
+    ADMIN: 3,
+    EDITOR: 2,
+    VIEWER: 1,
+  }
+
+  const userLevel = roleHierarchy[context.userRole]
+  const requiredLevel = roleHierarchy[requiredRole]
+
+  if (userLevel < requiredLevel) {
+    logger.warn('Insufficient permission for operation', {
+      retailerId: context.retailerId,
+      userRole: context.userRole,
+      requiredRole,
+      operation,
+    })
+    throw new RetailerContextError(
+      'INSUFFICIENT_PERMISSION',
+      `You need ${requiredRole} access to ${operation}. Your current role is ${context.userRole}.`,
+      403
+    )
+  }
+}
+
+/**
+ * Optional retailer context resolution - returns null instead of throwing for NO_RETAILERS.
+ * Useful for dashboard pages that should render even with no retailers.
+ */
+export async function getRetailerContext(
+  session: MerchantSession,
+  inputRetailerId?: string
+): Promise<RetailerContext | null> {
+  try {
+    return await requireRetailerContext(session, inputRetailerId)
+  } catch (error) {
+    if (error instanceof RetailerContextError && error.code === 'NO_RETAILERS') {
+      return null
+    }
+    throw error
   }
 }
 

@@ -70,15 +70,27 @@ export default async function MerchantDetailPage({
 
   const retailerId = merchantRetailer?.retailerId;
 
-  // Get SKU and feed counts from the retailer
-  const [skuCount, feedCount] = await Promise.all([
+  // Get SKU and feed counts from the retailer (both legacy and affiliate systems)
+  const [legacySkuCount, legacyFeedCount, affiliateFeedCount, sourceProductCount] = await Promise.all([
     retailerId
       ? prisma.retailer_skus.count({ where: { retailerId } })
       : Promise.resolve(0),
     retailerId
       ? prisma.retailer_feeds.count({ where: { retailerId } })
       : Promise.resolve(0),
+    // Count affiliate feeds via sources
+    retailerId
+      ? prisma.affiliate_feeds.count({ where: { sources: { retailerId } } })
+      : Promise.resolve(0),
+    // Count source products via sources
+    retailerId
+      ? prisma.source_products.count({ where: { sources: { retailerId } } })
+      : Promise.resolve(0),
   ]);
+
+  // Combined totals (legacy + affiliate systems)
+  const skuCount = legacySkuCount + sourceProductCount;
+  const feedCount = legacyFeedCount + affiliateFeedCount;
 
   const status = statusConfig[merchant.status];
   const ownerUser = merchant.merchant_users[0];

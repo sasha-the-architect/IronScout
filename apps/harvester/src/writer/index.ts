@@ -1,8 +1,14 @@
 import { prisma } from '@ironscout/db'
+import type { SourceKind } from '@ironscout/db/generated/prisma'
 import { Worker, Job } from 'bullmq'
 import { redisConnection } from '../config/redis'
 import { logger } from '../config/logger'
-import { alertQueue, WriteJobData, NormalizedProduct } from '../config/queues'
+import { alertQueue, WriteJobData, NormalizedProduct, enqueueProductResolve } from '../config/queues'
+import { RESOLVER_VERSION } from '../resolver'
+import {
+  recordPriceWriteWithVariance,
+  type SourceKindLabel,
+} from './metrics'
 
 const log = logger.writer
 
@@ -20,6 +26,7 @@ interface BatchResult {
   upsertedCount: number
   priceChanges: Array<{ productId: string; oldPrice?: number; newPrice: number }>
   errors: Array<{ item: NormalizedProduct; error: string }>
+  sourceProductIds: string[] // For resolver enqueue
 }
 
 // ============================================================================
@@ -28,6 +35,8 @@ interface BatchResult {
 
 /**
  * Upsert products in batch using transaction
+ * NOTE: This creates "legacy" products directly. The Product Resolver v1.2
+ * will create canonical products via source_products → product_links.
  */
 async function batchUpsertProducts(
   items: NormalizedProduct[]
@@ -73,13 +82,85 @@ async function batchUpsertProducts(
 }
 
 /**
+ * Upsert source_products in batch and return mapping
+ * Per Product Resolver Spec v1.2 §0.3: source_products are the input for resolution
+ *
+ * Uses sourceId + url as the deduplication key.
+ */
+async function batchUpsertSourceProducts(
+  items: NormalizedProduct[],
+  sourceId: string,
+  executionId: string
+): Promise<Map<string, string>> {
+  const urlToSourceProductId = new Map<string, string>()
+
+  // Get existing source_products by URL for this source
+  const urls = items.map(i => i.url)
+  const existing = await prisma.source_products.findMany({
+    where: {
+      sourceId,
+      url: { in: urls },
+    },
+    select: { id: true, url: true },
+  })
+
+  for (const sp of existing) {
+    urlToSourceProductId.set(sp.url, sp.id)
+  }
+
+  // Upsert each source_product
+  await prisma.$transaction(async (tx) => {
+    for (const item of items) {
+      const existingId = urlToSourceProductId.get(item.url)
+
+      if (existingId) {
+        // Update existing
+        await tx.source_products.update({
+          where: { id: existingId },
+          data: {
+            title: item.name,
+            imageUrl: item.imageUrl,
+            brand: item.brand,
+            description: item.description,
+            category: item.category,
+            lastUpdatedByRunId: executionId,
+          },
+        })
+      } else {
+        // Create new
+        const created = await tx.source_products.create({
+          data: {
+            sourceId,
+            title: item.name,
+            url: item.url,
+            imageUrl: item.imageUrl,
+            brand: item.brand,
+            description: item.description,
+            category: item.category,
+            createdByRunId: executionId,
+            lastUpdatedByRunId: executionId,
+          },
+        })
+        urlToSourceProductId.set(item.url, created.id)
+      }
+    }
+  })
+
+  return urlToSourceProductId
+}
+
+/**
  * Batch process prices - check existing and create new where needed
+ * @param urlToSourceProductId - Map of URL -> sourceProductId from source_products upsert
+ * @param sourceKind - Source kind for metrics labeling
  */
 export async function batchProcessPrices(
   items: NormalizedProduct[],
   retailerId: string,
   sourceId: string,
-  executionId: string
+  executionId: string,
+  urlToSourceProductId?: Map<string, string>,
+  sourceKind: SourceKindLabel = 'UNKNOWN'
 ): Promise<{ upsertedCount: number; priceChanges: Array<{ productId: string; oldPrice?: number; newPrice: number }> }> {
   let upsertedCount = 0
   const priceChanges: Array<{ productId: string; oldPrice?: number; newPrice: number }> = []
@@ -122,6 +203,7 @@ export async function batchProcessPrices(
     retailerId: string
     merchantId?: string
     sourceId: string
+    sourceProductId?: string // Product Resolver v1.2: Link to source_product
     ingestionRunType: 'SCRAPE' | 'AFFILIATE_FEED' | 'MERCHANT_FEED' | 'MANUAL'
     ingestionRunId: string
     observedAt: Date
@@ -143,6 +225,7 @@ export async function batchProcessPrices(
         retailerId,
         merchantId: undefined, // Derive later from merchant_retailers if needed
         sourceId,
+        sourceProductId: urlToSourceProductId?.get(item.url), // Product Resolver v1.2
         ingestionRunType: 'SCRAPE',
         ingestionRunId: executionId,
         observedAt,
@@ -152,13 +235,23 @@ export async function batchProcessPrices(
         inStock: item.inStock,
       })
 
-      // Track price changes for alerts
+      // Track price changes for alerts and metrics
       if (existing && existing.price !== newPrice) {
         priceChanges.push({
           productId: item.productId,
           oldPrice: existing.price,
           newPrice,
         })
+        // Record variance metric for price changes
+        recordPriceWriteWithVariance({
+          sourceKind,
+          oldPrice: existing.price,
+          newPrice,
+          action: 'ACCEPTED', // v1: all prices are accepted
+        })
+      } else {
+        // New price (no existing) - record as written without variance
+        recordPriceWriteWithVariance({ sourceKind, newPrice })
       }
     }
   }
@@ -182,12 +275,25 @@ async function processBatch(
   executionId: string,
   retailerId: string,
   sourceId: string,
+  sourceKind: SourceKindLabel,
   runLog: typeof log
 ): Promise<BatchResult> {
   const errors: Array<{ item: NormalizedProduct; error: string }> = []
 
   try {
-    // Step 1: Batch upsert products
+    // Step 1: Batch upsert source_products (Product Resolver v1.2)
+    const sourceProductStart = Date.now()
+    const urlToSourceProductId = await batchUpsertSourceProducts(items, sourceId, executionId)
+    const sourceProductDurationMs = Date.now() - sourceProductStart
+
+    runLog.debug('WRITE_BATCH_SOURCE_PRODUCTS_UPSERTED', {
+      phase: 'write',
+      itemCount: items.length,
+      sourceProductCount: urlToSourceProductId.size,
+      durationMs: sourceProductDurationMs,
+    })
+
+    // Step 2: Batch upsert products (legacy - will be replaced by resolver)
     const productUpsertStart = Date.now()
     await batchUpsertProducts(items)
     const productUpsertDurationMs = Date.now() - productUpsertStart
@@ -198,9 +304,11 @@ async function processBatch(
       durationMs: productUpsertDurationMs,
     })
 
-    // Step 2: Batch process prices
+    // Step 3: Batch process prices (with sourceProductId and metrics)
     const priceProcessStart = Date.now()
-    const { upsertedCount, priceChanges } = await batchProcessPrices(items, retailerId, sourceId, executionId)
+    const { upsertedCount, priceChanges } = await batchProcessPrices(
+      items, retailerId, sourceId, executionId, urlToSourceProductId, sourceKind
+    )
     const priceProcessDurationMs = Date.now() - priceProcessStart
 
     runLog.debug('WRITE_BATCH_PRICES_PROCESSED', {
@@ -211,7 +319,10 @@ async function processBatch(
       durationMs: priceProcessDurationMs,
     })
 
-    return { upsertedCount, priceChanges, errors }
+    // Collect sourceProductIds for resolver enqueue
+    const sourceProductIds = Array.from(urlToSourceProductId.values())
+
+    return { upsertedCount, priceChanges, errors, sourceProductIds }
   } catch (error) {
     // If batch fails, try item-by-item to identify failures
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
@@ -225,13 +336,51 @@ async function processBatch(
 
     let upsertedCount = 0
     const priceChanges: Array<{ productId: string; oldPrice?: number; newPrice: number }> = []
+    const sourceProductIds: string[] = []
 
     // ADR-015: Capture observation time for fallback processing
     const observedAt = new Date()
 
     for (const item of items) {
       try {
-        // Upsert product
+        // Upsert source_product first (Product Resolver v1.2)
+        const existingSourceProduct = await prisma.source_products.findFirst({
+          where: { sourceId, url: item.url },
+        })
+
+        let sourceProductId: string
+        if (existingSourceProduct) {
+          await prisma.source_products.update({
+            where: { id: existingSourceProduct.id },
+            data: {
+              title: item.name,
+              imageUrl: item.imageUrl,
+              brand: item.brand,
+              description: item.description,
+              category: item.category,
+              lastUpdatedByRunId: executionId,
+            },
+          })
+          sourceProductId = existingSourceProduct.id
+        } else {
+          const created = await prisma.source_products.create({
+            data: {
+              sourceId,
+              title: item.name,
+              url: item.url,
+              imageUrl: item.imageUrl,
+              brand: item.brand,
+              description: item.description,
+              category: item.category,
+              createdByRunId: executionId,
+              lastUpdatedByRunId: executionId,
+            },
+          })
+          sourceProductId = created.id
+        }
+        sourceProductIds.push(sourceProductId)
+
+        // Upsert product (legacy)
         await prisma.products.upsert({
           where: { id: item.productId },
           create: {
@@ -270,6 +419,7 @@ async function processBatch(
               productId: item.productId,
               retailerId,
               sourceId,
+              sourceProductId, // Product Resolver v1.2
               ingestionRunType: 'SCRAPE',
               ingestionRunId: executionId,
               observedAt,
@@ -280,8 +430,17 @@ async function processBatch(
             },
           })
 
+          // Record metrics for price write
           if (oldPrice && oldPrice !== newPrice) {
             priceChanges.push({ productId: item.productId, oldPrice, newPrice })
+            recordPriceWriteWithVariance({
+              sourceKind,
+              oldPrice,
+              newPrice,
+              action: 'ACCEPTED',
+            })
+          } else {
+            recordPriceWriteWithVariance({ sourceKind, newPrice })
           }
           upsertedCount++
         }
@@ -293,7 +452,7 @@ async function processBatch(
       }
     }
 
-    return { upsertedCount, priceChanges, errors }
+    return { upsertedCount, priceChanges, errors, sourceProductIds }
   }
 }
 
@@ -327,14 +486,15 @@ export const writerWorker = new Worker<WriteJobData>(
     let totalUpserted = 0
     const allPriceChanges: Array<{ productId: string; oldPrice?: number; newPrice: number }> = []
     const allErrors: Array<{ item: NormalizedProduct; error: string }> = []
+    const allSourceProductIds: string[] = [] // Product Resolver v1.2
 
     try {
-      // Get source for retailer context
+      // Get source for retailer context and metrics labeling
       runLog.debug('WRITE_LOADING_SOURCE', { phase: 'init' })
       const sourceLoadStart = Date.now()
       const source = await prisma.sources.findUnique({
         where: { id: sourceId },
-        select: { id: true, name: true, retailerId: true, retailers: { select: { name: true } } },
+        select: { id: true, name: true, retailerId: true, sourceKind: true, retailers: { select: { name: true } } },
       })
 
       if (!source || !source.retailerId) {
@@ -348,6 +508,7 @@ export const writerWorker = new Worker<WriteJobData>(
       }
 
       const retailerId = source.retailerId
+      const sourceKind: SourceKindLabel = source.sourceKind ?? 'UNKNOWN'
       const sourceLoadDurationMs = Date.now() - sourceLoadStart
 
       runLog.debug('WRITE_SOURCE_LOADED', {
@@ -355,6 +516,7 @@ export const writerWorker = new Worker<WriteJobData>(
         sourceName: source?.name,
         retailerName: source?.retailers?.name,
         retailerId,
+        sourceKind,
         sourceLoadDurationMs,
       })
 
@@ -391,12 +553,13 @@ export const writerWorker = new Worker<WriteJobData>(
           startIndex: i,
         })
 
-        const result = await processBatch(batch, executionId, retailerId, sourceId, runLog)
+        const result = await processBatch(batch, executionId, retailerId, sourceId, sourceKind, runLog)
 
         const batchDurationMs = Date.now() - batchStart
         totalUpserted += result.upsertedCount
         allPriceChanges.push(...result.priceChanges)
         allErrors.push(...result.errors)
+        allSourceProductIds.push(...result.sourceProductIds)
 
         runLog.debug('WRITE_BATCH_COMPLETE', {
           phase: 'write',
@@ -499,6 +662,39 @@ export const writerWorker = new Worker<WriteJobData>(
             event: 'ALERT_QUEUED',
             message: `Queued ${allPriceChanges.length} alert evaluations`,
             metadata: { retailerId },
+          },
+        })
+      }
+
+      // Product Resolver v1.2: Enqueue resolution jobs for all source_products
+      if (allSourceProductIds.length > 0) {
+        const resolveEnqueueStart = Date.now()
+
+        // Enqueue in parallel (debounced by queue)
+        await Promise.all(
+          allSourceProductIds.map(sourceProductId =>
+            enqueueProductResolve(sourceProductId, 'INGEST', RESOLVER_VERSION)
+          )
+        )
+
+        const resolveEnqueueDurationMs = Date.now() - resolveEnqueueStart
+
+        runLog.info('RESOLVE_QUEUED', {
+          phase: 'write',
+          sourceProductCount: allSourceProductIds.length,
+          durationMs: resolveEnqueueDurationMs,
+        })
+
+        await prisma.execution_logs.create({
+          data: {
+            executionId,
+            level: 'INFO',
+            event: 'RESOLVE_QUEUED',
+            message: `Queued ${allSourceProductIds.length} product resolution jobs`,
+            metadata: {
+              sourceProductCount: allSourceProductIds.length,
+              resolverVersion: RESOLVER_VERSION,
+            },
           },
         })
       }

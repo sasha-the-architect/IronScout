@@ -2,11 +2,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, Phone } from 'lucide-react'
 
-const RETAILER_REGISTER_URL = process.env.NEXT_PUBLIC_MERCHANT_URL
-  ? `${process.env.NEXT_PUBLIC_MERCHANT_URL}/register`
-  : process.env.NEXT_PUBLIC_DEALER_URL
-  ? `${process.env.NEXT_PUBLIC_DEALER_URL}/register`
-  : 'https://merchant.ironscout.ai/register'
+const RETAILER_REGISTER_URL = `${process.env.NEXT_PUBLIC_MERCHANT_URL || 'https://merchant.ironscout.ai'}/register`
 
 export function RetailerCTA() {
   return (

@@ -23,11 +23,9 @@ export default async function RootLayout({
 }) {
   const session = await getAdminSession();
 
-  // If not logged in as admin, redirect to local login page
+  // If not logged in as admin, redirect to admin's own login page
   if (!session) {
-    const webUrl = process.env.NEXT_PUBLIC_WEB_URL || 'https://ironscout.ai';
-    const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'https://admin.ironscout.ai';
-    const loginUrl = `${webUrl}/auth/signin?callbackUrl=${encodeURIComponent(adminUrl)}`;
+    const loginUrl = '/auth/signin';
 
     return (
       <html lang="en">

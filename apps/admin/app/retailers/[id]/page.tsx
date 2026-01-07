@@ -14,6 +14,7 @@ import {
   Database,
   Rss,
   DollarSign,
+  Plus,
 } from 'lucide-react';
 import { EditRetailerForm } from './edit-form';
 import { VisibilityActions } from './visibility-actions';
@@ -60,24 +61,76 @@ export default async function RetailerDetailPage({
     },
   });
 
+  // Count affiliate feeds and source products via sources for this retailer
+  const [affiliateFeedCount, sourceProductCount] = await Promise.all([
+    prisma.affiliate_feeds.count({
+      where: { sources: { retailerId: id } },
+    }),
+    prisma.source_products.count({
+      where: { sources: { retailerId: id } },
+    }),
+  ]);
+
   if (!retailer) {
     notFound();
   }
 
-  // Get recent feeds
-  const feeds = await prisma.retailer_feeds.findMany({
-    where: { retailerId: id },
-    orderBy: { createdAt: 'desc' },
-    take: 5,
-    select: {
-      id: true,
-      name: true,
-      status: true,
-      enabled: true,
-      lastSuccessAt: true,
-      createdAt: true,
-    },
-  });
+  // Get recent feeds from both legacy (retailer_feeds) and new (affiliate_feeds) systems
+  const [legacyFeeds, affiliateFeeds] = await Promise.all([
+    prisma.retailer_feeds.findMany({
+      where: { retailerId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        enabled: true,
+        lastSuccessAt: true,
+        createdAt: true,
+      },
+    }),
+    prisma.affiliate_feeds.findMany({
+      where: { sources: { retailerId: id } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        sources: {
+          select: { name: true },
+        },
+        affiliate_feed_runs: {
+          where: { status: 'SUCCEEDED' },
+          orderBy: { finishedAt: 'desc' },
+          take: 1,
+          select: { finishedAt: true },
+        },
+      },
+    }),
+  ]);
+
+  // Normalize affiliate feeds to match legacy feed shape
+  const normalizedAffiliateFeeds = affiliateFeeds.map(af => ({
+    id: af.id,
+    name: af.sources.name,
+    status: af.status === 'ENABLED' ? 'HEALTHY' : af.status === 'DISABLED' ? 'FAILED' : 'PENDING',
+    enabled: af.status === 'ENABLED',
+    lastSuccessAt: af.affiliate_feed_runs[0]?.finishedAt || null,
+    createdAt: af.createdAt,
+    feedType: 'affiliate' as const,
+  }));
+
+  const normalizedLegacyFeeds = legacyFeeds.map(lf => ({
+    ...lf,
+    feedType: 'legacy' as const,
+  }));
+
+  // Combine and sort by createdAt desc, take top 5
+  const feeds = [...normalizedLegacyFeeds, ...normalizedAffiliateFeeds]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
 
   const visibilityInfo = visibilityConfig[retailer.visibilityStatus];
   const tierInfo = tierConfig[retailer.tier];
@@ -262,14 +315,14 @@ export default async function RetailerDetailPage({
             <div className="flex items-center gap-3">
               <Rss className="h-8 w-8 text-orange-500" />
               <div>
-                <p className="text-2xl font-bold text-gray-900">{retailer._count.retailer_feeds}</p>
+                <p className="text-2xl font-bold text-gray-900">{affiliateFeedCount + retailer._count.retailer_feeds}</p>
                 <p className="text-sm text-gray-500">Feeds</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <Store className="h-8 w-8 text-purple-500" />
               <div>
-                <p className="text-2xl font-bold text-gray-900">{retailer._count.retailer_skus.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">{(sourceProductCount + retailer._count.retailer_skus).toLocaleString()}</p>
                 <p className="text-sm text-gray-500">SKUs</p>
               </div>
             </div>
@@ -278,14 +331,33 @@ export default async function RetailerDetailPage({
       </div>
 
       {/* Feeds Section */}
-      {feeds.length > 0 && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Feeds</h2>
+      <div className="bg-white shadow rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium text-gray-900">Feeds</h2>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/retailer-feeds/create?retailerId=${retailer.id}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              <Plus className="h-4 w-4" />
+              Retailer Feed
+            </Link>
+            <Link
+              href={`/affiliate-feeds/create?retailerId=${retailer.id}&retailerName=${encodeURIComponent(retailer.name)}&retailerWebsite=${encodeURIComponent(retailer.website)}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" />
+              Affiliate Feed
+            </Link>
+          </div>
+        </div>
+        {feeds.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Enabled</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Last Success</th>
@@ -294,7 +366,22 @@ export default async function RetailerDetailPage({
               <tbody className="divide-y divide-gray-200">
                 {feeds.map((feed) => (
                   <tr key={feed.id}>
-                    <td className="px-4 py-2 text-sm text-gray-900">{feed.name}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900">
+                      {feed.feedType === 'affiliate' ? (
+                        <Link href={`/affiliate-feeds/${feed.id}`} className="text-blue-600 hover:underline">
+                          {feed.name}
+                        </Link>
+                      ) : (
+                        feed.name
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                        feed.feedType === 'affiliate' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {feed.feedType === 'affiliate' ? 'Affiliate' : 'Legacy'}
+                      </span>
+                    </td>
                     <td className="px-4 py-2">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
                         feed.status === 'HEALTHY' ? 'bg-green-100 text-green-700' :
@@ -316,8 +403,10 @@ export default async function RetailerDetailPage({
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-sm text-gray-500">No feeds configured yet. Click "Create Feed" to add one.</p>
+        )}
+      </div>
 
       {/* Metadata */}
       <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-500">

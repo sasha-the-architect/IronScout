@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSession, requireRetailerContext, requireRetailerPermission, RetailerContextError } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 
 const feedSchema = z.object({
   id: z.string().optional(),
+  retailerId: z.string().optional(), // Optional: for multi-retailer merchants
   accessType: z.enum(['URL', 'AUTH_URL', 'FTP', 'SFTP', 'UPLOAD']),
   formatType: z.enum(['GENERIC', 'AMMOSEEK_V1', 'GUNENGINE_V2', 'IMPACT']).optional().default('GENERIC'),
   url: z.string().url().optional().nullable(),
@@ -17,32 +18,45 @@ const feedSchema = z.object({
   scheduleMinutes: z.number().min(60).max(1440),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   const reqLogger = logger.child({ endpoint: '/api/feed', method: 'GET' });
-  
+
   reqLogger.debug('Feed GET request received');
-  
+
   try {
     const session = await getSession();
-    
+
     if (!session || session.type !== 'merchant') {
       reqLogger.warn('Unauthorized feed access attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    reqLogger.debug('Fetching feed for merchant', { merchantId: session.merchantId });
+    // Resolve retailer context (supports multi-retailer merchants)
+    const url = new URL(request.url);
+    const inputRetailerId = url.searchParams.get('retailerId') || undefined;
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+
+    reqLogger.debug('Fetching feed for retailer', {
+      merchantId: session.merchantId,
+      retailerId: retailerContext.retailerId,
+      retailerName: retailerContext.retailerName,
+    });
 
     const feed = await prisma.retailer_feeds.findFirst({
-      where: { retailerId: session.merchantId },
+      where: { retailerId: retailerContext.retailerId },
     });
 
     reqLogger.debug('Feed lookup complete', {
-      merchantId: session.merchantId,
+      retailerId: retailerContext.retailerId,
       found: !!feed
     });
 
-    return NextResponse.json({ feed });
+    return NextResponse.json({ feed, retailerContext });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to get feed', {}, error);
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
@@ -54,19 +68,16 @@ export async function GET() {
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID().slice(0, 8);
   const reqLogger = logger.child({ requestId, endpoint: '/api/feed', method: 'POST' });
-  
+
   reqLogger.info('Feed create request received');
-  
+
   try {
     const session = await getSession();
-    
+
     if (!session || session.type !== 'merchant') {
       reqLogger.warn('Unauthorized feed create attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const merchantId = session.merchantId;
-    reqLogger.debug('Session verified', { merchantId });
 
     let body: unknown;
     try {
@@ -87,17 +98,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const { accessType, formatType, url, username, password, scheduleMinutes } = validation.data;
+    const { retailerId: inputRetailerId, accessType, formatType, url, username, password, scheduleMinutes } = validation.data;
 
-    reqLogger.debug('Checking for existing feed', { merchantId });
+    // Resolve retailer context (supports multi-retailer merchants)
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
 
-    // Check if merchant already has a feed
+    // Require ADMIN permission to create feeds
+    requireRetailerPermission(retailerContext, 'ADMIN', 'create feeds');
+
+    reqLogger.debug('Session verified', { merchantId: session.merchantId, retailerId });
+
+    reqLogger.debug('Checking for existing feed', { retailerId });
+
+    // Check if retailer already has a feed
     const existingFeed = await prisma.retailer_feeds.findFirst({
-      where: { retailerId: merchantId },
+      where: { retailerId },
     });
 
     if (existingFeed) {
-      reqLogger.warn('Feed already exists', { merchantId, existingFeedId: existingFeed.id });
+      reqLogger.warn('Feed already exists', { retailerId, existingFeedId: existingFeed.id });
       return NextResponse.json(
         { error: 'Feed already exists. Use PUT to update.' },
         { status: 400 }
@@ -105,7 +125,7 @@ export async function POST(request: Request) {
     }
 
     reqLogger.info('Creating new feed', {
-      merchantId,
+      retailerId,
       accessType,
       formatType,
       scheduleMinutes
@@ -114,7 +134,7 @@ export async function POST(request: Request) {
     // Create feed
     const feed = await prisma.retailer_feeds.create({
       data: {
-        retailerId: merchantId,
+        retailerId,
         accessType,
         formatType,
         url: url || null,
@@ -127,13 +147,17 @@ export async function POST(request: Request) {
 
     reqLogger.info('Feed created successfully', {
       feedId: feed.id,
-      merchantId,
+      retailerId,
       accessType,
       formatType
     });
 
-    return NextResponse.json({ success: true, feed });
+    return NextResponse.json({ success: true, feed, retailerContext });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to create feed', {}, error);
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
@@ -145,19 +169,16 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const requestId = crypto.randomUUID().slice(0, 8);
   const reqLogger = logger.child({ requestId, endpoint: '/api/feed', method: 'PUT' });
-  
+
   reqLogger.info('Feed update request received');
-  
+
   try {
     const session = await getSession();
-    
+
     if (!session || session.type !== 'merchant') {
       reqLogger.warn('Unauthorized feed update attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const merchantId = session.merchantId;
-    reqLogger.debug('Session verified', { merchantId });
 
     let body: unknown;
     try {
@@ -178,7 +199,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const { id, accessType, formatType, url, username, password, scheduleMinutes } = validation.data;
+    const { id, retailerId: inputRetailerId, accessType, formatType, url, username, password, scheduleMinutes } = validation.data;
 
     if (!id) {
       reqLogger.warn('Feed ID missing for update');
@@ -188,15 +209,23 @@ export async function PUT(request: Request) {
       );
     }
 
-    reqLogger.debug('Verifying feed ownership', { feedId: id, merchantId });
+    // Resolve retailer context (supports multi-retailer merchants)
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
 
-    // Verify ownership
+    // Require EDITOR permission to update feeds
+    requireRetailerPermission(retailerContext, 'EDITOR', 'update feeds');
+
+    reqLogger.debug('Session verified', { merchantId: session.merchantId, retailerId });
+    reqLogger.debug('Verifying feed ownership', { feedId: id, retailerId });
+
+    // Verify ownership - feed must belong to the resolved retailer
     const existingFeed = await prisma.retailer_feeds.findFirst({
-      where: { id, retailerId: merchantId },
+      where: { id, retailerId },
     });
 
     if (!existingFeed) {
-      reqLogger.warn('Feed not found or not owned', { feedId: id, merchantId });
+      reqLogger.warn('Feed not found or not owned', { feedId: id, retailerId });
       return NextResponse.json(
         { error: 'Feed not found' },
         { status: 404 }
@@ -226,8 +255,12 @@ export async function PUT(request: Request) {
 
     reqLogger.info('Feed updated successfully', { feedId: feed.id });
 
-    return NextResponse.json({ success: true, feed });
+    return NextResponse.json({ success: true, feed, retailerContext });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to update feed', {}, error);
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
@@ -236,7 +269,7 @@ export async function PUT(request: Request) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   const requestId = crypto.randomUUID().slice(0, 8);
   const reqLogger = logger.child({ requestId, endpoint: '/api/feed', method: 'DELETE' });
 
@@ -250,30 +283,42 @@ export async function DELETE() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const merchantId = session.merchantId;
-    reqLogger.debug('Session verified', { merchantId });
+    // Resolve retailer context (supports multi-retailer merchants)
+    const url = new URL(request.url);
+    const inputRetailerId = url.searchParams.get('retailerId') || undefined;
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
+
+    // Require ADMIN permission to delete feeds
+    requireRetailerPermission(retailerContext, 'ADMIN', 'delete feeds');
+
+    reqLogger.debug('Session verified', { merchantId: session.merchantId, retailerId });
 
     // Find and verify ownership
     const feed = await prisma.retailer_feeds.findFirst({
-      where: { retailerId: merchantId },
+      where: { retailerId },
     });
 
     if (!feed) {
-      reqLogger.warn('Feed not found for deletion', { merchantId });
+      reqLogger.warn('Feed not found for deletion', { retailerId });
       return NextResponse.json({ error: 'Feed not found' }, { status: 404 });
     }
 
-    reqLogger.info('Deleting feed', { feedId: feed.id, merchantId });
+    reqLogger.info('Deleting feed', { feedId: feed.id, retailerId });
 
     // Delete the feed (cascade will handle related records)
     await prisma.retailer_feeds.delete({
       where: { id: feed.id },
     });
 
-    reqLogger.info('Feed deleted successfully', { feedId: feed.id, merchantId });
+    reqLogger.info('Feed deleted successfully', { feedId: feed.id, retailerId });
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to delete feed', {}, error);
     return NextResponse.json(
       { error: 'An unexpected error occurred' },

@@ -65,10 +65,12 @@ export function MerchantLinkSection({ retailerId, linkedMerchant }: MerchantLink
   }
 
   async function handleUnlink() {
+    if (!linkedMerchant) return;
+
     setIsLoading(true);
     setError(null);
 
-    const result = await unlinkMerchantFromRetailer(retailerId);
+    const result = await unlinkMerchantFromRetailer(retailerId, linkedMerchant.id);
 
     if (result.success) {
       setIsUnlinkDialogOpen(false);

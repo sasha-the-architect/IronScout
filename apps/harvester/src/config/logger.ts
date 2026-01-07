@@ -22,6 +22,7 @@ export const logger = {
   alerter: rootLogger.child('alerter'),
   merchant: rootLogger.child('merchant'),
   affiliate: rootLogger.child('affiliate'),
+  resolver: rootLogger.child('resolver'),
 }
 
 // Export root logger for custom child creation

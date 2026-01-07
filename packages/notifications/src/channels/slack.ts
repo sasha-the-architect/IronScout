@@ -1,15 +1,15 @@
 /**
  * Slack Channel - Webhook Integration
- * 
+ *
  * Sends notifications to Slack via Incoming Webhooks.
- * 
+ *
  * Setup:
  * 1. Go to https://api.slack.com/apps
  * 2. Create a new app or select existing
  * 3. Enable "Incoming Webhooks"
  * 4. Add webhook to desired channel
- * 5. Copy webhook URL to SLACK_MERCHANT_OPS_WEBHOOK_URL env var (legacy: SLACK_DEALER_OPS_WEBHOOK_URL)
- * 
+ * 5. Copy webhook URL to SLACK_MERCHANT_OPS_WEBHOOK_URL env var
+ *
  * Optional: Use SLACK_FEEDS_WEBHOOK_URL for a separate feed alerts channel
  */
 
@@ -92,12 +92,10 @@ export interface SlackMessage {
 // Configuration
 // =============================================================================
 
-const merchantOpsWebhookUrl = process.env.SLACK_MERCHANT_OPS_WEBHOOK_URL || process.env.SLACK_DEALER_OPS_WEBHOOK_URL;
+const merchantOpsWebhookUrl = process.env.SLACK_MERCHANT_OPS_WEBHOOK_URL;
 
 export const SLACK_CONFIG = {
   merchantOpsWebhookUrl,
-  /** @deprecated Use merchantOpsWebhookUrl instead */
-  dealerOpsWebhookUrl: merchantOpsWebhookUrl,
   feedsWebhookUrl: process.env.SLACK_FEEDS_WEBHOOK_URL,
   enabled: !!merchantOpsWebhookUrl,
   adminPortalUrl: process.env.ADMIN_PORTAL_URL || 'https://admin.ironscout.ai',

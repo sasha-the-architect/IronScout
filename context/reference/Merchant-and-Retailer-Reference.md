@@ -58,10 +58,45 @@ Recommended structure:
 
 ### Listing / Entitlement
 
-- `merchant_retailers.listingStatus` controls whether a Merchant’s retailer listings are shown to consumers (LISTED | UNLISTED).
+**Retailer visibility is retailer-owned.** `retailers.visibilityStatus` is the primary gate. Merchant relationships are conditional overrides, not the source of truth.
+
+**Retailers may be consumer-visible without any merchant relationship.** Retailers sourced exclusively from affiliate or third-party feeds may have no associated Merchant. These retailers are consumer-visible if otherwise ELIGIBLE and are managed only through source- and affiliate-level controls.
+
+**`merchant_retailers.listingStatus` only gates visibility when at least one relationship exists.**
+
 - Relationship status (ACTIVE | SUSPENDED) is separate from Retailer eligibility.
-- Consumer visibility predicate (query-time): `retailers.visibilityStatus = ELIGIBLE` AND `merchant_retailers.listingStatus = LISTED` AND `merchant_retailers.status = ACTIVE`.
+- When multiple Merchant relationships exist, the Retailer is visible if **at least one** is ACTIVE and LISTED.
 - Subscription status is NOT a consumer visibility predicate.
+
+### Visibility Truth Table
+
+| `visibilityStatus` | Merchant Relationships | Result |
+|---|---|---|
+| ELIGIBLE | none | **Visible** (crawl-only) |
+| ELIGIBLE | ≥1 ACTIVE + LISTED | **Visible** |
+| ELIGIBLE | ≥1 ACTIVE, all UNLISTED | **Hidden** |
+| ELIGIBLE | all SUSPENDED | **Visible** (crawl-only) |
+| INELIGIBLE | any | **Hidden** |
+
+### Suspension and Removal Behavior
+
+If a Merchant–Retailer relationship is suspended or removed, the Retailer reverts to crawl-only behavior. Consumer visibility is determined solely by the Retailer's own eligibility and any remaining active, listed relationships.
+
+If all relationships are SUSPENDED, the retailer behaves as crawl-only.
+
+Removal and suspension have identical visibility effects; removal simply deletes the relationship record.
+
+Suspension means:
+- Merchant loses management rights.
+- Portal access revoked for that retailer.
+- Listings managed by that merchant are unlisted.
+
+Suspension does **not** mean:
+- The retailer disappears from the market.
+- Affiliate or crawl data is invalid.
+- Consumer discovery is blocked.
+
+Propagating suspension to visibility would let merchants "rage-hide" retailers, break affiliate coverage, and entangle billing disputes with consumer data integrity.
 
 ---
 
@@ -78,7 +113,21 @@ Common roles:
 - Manager: specific retailers.
 - Analyst: read-only.
 
-Retailers do not have users. Merchants do.
+**Retailers do not have users. Merchants do.**
+
+A retailer may have zero associated merchants. In that case it is managed only by internal ops and automated ingestion.
+
+### Canonical Permission Tables
+
+Permissions are stored in these tables and are the **only** allowed mechanism for access control:
+
+| Table | Purpose |
+|-------|---------|
+| `merchant_users` | Authenticated users under a merchant account |
+| `merchant_retailers` | Which retailers a merchant can administer |
+| `merchant_user_retailers` | Per-user permissions for specific retailers |
+
+Permissions are enforced via `merchant_user_retailers`, not inferred from other relationships.
 
 ---
 
@@ -104,15 +153,48 @@ Publishing merchant data into consumer prices requires an explicit mapping to a 
 
 ---
 
+### Relationship-Scoped Data
+
+Some operational data is scoped to the **Merchant–Retailer relationship** (`merchantId` + `retailerId`), not to merchant or retailer alone.
+
+| Table | Scope | Fallback |
+|-------|-------|----------|
+| `merchant_retailers.listingStatus` | Relationship | — |
+| `merchant_contacts` | Relationship | Merchant-level default |
+| `merchant_notification_prefs` | Relationship | Merchant-level default |
+
+**Pattern:** "I want different contacts for each storefront I manage, but default to my main contact if not specified."
+
+When adding new operational data, decide explicitly:
+- **Merchant-scoped:** Applies to all retailers the merchant manages (billing, subscription, audit logs).
+- **Retailer-scoped:** Applies to the retailer regardless of who manages it (prices, SKUs, visibility).
+- **Relationship-scoped:** Varies per merchant–retailer pair (listing preferences, retailer-specific contacts).
+
+Do not default to merchant-scoped. Ask which scope applies.
+
+---
+
 ## Source and Feed Model
 
 A **Source** or **Feed** represents the technical origin of price data.
 
 - Source/Feed is **not** a Merchant.
-- Source/Feed is usually associated with a Retailer.
+- Source/Feed is associated with a Retailer for identity.
 - Source explains provenance, not ownership.
 
-Simple rule:
+### Dual Attribution
+
+Feeds have dual attribution:
+
+| Aspect | Scope | Key |
+|--------|-------|-----|
+| **Identity** | Retailer | `retailerId` — whose data this is |
+| **Management** | Merchant | via `merchant_retailers` — who can edit, who is accountable |
+
+Feeds/Sources are keyed to `retailerId` for identity. Management and audit attribution flows through the `merchant_retailers` relationship.
+
+### Simple Rule
+
 - Retailer = who the price is from.
 - Source = how we got it.
 - Merchant = who logged in and manages data.
@@ -161,7 +243,7 @@ Merchant
 - Wrong from one affiliate network → AFFILIATE
 - Wrong from one ingestion run → FEED_RUN
 
-### If portal benchmarks are wrong
+### If merchant-submitted data is wrong
 - Wrong for one merchant → MERCHANT
 - Wrong from one portal ingestion run → FEED_RUN
 
@@ -212,10 +294,12 @@ Retailers: none
 
 - Merchants log in.
 - Retailers appear to consumers.
-- Consumer visibility = visibilityStatus (ELIGIBLE) + listingStatus (LISTED) + relationship status (ACTIVE); subscription is not a consumer visibility gate.
-- Delinquency/suspension auto-unlists; recovery requires explicit relist.
-- Sources explain ingestion.
-- Permissions are explicit.
+- Retailers may be visible without any merchant relationship (crawl-only).
+- Consumer visibility = `visibilityStatus` (ELIGIBLE) + at least one ACTIVE/LISTED relationship (if any exist); subscription is not a consumer visibility gate.
+- Suspension/removal reverts to crawl-only; does not hide the retailer.
+- Sources explain ingestion; feeds are retailer-scoped for identity, merchant-scoped for management.
+- Permissions are explicit and stored in `merchant_user_retailers`.
+- Data scope must be chosen explicitly: merchant, retailer, or relationship.
 - Corrections are scoped, not guessed.
 
 This separation is required for scale, clarity, and operational safety.

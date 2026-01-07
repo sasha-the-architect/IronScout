@@ -25,7 +25,7 @@ function getResendClient(): Resend {
 
 // Email configuration
 const FROM_EMAIL = process.env.EMAIL_FROM || 'IronScout <noreply@ironscout.ai>';
-const BASE_URL = process.env.NEXT_PUBLIC_MERCHANT_URL || process.env.NEXT_PUBLIC_DEALER_URL || 'https://merchant.ironscout.ai';
+const BASE_URL = process.env.NEXT_PUBLIC_MERCHANT_URL || 'https://merchant.ironscout.ai';
 
 export interface SendEmailResult {
   success: boolean;

@@ -3,7 +3,7 @@ import { getAdminSession, logAdminAction } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { headers } from 'next/headers';
 import { logger } from '@/lib/logger';
-import { notifyDealerSuspended } from '@ironscout/notifications';
+import { notifyMerchantSuspended } from '@ironscout/notifications';
 
 export async function POST(
   request: Request,
@@ -77,7 +77,7 @@ export async function POST(
 
     // Send suspension notification (email + Slack)
     if (ownerUser) {
-      const notifyResult = await notifyDealerSuspended(
+      const notifyResult = await notifyMerchantSuspended(
         {
           id: merchant.id,
           email: ownerUser.email,

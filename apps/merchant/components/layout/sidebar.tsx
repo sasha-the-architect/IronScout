@@ -6,8 +6,6 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Rss,
-  Package,
-  Lightbulb,
   BarChart3,
   Settings,
   Users,
@@ -31,8 +29,6 @@ interface NavItem {
 const merchantNavigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Feed Setup', href: '/feed', icon: Rss },
-  { name: 'SKUs', href: '/skus', icon: Package },
-  { name: 'Market Context', href: '/insights', icon: Lightbulb, proOnly: true },
   { name: 'Analytics', href: '/analytics', icon: BarChart3, proOnly: true },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

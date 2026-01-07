@@ -9,11 +9,19 @@ import {
   PremiumRankedProduct
 } from './premium-ranking'
 import { batchCalculatePriceSignalIndex, PriceSignalIndex } from './price-signal-index'
+import { batchGetPricesViaProductLinks } from './price-resolver'
 import { BulletType, PressureRating, BULLET_TYPE_CATEGORIES } from '../../types/product-metadata'
 import { visiblePriceWhere } from '../../config/tiers'
 import { loggers } from '../../config/logger'
 
 const log = loggers.ai
+
+/**
+ * Feature flag for Product Resolver v1.2 price path
+ * When enabled, prices are fetched through product_links instead of direct relation
+ * Set to true once resolver has populated product_links table
+ */
+const USE_RESOLVER_PRICE_PATH = process.env.USE_RESOLVER_PRICE_PATH === 'true'
 
 /**
  * Explicit filters that can override AI intent
@@ -541,43 +549,75 @@ function addCondition(where: any, condition: any): void {
 
 /**
  * Standard Prisma-based search
+ *
+ * When USE_RESOLVER_PRICE_PATH is enabled, prices are fetched through
+ * product_links per Spec v1.2 §0.0 instead of direct relation.
  */
 async function standardSearch(where: any, skip: number, take: number, includePremiumFields: boolean): Promise<any[]> {
+  const baseSelect = {
+    id: true,
+    name: true,
+    description: true,
+    category: true,
+    brand: true,
+    imageUrl: true,
+    upc: true,
+    caliber: true,
+    grainWeight: true,
+    caseMaterial: true,
+    purpose: true,
+    roundCount: true,
+    createdAt: true,
+    // Premium fields
+    ...(includePremiumFields ? {
+      bulletType: true,
+      pressureRating: true,
+      muzzleVelocityFps: true,
+      isSubsonic: true,
+      shortBarrelOptimized: true,
+      suppressorSafe: true,
+      lowFlash: true,
+      lowRecoil: true,
+      controlledExpansion: true,
+      matchGrade: true,
+      factoryNew: true,
+      dataSource: true,
+      dataConfidence: true,
+      metadata: true,
+    } : {}),
+  }
+
+  if (USE_RESOLVER_PRICE_PATH) {
+    // Product Resolver v1.2 path: fetch prices through product_links
+    const products = await prisma.products.findMany({
+      where,
+      skip,
+      take,
+      select: baseSelect,
+      orderBy: { createdAt: 'desc' },
+    })
+
+    if (products.length === 0) {
+      return []
+    }
+
+    // Batch fetch prices via product_links
+    const productIds = products.map((p: { id: string }) => p.id)
+    const pricesMap = await batchGetPricesViaProductLinks(productIds)
+
+    return products.map((p: { id: string }) => ({
+      ...p,
+      prices: pricesMap.get(p.id) || [],
+    }))
+  }
+
+  // Legacy path: direct prices relation
   return prisma.products.findMany({
     where,
     skip,
     take,
     select: {
-      id: true,
-      name: true,
-      description: true,
-      category: true,
-      brand: true,
-      imageUrl: true,
-      upc: true,
-      caliber: true,
-      grainWeight: true,
-      caseMaterial: true,
-      purpose: true,
-      roundCount: true,
-      createdAt: true,
-      // Premium fields
-      ...(includePremiumFields ? {
-        bulletType: true,
-        pressureRating: true,
-        muzzleVelocityFps: true,
-        isSubsonic: true,
-        shortBarrelOptimized: true,
-        suppressorSafe: true,
-        lowFlash: true,
-        lowRecoil: true,
-        controlledExpansion: true,
-        matchGrade: true,
-        factoryNew: true,
-        dataSource: true,
-        dataConfidence: true,
-        metadata: true,
-      } : {}),
+      ...baseSelect,
       prices: {
         where: visiblePriceWhere(),
         include: {
@@ -683,57 +723,77 @@ async function vectorEnhancedSearch(
   }
   
   // Fetch full product details
-  const products = await prisma.products.findMany({
-    where: {
-      id: { in: productIds.map(p => p.id) }
-    },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      category: true,
-      brand: true,
-      imageUrl: true,
-      upc: true,
-      caliber: true,
-      grainWeight: true,
-      caseMaterial: true,
-      purpose: true,
-      roundCount: true,
-      createdAt: true,
-      // Premium fields
-      ...(isPremium ? {
-        bulletType: true,
-        pressureRating: true,
-        muzzleVelocityFps: true,
-        isSubsonic: true,
-        shortBarrelOptimized: true,
-        suppressorSafe: true,
-        lowFlash: true,
-        lowRecoil: true,
-        controlledExpansion: true,
-        matchGrade: true,
-        factoryNew: true,
-        dataSource: true,
-        dataConfidence: true,
-        metadata: true,
-      } : {}),
-      prices: {
-        where: visiblePriceWhere(),
-        include: {
-          retailers: true
-        },
-        orderBy: [
-          { retailers: { tier: 'desc' } },
-          { price: 'asc' }
-        ]
+  const baseSelect = {
+    id: true,
+    name: true,
+    description: true,
+    category: true,
+    brand: true,
+    imageUrl: true,
+    upc: true,
+    caliber: true,
+    grainWeight: true,
+    caseMaterial: true,
+    purpose: true,
+    roundCount: true,
+    createdAt: true,
+    // Premium fields
+    ...(isPremium ? {
+      bulletType: true,
+      pressureRating: true,
+      muzzleVelocityFps: true,
+      isSubsonic: true,
+      shortBarrelOptimized: true,
+      suppressorSafe: true,
+      lowFlash: true,
+      lowRecoil: true,
+      controlledExpansion: true,
+      matchGrade: true,
+      factoryNew: true,
+      dataSource: true,
+      dataConfidence: true,
+      metadata: true,
+    } : {}),
+  }
+
+  let products: any[]
+
+  if (USE_RESOLVER_PRICE_PATH) {
+    // Product Resolver v1.2 path: fetch prices through product_links
+    const rawProducts = await prisma.products.findMany({
+      where: { id: { in: productIds.map(p => p.id) } },
+      select: baseSelect,
+    })
+
+    // Batch fetch prices via product_links
+    const ids = rawProducts.map((p: { id: string }) => p.id)
+    const pricesMap = await batchGetPricesViaProductLinks(ids)
+
+    products = rawProducts.map((p: { id: string }) => ({
+      ...p,
+      prices: pricesMap.get(p.id) || [],
+    }))
+  } else {
+    // Legacy path: direct prices relation
+    products = await prisma.products.findMany({
+      where: { id: { in: productIds.map(p => p.id) } },
+      select: {
+        ...baseSelect,
+        prices: {
+          where: visiblePriceWhere(),
+          include: { retailers: true },
+          orderBy: [
+            { retailers: { tier: 'desc' } },
+            { price: 'asc' }
+          ]
+        }
       }
-    }
-  })
+    })
+  }
 
   // Create similarity map and sort by similarity
   const similarityMap = new Map(productIds.map(p => [p.id, p.similarity]))
-  
+
   return products
     .map((p: { id: string; [key: string]: unknown }) => ({
       ...p,

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSession, requireRetailerContext, RetailerContextError } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { logger } from '@/lib/logger';
+import { z } from 'zod';
 
 // Force dynamic rendering - this route uses cookies for auth
 export const dynamic = 'force-dynamic';
@@ -14,14 +15,14 @@ async function getQueue() {
     logger.debug('Initializing BullMQ queue connection');
     const { Queue } = await import('bullmq');
     const Redis = (await import('ioredis')).default;
-    
+
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
     logger.debug('Connecting to Redis', { redisUrl: redisUrl.replace(/\/\/.*@/, '//***@') });
-    
+
     const redisConnection = new Redis(redisUrl, {
       maxRetriesPerRequest: null,
     });
-    
+
     merchantFeedIngestQueue = new Queue('merchant-feed-ingest', {
       connection: redisConnection,
     });
@@ -31,18 +32,23 @@ async function getQueue() {
   return merchantFeedIngestQueue;
 }
 
+const refreshSchema = z.object({
+  feedId: z.string().min(1),
+  retailerId: z.string().optional(), // Optional: for multi-retailer merchants
+});
+
 /**
  * Trigger a manual feed refresh
  */
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID().slice(0, 8);
   const reqLogger = logger.child({ requestId, endpoint: '/api/feed/refresh' });
-  
+
   reqLogger.info('Feed refresh request received');
-  
+
   try {
     const session = await getSession();
-    
+
     if (!session || session.type !== 'merchant') {
       reqLogger.warn('Unauthorized feed refresh attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -51,7 +57,7 @@ export async function POST(request: Request) {
     const merchantId = session.merchantId;
     reqLogger.debug('Session verified', { merchantId });
 
-    let body: { feedId?: string };
+    let body: unknown;
     try {
       body = await request.json();
     } catch {
@@ -59,25 +65,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const { feedId } = body;
-
-    if (!feedId) {
-      reqLogger.warn('Feed refresh failed - no feedId provided');
+    const validation = refreshSchema.safeParse(body);
+    if (!validation.success) {
+      reqLogger.warn('Feed refresh failed - invalid data');
       return NextResponse.json(
         { error: 'Feed ID is required' },
         { status: 400 }
       );
     }
 
-    reqLogger.debug('Looking up feed', { feedId, merchantId });
+    const { feedId, retailerId: inputRetailerId } = validation.data;
 
-    // Verify ownership
+    // Resolve retailer context (supports multi-retailer merchants)
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
+
+    reqLogger.debug('Looking up feed', { feedId, retailerId });
+
+    // Verify ownership - feed must belong to resolved retailer
     const feed = await prisma.retailer_feeds.findFirst({
-      where: { id: feedId, retailerId: merchantId },
+      where: { id: feedId, retailerId },
     });
 
     if (!feed) {
-      reqLogger.warn('Feed not found or not owned by merchant', { feedId, merchantId });
+      reqLogger.warn('Feed not found or not owned by retailer', { feedId, retailerId });
       return NextResponse.json(
         { error: 'Feed not found' },
         { status: 404 }
@@ -124,21 +135,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Look up retailerId via merchant_retailers
-    const merchantRetailer = await prisma.merchant_retailers.findFirst({
-      where: { merchantId },
-      select: { retailerId: true }
-    });
-    const retailerId = merchantRetailer?.retailerId;
-
-    if (!retailerId) {
-      reqLogger.warn('No retailerId found for merchant', { merchantId });
-      return NextResponse.json(
-        { error: 'No retailer configured for this merchant' },
-        { status: 400 }
-      );
-    }
-
     reqLogger.info('Creating feed run record', { feedId, merchantId, retailerId });
 
     // Create a feed run record
@@ -159,7 +155,7 @@ export async function POST(request: Request) {
     await queue.add(
       'ingest-manual',
       {
-        retailerId: merchantId,
+        retailerId,
         feedId: feed.id,
         feedRunId: run.id,
         accessType: feed.accessType,
@@ -185,8 +181,13 @@ export async function POST(request: Request) {
       success: true,
       runId: run.id,
       message: 'Feed refresh started',
+      retailerContext,
     });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Feed refresh failed - unexpected error', {}, error);
     return NextResponse.json(
       { error: 'An unexpected error occurred' },

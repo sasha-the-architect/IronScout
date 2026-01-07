@@ -14,7 +14,6 @@ import { redisConnection } from '../config/redis'
 import {
   QUEUE_NAMES,
   MerchantFeedIngestJobData,
-  merchantSkuMatchQueue,
 } from '../config/queues'
 import { createHash } from 'crypto'
 import {
@@ -539,27 +538,8 @@ async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
       },
     })
 
-    // Queue SKU matching in batches with idempotent jobIds
-    if (merchantSkuIds.length > 0) {
-      const BATCH_SIZE = 100
-      for (let i = 0; i < merchantSkuIds.length; i += BATCH_SIZE) {
-        const batchNum = Math.floor(i / BATCH_SIZE)
-        const batch = merchantSkuIds.slice(i, i + BATCH_SIZE)
-        await merchantSkuMatchQueue.add(
-          'match-batch',
-          {
-            retailerId,
-            feedRunId,
-            merchantSkuIds: batch,
-          },
-          {
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 5000 },
-            jobId: `sku-match--${feedRunId}--${batchNum}`, // Idempotent: one match job per feedRun batch
-          }
-        )
-      }
-    }
+    // Note: SKU matching queue removed for v1 (benchmark subsystem removed)
+    // In v1, products are matched to canonical products via UPC during affiliate ingestion
 
     const processDurationMs = Date.now() - processStart
     const totalDurationMs = Date.now() - startTime

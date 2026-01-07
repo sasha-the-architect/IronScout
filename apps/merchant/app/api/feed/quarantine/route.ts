@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { getSession, requireRetailerContext, RetailerContextError } from '@/lib/auth';
 import { prisma } from '@ironscout/db';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger';
 export const dynamic = 'force-dynamic';
 
 const querySchema = z.object({
+  retailerId: z.string().optional(), // Optional: for multi-retailer merchants
   status: z.enum(['QUARANTINED', 'RESOLVED', 'DISMISSED']).optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
@@ -16,7 +17,7 @@ const querySchema = z.object({
 
 /**
  * GET /api/feed/quarantine
- * List quarantined records for the merchant's feed
+ * List quarantined records for the retailer's feed
  */
 export async function GET(request: Request) {
   const reqLogger = logger.child({ endpoint: '/api/feed/quarantine', method: 'GET' });
@@ -35,16 +36,20 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
     }
 
-    const { status, page, limit, search } = queryResult.data;
+    const { retailerId: inputRetailerId, status, page, limit, search } = queryResult.data;
     const offset = (page - 1) * limit;
 
-    // Get merchant's feed
+    // Resolve retailer context (supports multi-retailer merchants)
+    const retailerContext = await requireRetailerContext(session, inputRetailerId);
+    const { retailerId } = retailerContext;
+
+    // Get retailer's feed
     const feed = await prisma.retailer_feeds.findFirst({
-      where: { retailerId: session.merchantId },
+      where: { retailerId },
     });
 
     if (!feed) {
-      return NextResponse.json({ records: [], total: 0, page, limit });
+      return NextResponse.json({ records: [], total: 0, page, limit, retailerContext });
     }
 
     // Build where clause
@@ -109,8 +114,13 @@ export async function GET(request: Request) {
       page,
       limit,
       counts,
+      retailerContext,
     });
   } catch (error) {
+    if (error instanceof RetailerContextError) {
+      reqLogger.warn('Retailer context error', { code: error.code, message: error.message });
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.statusCode });
+    }
     reqLogger.error('Failed to fetch quarantine records', {}, error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }
