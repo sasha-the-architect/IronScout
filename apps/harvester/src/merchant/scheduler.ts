@@ -3,15 +3,24 @@
  *
  * Schedules recurring merchant portal jobs:
  * - Feed ingestion (hourly by default, per-feed schedule)
- * - Benchmark calculation (every 2 hours)
- * - Insight generation (after benchmarks)
  *
  * Features:
- * - Uses BullMQ repeatable jobs (safe for multiple replicas)
+ * - Uses BullMQ repeatable jobs (inherently idempotent across replicas)
  * - Idempotent job creation per (feedId, scheduledWindow)
  * - Respects feed.enabled flag
  * - Applies scheduling jitter to prevent thundering herd
  * - Skips failed feeds until manually re-enabled
+ *
+ * ADR-001 Scope Clarification:
+ * ADR-001 (Singleton Harvester Scheduler) applies to the CRAWL scheduler
+ * which creates execution_logs and requires explicit singleton enforcement
+ * via HARVESTER_SCHEDULER_ENABLED.
+ *
+ * This merchant scheduler uses BullMQ repeatable jobs which handle
+ * deduplication internally - multiple instances scheduling the same
+ * repeatable job is safe because BullMQ deduplicates by jobId.
+ * This achieves the "no duplicate runs" invariant through a different
+ * mechanism than explicit singleton enforcement.
  */
 
 import { prisma } from '@ironscout/db'

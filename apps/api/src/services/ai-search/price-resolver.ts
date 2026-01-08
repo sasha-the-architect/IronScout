@@ -22,10 +22,11 @@ import { visiblePriceWhere } from '../../config/tiers'
  */
 export async function getPricesViaProductLinks(productId: string) {
   // Find all source_products linked to this canonical product
+  // Per Spec v1.2 §0.0: Query path must include both MATCHED and CREATED links
   const links = await prisma.product_links.findMany({
     where: {
       productId,
-      status: 'MATCHED', // Only consider matched links
+      status: { in: ['MATCHED', 'CREATED'] },
     },
     select: {
       sourceProductId: true,
@@ -76,10 +77,11 @@ export async function batchGetPricesViaProductLinks(
   productIds: string[]
 ): Promise<Map<string, any[]>> {
   // Find all source_products linked to these canonical products
+  // Per Spec v1.2 §0.0: Query path must include both MATCHED and CREATED links
   const links = await prisma.product_links.findMany({
     where: {
       productId: { in: productIds },
-      status: 'MATCHED',
+      status: { in: ['MATCHED', 'CREATED'] },
     },
     select: {
       sourceProductId: true,
@@ -216,10 +218,11 @@ export async function searchWithResolvedPrices(
  * @returns True if product has linked prices
  */
 export async function hasResolvedPrices(productId: string): Promise<boolean> {
+  // Per Spec v1.2 §0.0: Both MATCHED and CREATED links represent resolved prices
   const count = await prisma.product_links.count({
     where: {
       productId,
-      status: 'MATCHED',
+      status: { in: ['MATCHED', 'CREATED'] },
     },
   })
   return count > 0

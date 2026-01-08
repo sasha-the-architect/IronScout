@@ -29,11 +29,11 @@ Bull Board provides a web UI for monitoring all BullMQ queues in the harvester. 
 | `write` | Database writes and price updates |
 | `alert` | Price/availability alert triggers |
 | `merchant-feed-ingest` | Merchant product feed ingestion |
-| `merchant-sku-match` | SKU matching to canonical products |
-| `merchant-benchmark` | Market benchmark calculations |
-| `merchant-insight` | Merchant competitive insights |
 | `affiliate-feed` | Affiliate feed processing (FTP/SFTP) |
 | `affiliate-feed-scheduler` | Affiliate feed scheduling ticks |
+| `product-resolve` | Product identity resolution (Spec v1.2) |
+
+> **Removed for v1**: `merchant-sku-match`, `merchant-benchmark`, `merchant-insight` queues were removed. See `apps/harvester/src/config/queues.ts` for details.
 
 ### Starting Bull Board
 
