@@ -1,6 +1,6 @@
 # ADR-013: Homepage Positioning and Language Guardrails
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-12-29
 **Amends:** ADR-012 (Dashboard v3 – Action-Oriented Deal Surface)
 **Owners:** Product, UX, Engineering

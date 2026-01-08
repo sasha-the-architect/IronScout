@@ -1,9 +1,9 @@
 # ADR-012: Dashboard v3 – Action-Oriented Deal Surface Integrated with Search and Saved Items
 
-**Status:** Proposed  
+**Status:** Accepted
 **Date:** 2025-12-29  
 **Owners:** Product, UX, Engineering  
-**Related ADRs:** ADR-006, ADR-011, ADR-0XX-A1 (Homepage Guardrails), ADR-0XX-A2 (Search Guardrails)
+**Related ADRs:** ADR-006, ADR-011, ADR-013 (Homepage Guardrails), ADR-014 (Search Guardrails)
 
 ---
 

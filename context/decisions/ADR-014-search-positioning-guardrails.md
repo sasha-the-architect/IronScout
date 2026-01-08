@@ -1,6 +1,6 @@
 # ADR-014: Search Positioning and Language Guardrails
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2025-12-29
 **Amends:** ADR-012, ADR-013
 **Owners:** Product, UX, Engineering
