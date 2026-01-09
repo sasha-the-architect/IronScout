@@ -24,7 +24,7 @@ Per `context/architecture/00_system_overview.md`:
 - Submits inventory via feeds
 - Receives pricing insights
 - Has subscription tier (hobbyist, serious, national, top-tier)
-- Database: `merchants`, `merchant_users`, `merchant_feeds`, `merchant_skus`, `merchant_insights`
+- Database: `merchants`, `merchant_users`, `retailer_feeds`, `retailer_skus`, `merchant_insights`
 
 ### Retailer (Consumer Storefront)
 - Store/website that sells ammunition to consumers
@@ -93,7 +93,7 @@ apps/harvester/src/dealer/  →  apps/harvester/src/merchant/
 |----------|----------|
 | `dealer/index.ts` | `merchant/index.ts` |
 | `dealer/benchmark.ts` | `merchant/benchmark.ts` |
-| `dealer/feed-ingest.ts` | `merchant/feed-ingest.ts` |
+| `dealer/feed-ingest.ts` | `merchant/feed-ingest.ts` | Completed: exports `retailerFeedIngestWorker`
 | `dealer/ftp-fetcher.ts` | `merchant/ftp-fetcher.ts` |
 | `dealer/insight.ts` | `merchant/insight.ts` |
 | `dealer/scheduler.ts` | `merchant/scheduler.ts` |
@@ -129,14 +129,14 @@ Rename types/interfaces before updating code that uses them. TypeScript compiler
 | `DealerTier` | `MerchantTier` | `scale-data-generator.ts` |
 | `MockDealerSku` | `MockMerchantSku` | `scale-pipeline.test.ts` |
 | `MockDealerInsight` | `MockMerchantInsight` | `scale-pipeline.test.ts` |
-| `DealerFeedJobData` | `MerchantFeedJobData` | `queues.ts` |
+| `DealerFeedJobData` | `RetailerFeedIngestJobData` | `queues.ts` |
 | `DealerBenchmarkJobData` | `MerchantBenchmarkJobData` | `queues.ts` |
 | `DealerInsightJobData` | `MerchantInsightJobData` | `queues.ts` |
 
 ### 3.2 Queue Names
 | Old Name | New Name |
 |----------|----------|
-| `DEALER_FEED` | `MERCHANT_FEED` |
+| `DEALER_FEED` | `RETAILER_FEED_INGEST` |
 | `DEALER_BENCHMARK` | `MERCHANT_BENCHMARK` |
 | `DEALER_INSIGHT` | `MERCHANT_INSIGHT` |
 
@@ -221,7 +221,7 @@ pnpm --filter @ironscout/merchant build
 | `dealerSkus` | `merchantSkus` | Harvester |
 | `dealerPrices` | `merchantPrices` | Harvester |
 | `dealerData` | `merchantData` | Various |
-| `dealerFeed` | `merchantFeed` | Various |
+| `dealerFeed` | `retailerFeed` | Various |
 | `dealerUser` | `merchantUser` | Various |
 
 ### 6.2 Function Parameter Renames

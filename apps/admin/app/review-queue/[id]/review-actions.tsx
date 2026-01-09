@@ -44,6 +44,10 @@ interface ReviewActionsProps {
   candidates: Candidate[];
   searchProducts: SearchProduct[];
   inputNormalized?: InputNormalized;
+  /** Known brand values for autocomplete consistency */
+  knownBrands?: string[];
+  /** Known caliber values for autocomplete consistency */
+  knownCalibers?: string[];
 }
 
 export function ReviewActions({
@@ -51,6 +55,8 @@ export function ReviewActions({
   candidates,
   searchProducts,
   inputNormalized,
+  knownBrands = [],
+  knownCalibers = [],
 }: ReviewActionsProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -254,10 +260,17 @@ export function ReviewActions({
                 </label>
                 <input
                   type="text"
+                  list="brand-suggestions"
                   value={newProductBrand}
                   onChange={(e) => setNewProductBrand(e.target.value)}
+                  placeholder="Start typing..."
                   className="mt-1 w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500"
                 />
+                <datalist id="brand-suggestions">
+                  {knownBrands.map((brand) => (
+                    <option key={brand} value={brand} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700">
@@ -265,10 +278,17 @@ export function ReviewActions({
                 </label>
                 <input
                   type="text"
+                  list="caliber-suggestions"
                   value={newProductCaliber}
                   onChange={(e) => setNewProductCaliber(e.target.value)}
+                  placeholder="Start typing..."
                   className="mt-1 w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:border-blue-500 focus:ring-blue-500"
                 />
+                <datalist id="caliber-suggestions">
+                  {knownCalibers.map((caliber) => (
+                    <option key={caliber} value={caliber} />
+                  ))}
+                </datalist>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">

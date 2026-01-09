@@ -1,7 +1,7 @@
 /**
  * FTP/SFTP Feed Fetcher
  *
- * Provides FTP and SFTP feed fetching capabilities for dealer feeds.
+ * Provides FTP and SFTP feed fetching capabilities for retailer feeds.
  * Uses basic-ftp for FTP and ssh2 for SFTP connections.
  */
 

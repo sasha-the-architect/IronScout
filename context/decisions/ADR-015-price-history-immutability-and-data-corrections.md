@@ -146,7 +146,7 @@ if (!result.valid) {
 **Usage Rules**:
 - All new write paths for `prices` and `pricing_snapshots` MUST use these helpers
 - Never rely on DB defaults for `observedAt` in new code—set it explicitly
-- Valid `ingestionRunType` values: `SCRAPE`, `AFFILIATE_FEED`, `MERCHANT_FEED`, `MANUAL`
+- Valid `ingestionRunType` values: `SCRAPE`, `AFFILIATE_FEED`, `RETAILER_FEED`, `MANUAL`
 
 **Current Write Paths**:
 | Path | Type | Status |

@@ -1,7 +1,7 @@
 /**
- * Dealer Pipeline Scale Tests
+ * Retailer Pipeline Scale Tests
  *
- * Tests the harvester dealer pipeline at various catalog sizes:
+ * Tests the harvester retailer pipeline at various catalog sizes:
  * - Hobbyist: Under 300 SKUs
  * - Serious: 300-1,500 SKUs
  * - National: 1,500-5,000 SKUs
@@ -30,7 +30,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { GenericConnector } from '../connectors/generic-connector'
 import { AmmoSeekConnector } from '../connectors/ammoseek-connector'
 import {
-  generateMerchantFeed,
+  generateRetailerFeed,
   TIER_CONFIG,
   QUALITY_PROFILES,
   measurePerformance,
@@ -102,13 +102,13 @@ async function runParseTest(
 // HOBBYIST TIER TESTS (Under 300 SKUs)
 // ============================================================================
 
-describe.skipIf(!shouldRunTier('hobbyist'))('Hobbyist Dealer Scale (Under 300 SKUs)', () => {
+describe.skipIf(!shouldRunTier('hobbyist'))('Hobbyist Retailer Scale (Under 300 SKUs)', () => {
   const connector = new GenericConnector()
   const tier: MerchantTier = 'hobbyist'
 
   describe('Basic functionality', () => {
     it('parses minimum viable catalog (50 SKUs)', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 50,
         quality: 'excellent',
@@ -124,7 +124,7 @@ describe.skipIf(!shouldRunTier('hobbyist'))('Hobbyist Dealer Scale (Under 300 SK
     })
 
     it('parses maximum hobbyist catalog (299 SKUs)', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 299,
         quality: 'good',
@@ -139,7 +139,7 @@ describe.skipIf(!shouldRunTier('hobbyist'))('Hobbyist Dealer Scale (Under 300 SK
     })
 
     it('correctly classifies records at hobbyist scale', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 150,
         quality: 'good',
@@ -165,7 +165,7 @@ describe.skipIf(!shouldRunTier('hobbyist'))('Hobbyist Dealer Scale (Under 300 SK
 
   describe('Format handling', () => {
     it.each(['json', 'csv', 'xml'] as const)('parses %s format at hobbyist scale', async (format) => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 100,
         quality: 'good',
@@ -184,7 +184,7 @@ describe.skipIf(!shouldRunTier('hobbyist'))('Hobbyist Dealer Scale (Under 300 SK
     it.each(Object.keys(QUALITY_PROFILES) as Array<keyof typeof QUALITY_PROFILES>)(
       'handles %s quality data at hobbyist scale',
       async (quality) => {
-        const feed = generateMerchantFeed({
+        const feed = generateRetailerFeed({
           tier,
           count: 100,
           quality,
@@ -207,7 +207,7 @@ describe.skipIf(!shouldRunTier('hobbyist'))('Hobbyist Dealer Scale (Under 300 SK
 
   describe('Performance', () => {
     it('parses hobbyist catalog within time threshold', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: TIER_CONFIG[tier].defaultSkus,
         quality: 'good',
@@ -235,7 +235,7 @@ describe.skipIf(!shouldRunTier('serious'))('Serious Seller Scale (300-1,500 SKUs
 
   describe('Basic functionality', () => {
     it('parses minimum serious catalog (300 SKUs)', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 300,
         quality: 'excellent',
@@ -250,7 +250,7 @@ describe.skipIf(!shouldRunTier('serious'))('Serious Seller Scale (300-1,500 SKUs
     })
 
     it('parses typical serious catalog (800 SKUs)', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 800,
         quality: 'good',
@@ -265,7 +265,7 @@ describe.skipIf(!shouldRunTier('serious'))('Serious Seller Scale (300-1,500 SKUs
     })
 
     it('parses maximum serious catalog (1499 SKUs)', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 1499,
         quality: 'good',
@@ -282,7 +282,7 @@ describe.skipIf(!shouldRunTier('serious'))('Serious Seller Scale (300-1,500 SKUs
 
   describe('Error aggregation at scale', () => {
     it('correctly aggregates error codes for 1000 SKUs', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 1000,
         quality: 'fair', // Higher error rate for testing
@@ -303,7 +303,7 @@ describe.skipIf(!shouldRunTier('serious'))('Serious Seller Scale (300-1,500 SKUs
     })
 
     it('tracks MISSING_UPC errors accurately', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 500,
         quality: 'poor', // High missing UPC rate
@@ -324,7 +324,7 @@ describe.skipIf(!shouldRunTier('serious'))('Serious Seller Scale (300-1,500 SKUs
 
   describe('Performance', () => {
     it('parses serious catalog within time threshold', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: TIER_CONFIG[tier].defaultSkus,
         quality: 'good',
@@ -345,7 +345,7 @@ describe.skipIf(!shouldRunTier('serious'))('Serious Seller Scale (300-1,500 SKUs
       const results: Record<string, number> = {}
 
       for (const format of formats) {
-        const feed = generateMerchantFeed({
+        const feed = generateRetailerFeed({
           tier,
           count: 500,
           quality: 'good',
@@ -377,7 +377,7 @@ describe.skipIf(!shouldRunTier('national'))('National Operation Scale (1,500-5,0
 
   describe('Basic functionality', () => {
     it('parses minimum national catalog (1500 SKUs)', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 1500,
         quality: 'good',
@@ -392,7 +392,7 @@ describe.skipIf(!shouldRunTier('national'))('National Operation Scale (1,500-5,0
     }, 15000)
 
     it('parses typical national catalog (3000 SKUs)', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 3000,
         quality: 'good',
@@ -407,7 +407,7 @@ describe.skipIf(!shouldRunTier('national'))('National Operation Scale (1,500-5,0
     }, 30000)
 
     it('parses maximum national catalog (4999 SKUs)', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 4999,
         quality: 'good',
@@ -424,7 +424,7 @@ describe.skipIf(!shouldRunTier('national'))('National Operation Scale (1,500-5,0
 
   describe('Data integrity at scale', () => {
     it('preserves data accuracy for 3000 SKUs', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 3000,
         quality: 'excellent',
@@ -455,7 +455,7 @@ describe.skipIf(!shouldRunTier('national'))('National Operation Scale (1,500-5,0
     }, 30000)
 
     it('handles mixed data quality at national scale', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 2000,
         quality: 'fair',
@@ -476,7 +476,7 @@ describe.skipIf(!shouldRunTier('national'))('National Operation Scale (1,500-5,0
 
   describe('Performance', () => {
     it('parses national catalog within time threshold', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: TIER_CONFIG[tier].defaultSkus,
         quality: 'good',
@@ -498,13 +498,13 @@ describe.skipIf(!shouldRunTier('national'))('National Operation Scale (1,500-5,0
 // TOP-TIER TESTS (5,000+ SKUs)
 // ============================================================================
 
-describe.skipIf(!shouldRunTier('top-tier'))('Top-Tier Dealer Scale (5,000+ SKUs)', () => {
+describe.skipIf(!shouldRunTier('top-tier'))('Top-Tier Retailer Scale (5,000+ SKUs)', () => {
   const connector = new GenericConnector()
   const tier: MerchantTier = 'top-tier'
 
   describe('Basic functionality', () => {
     it('parses minimum top-tier catalog (5000 SKUs)', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 5000,
         quality: 'good',
@@ -519,7 +519,7 @@ describe.skipIf(!shouldRunTier('top-tier'))('Top-Tier Dealer Scale (5,000+ SKUs)
     }, 60000)
 
     it('parses typical top-tier catalog (10000 SKUs)', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 10000,
         quality: 'good',
@@ -536,7 +536,7 @@ describe.skipIf(!shouldRunTier('top-tier'))('Top-Tier Dealer Scale (5,000+ SKUs)
 
   describe('Stress tests', () => {
     it.skipIf(!ENABLE_STRESS_TESTS)('handles 25000 SKUs', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 25000,
         quality: 'good',
@@ -553,7 +553,7 @@ describe.skipIf(!shouldRunTier('top-tier'))('Top-Tier Dealer Scale (5,000+ SKUs)
     }, 300000) // 5 minute timeout
 
     it.skipIf(!ENABLE_STRESS_TESTS)('handles 50000 SKUs', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 50000,
         quality: 'excellent', // Use excellent quality for max throughput
@@ -572,7 +572,7 @@ describe.skipIf(!shouldRunTier('top-tier'))('Top-Tier Dealer Scale (5,000+ SKUs)
 
   describe('Performance', () => {
     it('parses top-tier catalog within time threshold', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: TIER_CONFIG[tier].defaultSkus,
         quality: 'good',
@@ -589,7 +589,7 @@ describe.skipIf(!shouldRunTier('top-tier'))('Top-Tier Dealer Scale (5,000+ SKUs)
     }, 180000)
 
     it('achieves minimum throughput of 500 items/sec for JSON', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 5000,
         quality: 'excellent',
@@ -608,7 +608,7 @@ describe.skipIf(!shouldRunTier('top-tier'))('Top-Tier Dealer Scale (5,000+ SKUs)
 
   describe('Batch processing simulation', () => {
     it('simulates batch queuing for SKU matching', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 5000,
         quality: 'good',
@@ -648,7 +648,7 @@ describe.skipIf(!!RUN_TIER)('Cross-Tier Performance Comparison', () => {
     const results: Record<MerchantTier, { count: number; timeMs: number; throughput: number }> = {} as any
 
     for (const tier of tiers) {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: TIER_CONFIG[tier].defaultSkus,
         quality: 'good',
@@ -694,7 +694,7 @@ describe.skipIf(!ENABLE_MEMORY_TESTS)('Memory Usage Tests', () => {
       // Force GC before test
       if (global.gc) global.gc()
 
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier: 'top-tier',
         count: size,
         quality: 'good',
@@ -729,7 +729,7 @@ describe.skipIf(!!RUN_TIER)('Edge Cases at Scale', () => {
 
   it('handles catalog with all records quarantined (missing UPCs)', async () => {
     // Create a feed where ALL records are missing UPCs
-    const feed = generateMerchantFeed({
+    const feed = generateRetailerFeed({
       tier: 'serious',
       count: 500,
       quality: 'poor',
@@ -748,7 +748,7 @@ describe.skipIf(!!RUN_TIER)('Edge Cases at Scale', () => {
   }, 30000)
 
   it('handles catalog with high rejection rate', async () => {
-    const feed = generateMerchantFeed({
+    const feed = generateRetailerFeed({
       tier: 'serious',
       count: 500,
       quality: 'poor',
@@ -767,7 +767,7 @@ describe.skipIf(!!RUN_TIER)('Edge Cases at Scale', () => {
   }, 30000)
 
   it('handles extremely long product titles', async () => {
-    const feed = generateMerchantFeed({
+    const feed = generateRetailerFeed({
       tier: 'hobbyist',
       count: 100,
       quality: 'excellent',
@@ -791,7 +791,7 @@ describe.skipIf(!!RUN_TIER)('Edge Cases at Scale', () => {
 
   it('handles catalog with maximum field variety', async () => {
     // Use all calibers, brands, bullet types
-    const feed = generateMerchantFeed({
+    const feed = generateRetailerFeed({
       tier: 'national',
       count: 2000,
       quality: 'excellent',
@@ -829,7 +829,7 @@ describe.skipIf(!!RUN_TIER)('Regression Tests', () => {
     const results: number[] = []
 
     for (let i = 0; i < 3; i++) {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier: 'hobbyist',
         count: 100,
         quality: 'good',
@@ -850,7 +850,7 @@ describe.skipIf(!!RUN_TIER)('Regression Tests', () => {
     const indexableCounts: number[] = []
 
     for (let seed = 1; seed <= 5; seed++) {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier: 'hobbyist',
         count: 200,
         quality: 'fair',

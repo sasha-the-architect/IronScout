@@ -1,8 +1,8 @@
 # Affiliate Feeds v1 - Complete Specification
 
 **Status:** Ready for Implementation
-**Date:** 2025-12-27
-**Version:** 1.1
+**Date:** 2026-01-08
+**Version:** 1.2
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### 1.1 Purpose
 
-Enable IronScout to ingest product catalog data from affiliate networks (starting with Impact) via scheduled FTP/SFTP file retrieval. This creates a new data source pipeline separate from merchant feeds, managed through the admin portal.
+Enable IronScout to ingest product catalog data from affiliate networks (starting with Impact) via scheduled FTP/SFTP file retrieval. This creates a new data source pipeline separate from retailer feeds, managed through the admin portal.
 
 ### 1.2 Scope
 
@@ -36,7 +36,7 @@ Enable IronScout to ingest product catalog data from affiliate networks (startin
 2. **Fail closed on ambiguity** - Follows ADR-009
 3. **Server-side enforcement** - Follows ADR-002
 4. **Credential security** - Never in Redis, decrypt only at execution
-5. **Reuse existing patterns** - BullMQ, merchant feed infrastructure (legacy dealer naming)
+5. **Reuse existing patterns** - BullMQ, retailer feed infrastructure (legacy dealer naming)
 
 ---
 
@@ -1675,7 +1675,7 @@ enum AffiliateFeedRunStatus {
 2. **Decompress** - GZIP if applicable
 3. **Parse** - CSV row iteration
 4. **Validate** - Required fields, data types
-5. **Transform** - Map to SourceProduct + Price schema
+5. **Transform** - Map to SourceProduct + Price schema (see Section 7.1.1)
 6. **Upsert** - Chunked commits (500-5000 rows per batch)
    - Update `lastSeenAt` only
    - Insert into `SourceProductSeen` staging table
@@ -1684,6 +1684,82 @@ enum AffiliateFeedRunStatus {
 7. **Evaluate** - Compute spike metrics, check thresholds (Section 8.2)
 8. **Promote** - If no spike: update `lastSeenSuccessAt` for seen products
 9. **Alert** - Slack notification for spikes or failures
+
+### 7.1.1 CSV Field Mapping
+
+The parser maps CSV columns to internal schema using case-insensitive matching with fallback priority. This handles variance across affiliate networks and feed formats.
+
+#### Price Field Mapping
+
+**Problem:** Feeds may have both a list/MSRP price (`Price`) and a discounted/sale price (`SalePrice`). We must use the actual selling price for consumer display while preserving original price for discount calculations.
+
+**Solution:**
+
+| Priority | CSV Columns Checked | Target Field | Rationale |
+|----------|-------------------|--------------|-----------|
+| 1 | `SalePrice`, `Sale Price`, `CurrentPrice`, `Current Price` | `price` (current) | Actual selling price - what consumer pays |
+| 2 | `Price`, `price`, `ListPrice`, `List Price` | Fallback to `price` | Use if no sale price present |
+| 3 | `OriginalPrice`, `Original Price`, `MSRP`, `RetailPrice`, `Retail Price` | `originalPrice` | Explicit MSRP/list price |
+| 4 | `Price` (when SalePrice was used) | `originalPrice` | Infer MSRP from list price |
+
+**Logic:**
+```typescript
+// 1. Check for sale/current price first
+const salePriceStr = getValue('SalePrice', 'Sale Price', 'CurrentPrice', 'Current Price')
+const listPriceStr = getValue('Price', 'price', 'ListPrice', 'List Price')
+
+// 2. Use sale price if available, otherwise fall back to list price
+const priceStr = salePriceStr || listPriceStr
+
+// 3. For originalPrice: explicit fields take priority, else infer from list price
+const explicitOriginalPriceStr = getValue('OriginalPrice', 'Original Price', 'MSRP', 'RetailPrice')
+const originalPriceStr = explicitOriginalPriceStr || (salePriceStr ? listPriceStr : undefined)
+```
+
+**Example Feed:**
+```csv
+SKU,Name,Price,SalePrice,Availability
+PSA-001,Federal 9mm 50rd,18.99,15.99,in stock
+```
+
+**Result:**
+- `price` = 15.99 (SalePrice - actual selling price)
+- `originalPrice` = 18.99 (Price - used as MSRP since SalePrice was primary)
+
+#### UPC/GTIN Field Mapping
+
+UPCs are fixed-length codes where leading zeros are significant.
+
+| CSV Columns | Target | Notes |
+|-------------|--------|-------|
+| `Gtin`, `GTIN`, `UPC`, `EAN`, `ISBN`, `upc`, `gtin`, `ean` | `upc` | Strip non-digits, preserve leading zeros |
+
+**Important:** UPC `020892215513` must remain `020892215513`, not be truncated to `20892215513`. UPC-A codes are always 12 digits; leading zeros are part of the code.
+
+#### Other Field Mappings
+
+| Target Field | CSV Columns (priority order) |
+|-------------|------------------------------|
+| `name` | `Name`, `ProductName`, `Product Name`, `title`, `Title` |
+| `url` | `Url`, `URL`, `ProductURL`, `Product URL`, `Link`, `url`, `link` |
+| `sku` | `SKU`, `MerchantSKU`, `sku`, `merchant_sku`, `ProductSKU`, `Unique Merchant SKU` |
+| `impactItemId` | `CatalogItemId`, `ItemId`, `item_id`, `catalogItemId` |
+| `brand` | `Manufacturer`, `Brand`, `brand`, `manufacturer` |
+| `imageUrl` | `ImageUrl`, `ImageURL`, `Image URL`, `Image`, `PrimaryImage` |
+| `description` | `Description`, `ProductDescription`, `Product Description` |
+| `category` | `Category`, `ProductCategory`, `category`, `Product Type` |
+| `currency` | `Currency`, `CurrencyCode`, `currency` (default: USD) |
+| `inStock` | `StockAvailability`, `Stock Availability`, `Availability`, `InStock` |
+
+#### Stock Status Mapping
+
+| CSV Value | `inStock` | Notes |
+|-----------|-----------|-------|
+| `y`, `yes`, `true`, `1`, `in stock`, `instock`, `available` | `true` | In stock |
+| `low stock`, `lowstock`, `low_stock`, `limited` | `true` | In stock (limited quantity) |
+| `n`, `no`, `false`, `0`, `out of stock`, `outofstock`, `unavailable` | `false` | Out of stock |
+| `backordered`, `preorder`, `pre-order`, `sold out`, `discontinued` | `false` | Unavailable variants |
+| (unrecognized) | `true` | Default to in stock if ambiguous |
 
 ### 7.2 Ingest Write Pattern (Phase 1)
 

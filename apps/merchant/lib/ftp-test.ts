@@ -1,7 +1,7 @@
 /**
  * FTP/SFTP Test Helper
  *
- * Provides FTP and SFTP connection testing for the merchant feed test route.
+ * Provides FTP and SFTP connection testing for the retailer feed test route.
  */
 
 import * as ftp from 'basic-ftp'

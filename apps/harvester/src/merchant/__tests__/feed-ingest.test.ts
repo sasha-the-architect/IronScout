@@ -1,7 +1,7 @@
 /**
  * Feed Ingest Worker Integration Tests
  *
- * Tests the dealer feed ingestion pipeline with mocked:
+ * Tests the retailer feed ingestion pipeline with mocked:
  * - HTTP transport (fetch)
  * - Database (Prisma)
  * - Job queue (BullMQ)
@@ -35,7 +35,7 @@ vi.mock('../subscription', () => ({
 }))
 
 vi.mock('../../config/queues', () => ({
-  QUEUE_NAMES: { MERCHANT_FEED_INGEST: 'merchant-feed-ingest' },
+  QUEUE_NAMES: { RETAILER_FEED_INGEST: 'retailer-feed-ingest' },
 }))
 
 vi.mock('../../config/redis', () => ({
@@ -316,7 +316,7 @@ describe('Feed Ingest Worker', () => {
         reason: 'Active subscription',
       })
 
-      const result = await checkMerchantSubscription('dealer-123')
+      const result = await checkMerchantSubscription('merchant-123')
       expect(result.isActive).toBe(true)
     })
 
@@ -332,7 +332,7 @@ describe('Feed Ingest Worker', () => {
         reason: 'Subscription expired on 2025-01-01',
       })
 
-      const result = await checkMerchantSubscription('dealer-123')
+      const result = await checkMerchantSubscription('merchant-123')
       expect(result.isActive).toBe(false)
       expect(result.status).toBe('EXPIRED')
     })
@@ -349,7 +349,7 @@ describe('Feed Ingest Worker', () => {
         reason: 'Subscription expired',
       })
 
-      const result = await checkMerchantSubscription('dealer-123')
+      const result = await checkMerchantSubscription('merchant-123')
       expect(result.shouldNotify).toBe(true)
     })
 
@@ -365,7 +365,7 @@ describe('Feed Ingest Worker', () => {
         reason: 'FOUNDING tier - lifetime access',
       })
 
-      const result = await checkMerchantSubscription('dealer-123')
+      const result = await checkMerchantSubscription('merchant-123')
       expect(result.isActive).toBe(true)
     })
 
@@ -381,7 +381,7 @@ describe('Feed Ingest Worker', () => {
         reason: 'In grace period (5 days remaining)',
       })
 
-      const result = await checkMerchantSubscription('dealer-123')
+      const result = await checkMerchantSubscription('merchant-123')
       expect(result.isActive).toBe(true)
       expect(result.shouldNotify).toBe(true)
     })

@@ -13,9 +13,9 @@ import { prisma } from './index.js'
 
 /**
  * Valid ingestion run types for provenance tracking.
- * @type {readonly ['SCRAPE', 'AFFILIATE_FEED', 'MERCHANT_FEED', 'MANUAL']}
+ * @type {readonly ['SCRAPE', 'AFFILIATE_FEED', 'RETAILER_FEED', 'MANUAL']}
  */
-const VALID_INGESTION_RUN_TYPES = ['SCRAPE', 'AFFILIATE_FEED', 'MERCHANT_FEED', 'MANUAL']
+const VALID_INGESTION_RUN_TYPES = ['SCRAPE', 'AFFILIATE_FEED', 'RETAILER_FEED', 'MANUAL']
 
 /**
  * Validates that provenance fields are present and valid.
@@ -74,7 +74,7 @@ export function assertProvenanceValid(data) {
  * Creates a provenance object with the required fields.
  * Convenience function to ensure type safety when building price records.
  *
- * @param {'SCRAPE' | 'AFFILIATE_FEED' | 'MERCHANT_FEED' | 'MANUAL'} type - The ingestion run type
+ * @param {'SCRAPE' | 'AFFILIATE_FEED' | 'RETAILER_FEED' | 'MANUAL'} type - The ingestion run type
  * @param {string} runId - The ingestion run ID
  * @param {Date} [observedAt=new Date()] - When the price was observed
  * @returns {{ ingestionRunType: string; ingestionRunId: string; observedAt: Date }}

@@ -15,7 +15,7 @@ import { prisma } from './index.js'
  * Valid ingestion run types for provenance tracking.
  * Must match the IngestionRunType enum in schema.prisma.
  */
-export type IngestionRunType = 'SCRAPE' | 'AFFILIATE_FEED' | 'MERCHANT_FEED' | 'MANUAL'
+export type IngestionRunType = 'SCRAPE' | 'AFFILIATE_FEED' | 'RETAILER_FEED' | 'MANUAL'
 
 /**
  * Provenance data required for prices and pricing_snapshots.
@@ -64,7 +64,7 @@ export function validateProvenance(data: {
   if (!data.ingestionRunType) {
     errors.push('ingestionRunType is required (ADR-015)')
   } else {
-    const validTypes: IngestionRunType[] = ['SCRAPE', 'AFFILIATE_FEED', 'MERCHANT_FEED', 'MANUAL']
+    const validTypes: IngestionRunType[] = ['SCRAPE', 'AFFILIATE_FEED', 'RETAILER_FEED', 'MANUAL']
     if (!validTypes.includes(data.ingestionRunType)) {
       errors.push(`ingestionRunType must be one of: ${validTypes.join(', ')}`)
     }

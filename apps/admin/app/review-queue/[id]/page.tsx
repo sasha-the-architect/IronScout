@@ -132,6 +132,25 @@ export default async function ReviewDetailPage({
     orderBy: { name: 'asc' },
   });
 
+  // Get distinct brands and calibers for autocomplete (promotes consistency)
+  const [distinctBrands, distinctCalibers] = await Promise.all([
+    prisma.products.findMany({
+      where: { brandNorm: { not: null } },
+      select: { brandNorm: true },
+      distinct: ['brandNorm'],
+      orderBy: { brandNorm: 'asc' },
+    }),
+    prisma.products.findMany({
+      where: { caliberNorm: { not: null } },
+      select: { caliberNorm: true },
+      distinct: ['caliberNorm'],
+      orderBy: { caliberNorm: 'asc' },
+    }),
+  ]);
+
+  const brands = distinctBrands.map(b => b.brandNorm!).filter(Boolean);
+  const calibers = distinctCalibers.map(c => c.caliberNorm!).filter(Boolean);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -405,6 +424,8 @@ export default async function ReviewDetailPage({
               caliberNorm: p.caliberNorm,
             }))}
             inputNormalized={inputNormalized}
+            knownBrands={brands}
+            knownCalibers={calibers}
           />
         </div>
       </div>

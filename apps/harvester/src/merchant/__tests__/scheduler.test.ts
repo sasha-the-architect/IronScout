@@ -1,7 +1,7 @@
 /**
- * Tests for Dealer Portal Job Scheduler
+ * Tests for Retailer Portal Job Scheduler
  *
- * Tests the dealer feed scheduling logic including:
+ * Tests the retailer feed scheduling logic including:
  * - Feed scheduling based on scheduleMinutes
  * - Idempotent job creation per scheduling window
  * - Immediate feed ingestion (manual triggers)
@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockFeedFindMany = vi.fn()
 const mockFeedFindUnique = vi.fn()
 const mockFeedUpdate = vi.fn()
-const mockDealerFindUnique = vi.fn()
+const mockMerchantFindUnique = vi.fn()
 const mockFeedRunCreate = vi.fn()
 
 vi.mock('@ironscout/db', () => ({
@@ -26,7 +26,7 @@ vi.mock('@ironscout/db', () => ({
       update: mockFeedUpdate,
     },
     merchants: {
-      findUnique: mockDealerFindUnique,
+      findUnique: mockMerchantFindUnique,
     },
     retailer_feed_runs: {
       create: mockFeedRunCreate,
@@ -37,22 +37,20 @@ vi.mock('@ironscout/db', () => ({
 // Mock queues
 const mockIngestQueueAdd = vi.fn()
 const mockIngestQueueGetJob = vi.fn()
+// Note: benchmarkQueue mocks removed for v1 (benchmark subsystem removed)
 const mockBenchmarkQueueAdd = vi.fn()
 const mockBenchmarkQueueGetJob = vi.fn()
 
 vi.mock('../../config/queues', () => ({
   QUEUE_NAMES: {
-    MERCHANT_FEED_INGEST: 'merchant-feed-ingest',
-    MERCHANT_BENCHMARK: 'merchant-benchmark',
+    RETAILER_FEED_INGEST: 'retailer-feed-ingest',
+    // Note: MERCHANT_BENCHMARK removed for v1 (benchmark subsystem removed)
   },
-  merchantFeedIngestQueue: {
+  retailerFeedIngestQueue: {
     add: mockIngestQueueAdd,
     getJob: mockIngestQueueGetJob,
   },
-  merchantBenchmarkQueue: {
-    add: mockBenchmarkQueueAdd,
-    getJob: mockBenchmarkQueueGetJob,
-  },
+  // Note: merchantBenchmarkQueue removed for v1 (benchmark subsystem removed)
 }))
 
 vi.mock('../../config/redis', () => ({
@@ -105,12 +103,12 @@ const createMockFeed = (overrides = {}) => ({
   ...overrides,
 })
 
-describe('Merchant Feed Scheduling', () => {
+describe('Retailer Feed Scheduling', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  describe('scheduleMerchantFeeds', () => {
+  describe('scheduleRetailerFeeds', () => {
     it('should find all enabled feeds from active merchants', async () => {
       const feeds = [
         createMockFeed({ id: 'feed-1' }),
@@ -262,7 +260,7 @@ describe('Merchant Feed Scheduling', () => {
   })
 
   describe('Immediate Feed Ingestion', () => {
-    it('should find feed with dealer info', async () => {
+    it('should find feed with merchant info', async () => {
       const feed = createMockFeed()
 
       mockFeedFindUnique.mockResolvedValue(feed)
@@ -284,7 +282,7 @@ describe('Merchant Feed Scheduling', () => {
       expect(feed).toBeNull()
     })
 
-    it('should throw if dealer is not active', async () => {
+    it('should throw if merchant is not active', async () => {
       const feed = createMockFeed({ merchants: { id: 'merchant-456', status: 'SUSPENDED' } })
 
       expect(feed.merchants.status).not.toBe('ACTIVE')

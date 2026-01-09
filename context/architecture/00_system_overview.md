@@ -97,11 +97,11 @@ Merchants provide feeds. Harvester supports Merchant portal jobs (legacy dealer-
 Merchant portal job scheduling runs inside the worker process via a scheduler function (interval-based) and enqueues BullMQ jobs (legacy dealer-* queues).
 
 **Key components**
-- `src/dealer/feed-ingest.ts`
-- `src/dealer/sku-match.ts`
-- `src/dealer/benchmark.ts`
-- `src/dealer/insight.ts`
-- `src/dealer/scheduler.ts` (starts an interval scheduler)
+- `src/merchant/feed-ingest.ts`
+- `src/merchant/sku-match.ts`
+- `src/merchant/benchmark.ts`
+- `src/merchant/insight.ts`
+- `src/merchant/scheduler.ts` (starts an interval scheduler)
 
 ---
 
@@ -207,11 +207,11 @@ Merchants provide feeds. Harvester supports Merchant portal jobs (legacy dealer-
 Merchant portal job scheduling runs inside the worker process via a scheduler function (interval-based) and enqueues BullMQ jobs (legacy dealer-* queues).
 
 **Key components**
-- `src/dealer/feed-ingest.ts`
-- `src/dealer/sku-match.ts`
-- `src/dealer/benchmark.ts`
-- `src/dealer/insight.ts`
-- `src/dealer/scheduler.ts` (starts an interval scheduler)
+- `src/merchant/feed-ingest.ts`
+- `src/merchant/sku-match.ts`
+- `src/merchant/benchmark.ts`
+- `src/merchant/insight.ts`
+- `src/merchant/scheduler.ts` (starts an interval scheduler)
 
 ---
 
@@ -237,7 +237,7 @@ This stack must be enforced in all consumer reads (search, product, dashboard, a
 ### Merchant identity
 
 - Merchant portal has its own auth flows under `apps/dealer/app/api/auth/*` (legacy path).
-- Merchant feed management and quarantine endpoints exist in the portal under `apps/dealer/app/api/feed/*` (legacy path).
+- Retailer feed management and quarantine endpoints exist in the portal under `apps/dealer/app/api/feed/*` (legacy path).
 
 ### Admin identity
 

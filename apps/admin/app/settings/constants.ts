@@ -23,10 +23,8 @@ export const SETTING_KEYS = {
   QUEUE_HISTORY_NORMALIZE: 'QUEUE_HISTORY_NORMALIZE',
   QUEUE_HISTORY_WRITE: 'QUEUE_HISTORY_WRITE',
   QUEUE_HISTORY_ALERT: 'QUEUE_HISTORY_ALERT',
-  QUEUE_HISTORY_MERCHANT_FEED_INGEST: 'QUEUE_HISTORY_MERCHANT_FEED_INGEST',
-  QUEUE_HISTORY_MERCHANT_SKU_MATCH: 'QUEUE_HISTORY_MERCHANT_SKU_MATCH',
-  QUEUE_HISTORY_MERCHANT_BENCHMARK: 'QUEUE_HISTORY_MERCHANT_BENCHMARK',
-  QUEUE_HISTORY_MERCHANT_INSIGHT: 'QUEUE_HISTORY_MERCHANT_INSIGHT',
+  QUEUE_HISTORY_RETAILER_FEED_INGEST: 'QUEUE_HISTORY_RETAILER_FEED_INGEST',
+  // Note: sku-match, benchmark, insight queue settings removed (benchmark subsystem removed for v1)
   QUEUE_HISTORY_AFFILIATE_FEED: 'QUEUE_HISTORY_AFFILIATE_FEED',
   QUEUE_HISTORY_AFFILIATE_SCHEDULER: 'QUEUE_HISTORY_AFFILIATE_SCHEDULER',
 
@@ -67,10 +65,7 @@ export const QUEUE_HISTORY_KEYS = [
   SETTING_KEYS.QUEUE_HISTORY_NORMALIZE,
   SETTING_KEYS.QUEUE_HISTORY_WRITE,
   SETTING_KEYS.QUEUE_HISTORY_ALERT,
-  SETTING_KEYS.QUEUE_HISTORY_MERCHANT_FEED_INGEST,
-  SETTING_KEYS.QUEUE_HISTORY_MERCHANT_SKU_MATCH,
-  SETTING_KEYS.QUEUE_HISTORY_MERCHANT_BENCHMARK,
-  SETTING_KEYS.QUEUE_HISTORY_MERCHANT_INSIGHT,
+  SETTING_KEYS.QUEUE_HISTORY_RETAILER_FEED_INGEST,
   SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_FEED,
   SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_SCHEDULER,
 ] as const;
@@ -109,10 +104,7 @@ export const SETTING_DEFAULTS: Record<SettingKey, boolean | number | string> = {
   [SETTING_KEYS.QUEUE_HISTORY_NORMALIZE]: true,
   [SETTING_KEYS.QUEUE_HISTORY_WRITE]: true,
   [SETTING_KEYS.QUEUE_HISTORY_ALERT]: true,
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_FEED_INGEST]: true,
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_SKU_MATCH]: true,
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_BENCHMARK]: true,
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_INSIGHT]: true,
+  [SETTING_KEYS.QUEUE_HISTORY_RETAILER_FEED_INGEST]: true,
   [SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_FEED]: true,
   [SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_SCHEDULER]: true,
 
@@ -150,10 +142,7 @@ export const SETTING_DESCRIPTIONS: Record<SettingKey, string> = {
   [SETTING_KEYS.QUEUE_HISTORY_NORMALIZE]: 'Retain job history for normalize queue',
   [SETTING_KEYS.QUEUE_HISTORY_WRITE]: 'Retain job history for write queue',
   [SETTING_KEYS.QUEUE_HISTORY_ALERT]: 'Retain job history for alert queue',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_FEED_INGEST]: 'Retain job history for merchant feed ingest queue',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_SKU_MATCH]: 'Retain job history for merchant SKU match queue',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_BENCHMARK]: 'Retain job history for merchant benchmark queue',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_INSIGHT]: 'Retain job history for merchant insight queue',
+  [SETTING_KEYS.QUEUE_HISTORY_RETAILER_FEED_INGEST]: 'Retain job history for retailer feed ingest queue',
   [SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_FEED]: 'Retain job history for affiliate feed queue',
   [SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_SCHEDULER]: 'Retain job history for affiliate scheduler queue',
 
@@ -193,10 +182,7 @@ export const SETTING_TYPES: Record<SettingKey, SettingType> = {
   [SETTING_KEYS.QUEUE_HISTORY_NORMALIZE]: 'boolean',
   [SETTING_KEYS.QUEUE_HISTORY_WRITE]: 'boolean',
   [SETTING_KEYS.QUEUE_HISTORY_ALERT]: 'boolean',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_FEED_INGEST]: 'boolean',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_SKU_MATCH]: 'boolean',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_BENCHMARK]: 'boolean',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_INSIGHT]: 'boolean',
+  [SETTING_KEYS.QUEUE_HISTORY_RETAILER_FEED_INGEST]: 'boolean',
   [SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_FEED]: 'boolean',
   [SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_SCHEDULER]: 'boolean',
 
@@ -231,10 +217,7 @@ export const QUEUE_DISPLAY_NAMES: Record<string, string> = {
   [SETTING_KEYS.QUEUE_HISTORY_NORMALIZE]: 'Normalize',
   [SETTING_KEYS.QUEUE_HISTORY_WRITE]: 'Write',
   [SETTING_KEYS.QUEUE_HISTORY_ALERT]: 'Alert',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_FEED_INGEST]: 'Merchant Feed Ingest',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_SKU_MATCH]: 'Merchant SKU Match',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_BENCHMARK]: 'Merchant Benchmark',
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_INSIGHT]: 'Merchant Insight',
+  [SETTING_KEYS.QUEUE_HISTORY_RETAILER_FEED_INGEST]: 'Retailer Feed Ingest',
   [SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_FEED]: 'Affiliate Feed',
   [SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_SCHEDULER]: 'Affiliate Scheduler',
 };
@@ -351,25 +334,10 @@ export const SETTING_TOOLTIPS: Record<SettingKey, SettingTooltip> = {
     whenEnabled: 'Completed alert jobs appear in Bull Board for debugging.',
     whenDisabled: 'Alert jobs are removed immediately after completion, saving Redis memory.',
   },
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_FEED_INGEST]: {
-    summary: 'Retain job history for merchant feed ingestion queue.',
-    whenEnabled: 'Completed merchant feed jobs appear in Bull Board for debugging.',
-    whenDisabled: 'Merchant feed jobs are removed immediately after completion.',
-  },
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_SKU_MATCH]: {
-    summary: 'Retain job history for merchant SKU matching queue.',
-    whenEnabled: 'Completed SKU match jobs appear in Bull Board for debugging.',
-    whenDisabled: 'SKU match jobs are removed immediately after completion.',
-  },
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_BENCHMARK]: {
-    summary: 'Retain job history for merchant benchmark calculation queue.',
-    whenEnabled: 'Completed benchmark jobs appear in Bull Board for debugging.',
-    whenDisabled: 'Benchmark jobs are removed immediately after completion.',
-  },
-  [SETTING_KEYS.QUEUE_HISTORY_MERCHANT_INSIGHT]: {
-    summary: 'Retain job history for merchant insight generation queue.',
-    whenEnabled: 'Completed insight jobs appear in Bull Board for debugging.',
-    whenDisabled: 'Insight jobs are removed immediately after completion.',
+  [SETTING_KEYS.QUEUE_HISTORY_RETAILER_FEED_INGEST]: {
+    summary: 'Retain job history for retailer feed ingestion queue.',
+    whenEnabled: 'Completed retailer feed jobs appear in Bull Board for debugging.',
+    whenDisabled: 'Retailer feed jobs are removed immediately after completion.',
   },
   [SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_FEED]: {
     summary: 'Retain job history for affiliate feed processing queue.',

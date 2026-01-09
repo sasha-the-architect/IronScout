@@ -55,11 +55,11 @@ The following guides are required for v1 operations.
 
 ---
 
-### Guide: Debugging a Broken Merchant Feed (legacy naming)
+### Guide: Debugging a Broken Retailer Feed (legacy naming)
 
 **When to use**
 - Merchant reports missing or incorrect inventory
-- Ingestion errors appear for a Merchant feed
+- Ingestion errors appear for a Retailer feed
 
 **Steps**
 1. Open Admin app → Merchants → Feeds

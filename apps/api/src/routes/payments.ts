@@ -1913,7 +1913,7 @@ router.get('/merchant/plans', requirePremiumApi(), async (req: Request, res: Res
         interval: 'month',
         features: [
           'Product listing inclusion on IronScout.ai',
-          'Merchant feed ingestion and SKU matching',
+          'Retailer feed ingestion and SKU matching',
           'Market price benchmarks by caliber',
           'Basic pricing insights',
           'Email alerts for market changes',

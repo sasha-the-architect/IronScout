@@ -50,35 +50,38 @@ interface ProductLinkWriteResult {
  * Normalize UPC string for consistent matching
  *
  * Rules:
- * - Strip non-digit characters
- * - Remove leading zeros (for comparison)
+ * - Strip non-digit characters (hyphens, spaces, etc.)
+ * - Preserve leading zeros (UPC/EAN/GTIN are fixed-length codes)
  * - Return null for empty/invalid UPCs
  *
+ * Note: Leading zeros are significant in UPC codes. A UPC-A code is always
+ * 12 digits, and "020892215513" is different from "20892215513". Stripping
+ * leading zeros causes matching failures across sources that handle them
+ * differently.
+ *
  * Examples:
- * - "012345678901" -> "12345678901"
- * - "0-12345-67890-1" -> "12345678901"
- * - "00000123" -> "123"
+ * - "012345678901" -> "012345678901" (preserved)
+ * - "0-12345-67890-1" -> "012345678901" (hyphens stripped)
+ * - "020892215513" -> "020892215513" (12-digit UPC preserved)
  * - "" -> null
  * - "N/A" -> null
  */
 export function normalizeUpc(upc: string | null | undefined): string | null {
   if (!upc) return null
 
-  // Strip non-digit characters
+  // Strip non-digit characters (hyphens, spaces, etc.)
   const digits = upc.replace(/\D/g, '')
 
   // Empty or all non-digits
   if (!digits) return null
 
-  // Remove leading zeros for comparison
-  // Keep at least 1 character (in case UPC is "0")
-  const normalized = digits.replace(/^0+/, '') || '0'
+  // Preserve leading zeros - UPC/EAN/GTIN are fixed-length codes where
+  // leading zeros are significant (e.g., 020892215513 is a valid 12-digit UPC)
 
-  // UPCs should be at least 6 digits after normalization (typical minimum)
-  // Accept shorter for SKU-like values that may be in UPC field
-  if (normalized.length < 3) return null
+  // UPCs should be at least 3 digits (reject garbage values)
+  if (digits.length < 3) return null
 
-  return normalized
+  return digits
 }
 
 // ============================================================================

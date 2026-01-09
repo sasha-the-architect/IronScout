@@ -28,7 +28,7 @@ Bull Board provides a web UI for monitoring all BullMQ queues in the harvester. 
 | `normalize` | Data normalization and validation |
 | `write` | Database writes and price updates |
 | `alert` | Price/availability alert triggers |
-| `merchant-feed-ingest` | Merchant product feed ingestion |
+| `retailer-feed-ingest` | Retailer product feed ingestion |
 | `affiliate-feed` | Affiliate feed processing (FTP/SFTP) |
 | `affiliate-feed-scheduler` | Affiliate feed scheduling ticks |
 | `product-resolve` | Product identity resolution (Spec v1.2) |

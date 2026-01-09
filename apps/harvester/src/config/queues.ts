@@ -2,6 +2,7 @@ import { Queue } from 'bullmq'
 import { redisConnection } from './redis'
 import { getQueueHistorySettings, prisma } from '@ironscout/db'
 import { createId } from '@paralleldrive/cuid2'
+import { rootLogger } from './logger'
 
 // Queue names
 export const QUEUE_NAMES = {
@@ -11,8 +12,8 @@ export const QUEUE_NAMES = {
   NORMALIZE: 'normalize',
   WRITE: 'write',
   ALERT: 'alert',
-  // Merchant Portal queues
-  MERCHANT_FEED_INGEST: 'merchant-feed-ingest',
+  // Retailer Portal queues
+  RETAILER_FEED_INGEST: 'retailer-feed-ingest',
   // Note: sku-match, benchmark, insight queues removed for v1 (benchmark subsystem removed)
   // Affiliate Feed queues
   AFFILIATE_FEED: 'affiliate-feed',
@@ -126,7 +127,11 @@ export async function initQueueSettings(): Promise<void> {
         .map(([k]) => k),
     })
   } catch (error) {
-    console.error('[Queues] Failed to load history settings, using defaults:', error)
+    rootLogger.error(
+      'Queue history settings load failed; using defaults',
+      { retentionCount: 100 },
+      error
+    )
     queueHistorySettings = {
       retentionCount: 100,
       queues: {
@@ -136,7 +141,7 @@ export async function initQueueSettings(): Promise<void> {
         normalize: true,
         write: true,
         alert: true,
-        'merchant-feed-ingest': true,
+        'retailer-feed-ingest': true,
         'affiliate-feed': true,
         'affiliate-feed-scheduler': true,
       },
@@ -179,10 +184,10 @@ export const alertQueue = new Queue<AlertJobData>(QUEUE_NAMES.ALERT, {
 })
 
 // ============================================================================
-// MERCHANT PORTAL QUEUES
+// RETAILER PORTAL QUEUES
 // ============================================================================
 
-export interface MerchantFeedIngestJobData {
+export interface RetailerFeedIngestJobData {
   retailerId: string
   feedId: string
   feedRunId: string
@@ -196,14 +201,14 @@ export interface MerchantFeedIngestJobData {
   adminId?: string // For audit logging
 }
 
-// Note: MerchantSkuMatchJobData, MerchantBenchmarkJobData, MerchantInsightJobData removed for v1
+// Note: RetailerSkuMatchJobData, RetailerBenchmarkJobData, RetailerInsightJobData removed for v1
 
-export const merchantFeedIngestQueue = new Queue<MerchantFeedIngestJobData>(
-  QUEUE_NAMES.MERCHANT_FEED_INGEST,
-  { connection: redisConnection, defaultJobOptions: getJobOptions('merchant-feed-ingest') }
+export const retailerFeedIngestQueue = new Queue<RetailerFeedIngestJobData>(
+  QUEUE_NAMES.RETAILER_FEED_INGEST,
+  { connection: redisConnection, defaultJobOptions: getJobOptions('retailer-feed-ingest') }
 )
 
-// Note: merchantSkuMatchQueue, merchantBenchmarkQueue, merchantInsightQueue removed for v1
+// Note: retailerSkuMatchQueue, retailerBenchmarkQueue, retailerInsightQueue removed for v1
 
 // ============================================================================
 // AFFILIATE FEED QUEUES
@@ -306,12 +311,22 @@ export async function enqueueProductResolve(
   resolverVersion: string,
   options?: { delay?: number; sourceId?: string; identityKey?: string }
 ): Promise<string | null> {
-  // Build idempotency key: sourceId:identityKey or fallback to sourceProductId
-  const idempotencyKey = options?.sourceId && options?.identityKey
-    ? `${options.sourceId}:${options.identityKey}`
-    : `sp:${sourceProductId}` // Fallback for backward compatibility
+  // ADR-009: Fail-closed when sourceId is missing
+  // sourceId has FK constraint to sources table, so 'unknown' will fail with 23503
+  if (!options?.sourceId) {
+    console.warn(
+      '[enqueueProductResolve] Missing sourceId - skipping enqueue (ADR-009 fail-closed)',
+      { sourceProductId, trigger }
+    )
+    return null
+  }
 
-  const sourceId = options?.sourceId ?? 'unknown'
+  const sourceId = options.sourceId
+
+  // Build idempotency key: sourceId:identityKey or fallback to sourceProductId
+  const idempotencyKey = options.identityKey
+    ? `${sourceId}:${options.identityKey}`
+    : `sp:${sourceProductId}` // Fallback for backward compatibility
 
   try {
     // Atomic upsert with state machine logic
@@ -353,7 +368,8 @@ export async function enqueueProductResolve(
     // Only enqueue if status is now PENDING
     // (either new insert or FAILED → PENDING transition)
     if (status === 'PENDING') {
-      const jobId = `RESOLVE_SOURCE_PRODUCT:${sourceProductId}`
+      // BullMQ doesn't allow colons in job IDs - use underscore instead
+      const jobId = `RESOLVE_SOURCE_PRODUCT_${sourceProductId}`
       await productResolveQueue.add(
         'RESOLVE_SOURCE_PRODUCT',
         { sourceProductId, trigger, resolverVersion },
@@ -369,7 +385,11 @@ export async function enqueueProductResolve(
     return null
   } catch (err) {
     // Log but don't throw - dedup failures shouldn't block price writes
-    console.error('[enqueueProductResolve] Failed to enqueue resolve request:', err)
+    rootLogger.error(
+      '[enqueueProductResolve] Failed to enqueue resolve request',
+      { sourceProductId, trigger, sourceId },
+      err
+    )
     return null
   }
 }
@@ -384,7 +404,8 @@ export async function enqueueProductResolveLegacy(
   resolverVersion: string,
   options?: { delay?: number }
 ): Promise<void> {
-  const jobId = `RESOLVE_SOURCE_PRODUCT:${sourceProductId}`
+  // BullMQ doesn't allow colons in job IDs - use underscore instead
+  const jobId = `RESOLVE_SOURCE_PRODUCT_${sourceProductId}`
   await productResolveQueue.add(
     'RESOLVE_SOURCE_PRODUCT',
     { sourceProductId, trigger, resolverVersion },
@@ -403,9 +424,9 @@ export const queues = {
   normalize: normalizeQueue,
   write: writeQueue,
   alert: alertQueue,
-  // Merchant queues
-  merchantFeedIngest: merchantFeedIngestQueue,
-  // Note: merchantSkuMatch, merchantBenchmark, merchantInsight removed for v1
+  // Retailer queues
+  retailerFeedIngest: retailerFeedIngestQueue,
+  // Note: retailerSkuMatch, retailerBenchmark, retailerInsight removed for v1
   // Affiliate queues
   affiliateFeed: affiliateFeedQueue,
   affiliateFeedScheduler: affiliateFeedSchedulerQueue,

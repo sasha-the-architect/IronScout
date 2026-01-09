@@ -1,8 +1,8 @@
 /**
  * Scale Test Data Generator
  *
- * Generates realistic dealer catalog data at various scales:
- * - Hobbyist: Under 300 SKUs (local/hobbyist dealer)
+ * Generates realistic retailer catalog data at various scales:
+ * - Hobbyist: Under 300 SKUs (local/hobbyist retailer)
  * - Serious: 300-1,500 SKUs (serious online ammo seller)
  * - National: 1,500-5,000 SKUs (scaled national operation)
  * - TopTier: 5,000+ SKUs (top-tier ammo-first business)
@@ -27,7 +27,7 @@ export const TIER_CONFIG = {
     minSkus: 50,
     maxSkus: 299,
     defaultSkus: 150,
-    description: 'Under 300 SKUs - local/hobbyist dealer',
+    description: 'Under 300 SKUs - local/hobbyist retailer',
     expectedParseTimeMs: 500, // sub-second
     expectedMemoryMb: 50,
   },
@@ -180,7 +180,7 @@ export const QUALITY_PROFILES: Record<string, DataQualityConfig> = {
     specialCharRate: 0.02,
     outOfStockRate: 0.15,
   },
-  // Typical dealer feed
+  // Typical retailer feed
   good: {
     missingUpcRate: 0.05,
     invalidUpcRate: 0.02,
@@ -394,7 +394,7 @@ export interface GeneratedFeed {
   }
 }
 
-export function generateMerchantFeed(options: GeneratorOptions): GeneratedFeed {
+export function generateRetailerFeed(options: GeneratorOptions): GeneratedFeed {
   const { tier, quality = 'good', seed = Date.now(), format = 'json' } = options
   const config = TIER_CONFIG[tier]
   const qualityConfig = QUALITY_PROFILES[quality]

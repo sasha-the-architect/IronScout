@@ -5,7 +5,7 @@
  * Note: benchmark, insight, and sku-match workers removed for v1 (benchmark subsystem removed)
  */
 
-export { merchantFeedIngestWorker } from './feed-ingest'
+export { retailerFeedIngestWorker } from './feed-ingest'
 
 // Re-export queue references for scheduling
-export { merchantFeedIngestQueue } from '../config/queues'
+export { retailerFeedIngestQueue } from '../config/queues'

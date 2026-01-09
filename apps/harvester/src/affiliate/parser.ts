@@ -395,7 +395,11 @@ function mapRecord(record: Record<string, string>, rowNumber: number): ParsedFee
   }
 
   // Extract and normalize price
-  const priceStr = getValue('CurrentPrice', 'Price', 'Current Price', 'SalePrice', 'price')
+  // Priority: SalePrice > CurrentPrice > Price (SalePrice is the actual selling price)
+  const salePriceStr = getValue('SalePrice', 'Sale Price', 'CurrentPrice', 'Current Price')
+  const listPriceStr = getValue('Price', 'price', 'ListPrice', 'List Price')
+  // Use sale price if available, otherwise fall back to list price
+  const priceStr = salePriceStr || listPriceStr
   const price = normalizePrice(priceStr)
 
   // Parse stock status
@@ -414,7 +418,11 @@ function mapRecord(record: Record<string, string>, rowNumber: number): ParsedFee
   const url = normalizeProductUrl(getValue('Url', 'URL', 'ProductURL', 'Product URL', 'Link', 'url', 'link'))
 
   // Extract and normalize original price
-  const originalPriceStr = getValue('OriginalPrice', 'Original Price', 'MSRP', 'ListPrice', 'RetailPrice', 'Retail Price')
+  // If we used SalePrice, the list price (Price column) becomes the original/MSRP
+  // Otherwise check explicit OriginalPrice/MSRP fields
+  const explicitOriginalPriceStr = getValue('OriginalPrice', 'Original Price', 'MSRP', 'RetailPrice', 'Retail Price')
+  // Use explicit original price if available, or list price if we used sale price
+  const originalPriceStr = explicitOriginalPriceStr || (salePriceStr ? listPriceStr : undefined)
   const originalPrice = normalizePrice(originalPriceStr)
 
   return {
@@ -456,7 +464,11 @@ function parseStockStatus(value: unknown): boolean {
       normalized === 'in stock' ||
       normalized === 'instock' ||
       normalized === 'available' ||
-      normalized === 'in_stock'
+      normalized === 'in_stock' ||
+      normalized === 'low stock' ||
+      normalized === 'lowstock' ||
+      normalized === 'low_stock' ||
+      normalized === 'limited'
     ) {
       return true
     }

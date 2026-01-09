@@ -38,9 +38,10 @@ import {
   normalizeQueue,
   writeQueue,
   alertQueue,
-  merchantFeedIngestQueue,
+  retailerFeedIngestQueue,
   affiliateFeedQueue,
   affiliateFeedSchedulerQueue,
+  productResolveQueue,
 } from '../config/queues'
 
 const log = rootLogger.child('bullboard')
@@ -109,11 +110,13 @@ createBullBoard({
     new BullMQAdapter(normalizeQueue),
     new BullMQAdapter(writeQueue),
     new BullMQAdapter(alertQueue),
-    // Merchant portal queues
-    new BullMQAdapter(merchantFeedIngestQueue),
+    // Retailer portal queues
+    new BullMQAdapter(retailerFeedIngestQueue),
     // Affiliate feed queues
     new BullMQAdapter(affiliateFeedQueue),
     new BullMQAdapter(affiliateFeedSchedulerQueue),
+    // Product Resolver queue
+    new BullMQAdapter(productResolveQueue),
   ],
   serverAdapter,
 })
@@ -159,8 +162,9 @@ const server = app.listen(config.port, () => {
     url: `http://localhost:${config.port}${config.basePath}`,
     queues: [
       'crawl', 'fetch', 'extract', 'normalize', 'write', 'alert',
-      'merchant-feed-ingest',
+      'retailer-feed-ingest',
       'affiliate-feed', 'affiliate-feed-scheduler',
+      'product-resolve',
     ],
     warning: 'DO NOT EXPOSE TO PUBLIC INTERNET',
   })

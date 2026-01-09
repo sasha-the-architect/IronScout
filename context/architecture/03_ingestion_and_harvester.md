@@ -107,12 +107,12 @@ Source (config) → Fetch → ParsedProduct (ephemeral) → Normalize → Price 
 
 ---
 
-### 2) Merchant Portal Feed Ingestion (legacy dealer naming)
+### 2) Retailer Portal Feed Ingestion (legacy dealer naming)
 
-Merchant feeds are ingested through a separate pipeline (legacy dealer-* naming).
+Retailer feeds are ingested through a separate pipeline (legacy dealer-* naming).
 
 **High-level stages:**
-1. Merchant feed scheduling
+1. Retailer feed scheduling
 2. Fetch and parse feed
 3. Validate feed health
 4. Normalize SKUs
@@ -120,12 +120,12 @@ Merchant feeds are ingested through a separate pipeline (legacy dealer-* naming)
 6. Write Retailer price data
 7. Generate benchmarks and insights (pricing_snapshots) if eligible
 
-**Key components (observed):**
-- `dealer/feed-ingest.ts` (legacy naming)
-- `dealer/sku-match.ts` (legacy naming)
-- `dealer/benchmark.ts` (legacy naming)
-- `dealer/insight.ts` (legacy naming)
-- `dealer/scheduler.ts` (legacy naming)
+**Key components:**
+- `merchant/feed-ingest.ts`
+- `merchant/sku-match.ts`
+- `merchant/benchmark.ts`
+- `merchant/insight.ts`
+- `merchant/scheduler.ts`
 
 ---
 
@@ -133,7 +133,7 @@ Merchant feeds are ingested through a separate pipeline (legacy dealer-* naming)
 
 ### Current State
 
-- Merchant feed scheduling uses `setInterval` inside the worker process (legacy dealer naming).
+- Retailer feed scheduling uses `setInterval` inside the worker process (legacy dealer naming).
 - Retailer scheduling appears to follow a similar in-process pattern.
 
 ### Implication
@@ -216,7 +216,7 @@ For v1, one of the following must be explicitly chosen and documented:
 
 ### Required Behavior
 
-- Merchant feeds must respect Merchant subscription status and Retailer eligibility
+- Retailer feeds must respect Merchant subscription status and Retailer eligibility
 - If a Retailer is ineligible:
   - Execution is marked SKIPPED
   - No downstream jobs run

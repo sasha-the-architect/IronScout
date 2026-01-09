@@ -640,6 +640,19 @@ async function executePhase1(context: FeedRunContext): Promise<Phase1Result> {
   log.info('Phase 1: Processing products', { feedId: feed.id, runId: run.id, sourceName, count: parseResult.products.length })
   const processResult = await processProducts(context, parseResult.products)
 
+  // Phase 1 summary - log write results at info for quick validation
+  log.info('PHASE1_PROCESS_OK', {
+    feedId: feed.id,
+    runId: run.id,
+    sourceName,
+    productsUpserted: processResult.productsUpserted,
+    pricesWritten: processResult.pricesWritten,
+    productsRejected: processResult.productsRejected,
+    duplicateKeyCount: processResult.duplicateKeyCount,
+    urlHashFallbackCount: processResult.urlHashFallbackCount,
+    errorCount: parseResult.errors.length + processResult.errors.length,
+  })
+
   // Log processing errors
   if (processResult.errors.length > 0) {
     await prisma.affiliate_feed_run_errors.createMany({

@@ -1,9 +1,9 @@
 /**
- * Merchant Feed Ingestion Worker
+ * Retailer Feed Ingestion Worker
  *
- * Downloads and parses merchant product feeds using format-specific connectors.
+ * Downloads and parses retailer product feeds using format-specific connectors.
  * Implements two-lane ingestion:
- * - Indexable Lane: Records with valid UPC -> MerchantSku
+ * - Indexable Lane: Records with valid UPC -> RetailerSku
  * - Quarantine Lane: Records without UPC -> QuarantinedRecord
  */
 
@@ -13,7 +13,7 @@ import type { FeedFormatType } from '@ironscout/db'
 import { redisConnection } from '../config/redis'
 import {
   QUEUE_NAMES,
-  MerchantFeedIngestJobData,
+  RetailerFeedIngestJobData,
 } from '../config/queues'
 import { createHash } from 'crypto'
 import {
@@ -193,7 +193,7 @@ function generateMatchKey(title: string, sku?: string): string {
 // WORKER
 // ============================================================================
 
-async function processFeedIngest(job: Job<MerchantFeedIngestJobData>) {
+async function processFeedIngest(job: Job<RetailerFeedIngestJobData>) {
   const { retailerId, feedId, feedRunId, accessType, formatType, url, username, password, adminOverride, adminId } = job.data
 
   const startTime = Date.now()
@@ -805,15 +805,15 @@ function getMostCommonErrorCode(errorCodes: Record<string, number>): string | nu
 // WORKER EXPORT
 // ============================================================================
 
-export const merchantFeedIngestWorker = new Worker(QUEUE_NAMES.MERCHANT_FEED_INGEST, processFeedIngest, {
+export const retailerFeedIngestWorker = new Worker(QUEUE_NAMES.RETAILER_FEED_INGEST, processFeedIngest, {
   connection: redisConnection,
   concurrency: 5,
 })
 
-merchantFeedIngestWorker.on('completed', (job) => {
+retailerFeedIngestWorker.on('completed', (job) => {
   log.info('Job completed', { jobId: job.id })
 })
 
-merchantFeedIngestWorker.on('failed', (job, error) => {
+retailerFeedIngestWorker.on('failed', (job, error) => {
   log.error('Job failed', { jobId: job?.id, error: error.message }, error)
 })

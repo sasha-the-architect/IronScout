@@ -664,7 +664,7 @@ model prices {
 
   /// ADR-015 Provenance: Type of ingestion run that created this price
   ingestionRunType IngestionRunType?
-  /// ADR-015 Provenance: ID of the specific run (execution, affiliate_feed_run, merchant_feed_run)
+  /// ADR-015 Provenance: ID of the specific run (execution, affiliate_feed_run, retailer_feed_run)
   ingestionRunId   String?
   /// ADR-015 Provenance: Affiliate network ID if from affiliate feed
   affiliateId      String?
@@ -1406,8 +1406,8 @@ enum IngestionRunType {
   SCRAPE
   /// From affiliate feed via affiliate_feed_runs
   AFFILIATE_FEED
-  /// From merchant portal feed via merchant_feed_runs (legacy: dealer_feed_runs)
-  MERCHANT_FEED
+  /// From merchant portal feed via retailer_feed_runs (legacy: dealer_feed_runs)
+  RETAILER_FEED
   /// Manual entry or import
   MANUAL
 }

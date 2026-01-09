@@ -1,6 +1,6 @@
 # Data Model
 
-This document describes IronScout's current data model as represented in the existing documentation and reflected by how the apps behave (API search, harvester ingestion, merchant feeds, subscriptions).
+This document describes IronScout's current data model as represented in the existing documentation and reflected by how the apps behave (API search, harvester ingestion, retailer feeds, subscriptions).
 
 **Source of truth note:** the only Prisma schema we have in the provided materials is the excerpt in `database.md`, and it contains `...` placeholders. That means some fields and relations are intentionally omitted. Before treating this as final, the repo should expose the actual Prisma schema (e.g. `prisma/schema.prisma` or `packages/db/prisma/schema.prisma`) and this document should be reconciled against it.
 
@@ -38,7 +38,7 @@ At a high level:
 - **Merchant** is the B2B portal account that may administer Retailers.
 - **Price** is the time-series record of a consumer price (keyed by `retailerId` + `productId`).
 - **Alert** is a user-defined trigger referencing product/filters.
-- **MerchantFeed / MerchantSku** model merchant inventory ingestion and mapping to canonical products.
+- **RetailerFeed / RetailerSku** model retailer inventory ingestion and mapping to canonical products.
 - **MarketBenchmark / MerchantInsight** model "context" for merchants (not recommendations).
 - **Source / Execution** model harvester ingestion operations.
 - **AdminAuditLog** captures privileged actions.
@@ -188,8 +188,8 @@ Invariants:
 
 ---
 
-### MerchantFeed
-Represents a configured feed for a Merchant (submitted inventory).
+### RetailerFeed
+Represents a configured feed for a Retailer (submitted inventory).
 
 Key responsibilities:
 - Store feed URL/type, parsing config, status, health, last run.
@@ -201,13 +201,13 @@ Operational invariants:
 
 ---
 
-### MerchantSku
-Represents a merchant-provided SKU row (their inventory unit) and its mapping to canonical products.
+### RetailerSku
+Represents a retailer-provided SKU row (their inventory unit) and its mapping to canonical products.
 
 Key responsibilities:
-- Preserve merchant SKU identity and metadata.
+- Preserve retailer SKU identity and metadata.
 - Map to canonical `Product` when possible.
-- Serve as the anchor for merchant inventory submission.
+- Serve as the anchor for retailer inventory submission.
 
 Invariants:
 - Mapping must be deterministic and explainable enough for ops.

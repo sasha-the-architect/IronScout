@@ -17,6 +17,7 @@
  * Environment variables (Node.js only):
  * - LOG_LEVEL: Minimum log level (debug, info, warn, error, fatal). Default: info
  * - LOG_FORMAT: Output format (json, pretty). Default: json in production, pretty in development
+ * - LOG_ASYNC: Enable async buffered logging (true/1). Default: false
  * - NODE_ENV: Used to determine defaults
  *
  * Browser behavior:
@@ -80,6 +81,15 @@ const LOG_LEVELS = {
 };
 // Dynamic log level support - allows runtime changes without restart
 let dynamicLogLevel = null;
+function isAsyncEnabled() {
+    if (!isNode || isBrowser)
+        return false;
+    const flag = getEnv('LOG_ASYNC');
+    return flag === 'true' || flag === '1';
+}
+const asyncQueue = [];
+let asyncFlushPromise = null;
+let asyncFlushing = false;
 /**
  * Set the log level dynamically at runtime
  * This takes precedence over LOG_LEVEL env var
@@ -209,8 +219,48 @@ function formatPrettyBrowser(entry) {
     ];
     return { message: formattedMessage, styles };
 }
+function enqueueAsync(line, level) {
+    asyncQueue.push({ line, level });
+    if (!asyncFlushing) {
+        asyncFlushing = true;
+        asyncFlushPromise = flushAsyncQueue();
+    }
+}
+async function flushAsyncQueue() {
+    while (asyncQueue.length > 0) {
+        const next = asyncQueue.shift();
+        if (!next)
+            continue;
+        const stream = next.level === 'error' || next.level === 'fatal'
+            ? process.stderr
+            : process.stdout;
+        if (!stream.write(`${next.line}\n`)) {
+            await new Promise((resolve) => stream.once('drain', resolve));
+        }
+    }
+    asyncFlushing = false;
+}
+export async function flushLogs() {
+    if (!isAsyncEnabled())
+        return;
+    if (asyncFlushing && asyncFlushPromise) {
+        await asyncFlushPromise;
+    }
+    if (asyncQueue.length > 0) {
+        asyncFlushing = true;
+        asyncFlushPromise = flushAsyncQueue();
+        await asyncFlushPromise;
+    }
+}
 function output(entry) {
     const format = getLogFormat();
+    if (!isBrowser && isAsyncEnabled()) {
+        const line = format === 'json'
+            ? formatJson(entry)
+            : formatPrettyNode(entry);
+        enqueueAsync(line, entry.level);
+        return;
+    }
     if (format === 'json') {
         const formatted = formatJson(entry);
         switch (entry.level) {

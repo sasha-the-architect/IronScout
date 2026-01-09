@@ -2,12 +2,14 @@
  * Harvester Logger Configuration
  *
  * Pre-configured loggers for harvester components
+ * Error/fatal logs notify Slack (#data-feed-alerts) via feeds webhook.
  */
 
 import { createLogger } from '@ironscout/logger'
+import { wrapLoggerWithSlack } from '@ironscout/notifications'
 
 // Root logger for harvester service
-const rootLogger = createLogger('harvester')
+const rootLogger = wrapLoggerWithSlack(createLogger('harvester'), { service: 'harvester' })
 
 // Pre-configured child loggers for harvester components
 export const logger = {

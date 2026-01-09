@@ -57,6 +57,13 @@ export {
   type SlackBlock,
 } from './channels/slack.js';
 
+export {
+  wrapLoggerWithSlack,
+  type ILogger,
+  type LogContext,
+  type SlackLoggerOptions,
+} from './logger-slack.js';
+
 // =============================================================================
 // Notification Exports (primary usage)
 // =============================================================================

@@ -1,6 +1,7 @@
 import { prisma } from '@ironscout/db'
 import type { SourceKind } from '@ironscout/db/generated/prisma'
 import { Worker, Job } from 'bullmq'
+import { createHash } from 'crypto'
 import { redisConnection } from '../config/redis'
 import { logger } from '../config/logger'
 import { alertQueue, WriteJobData, NormalizedProduct, enqueueProductResolve } from '../config/queues'
@@ -9,6 +10,14 @@ import {
   recordPriceWriteWithVariance,
   type SourceKindLabel,
 } from './metrics'
+
+/**
+ * Compute URL hash for identity key (consistent with affiliate processor)
+ * Uses SHA-256 truncated to 16 characters for compact, collision-resistant identity
+ */
+function computeUrlHash(url: string): string {
+  return createHash('sha256').update(url).digest('hex').slice(0, 16)
+}
 
 const log = logger.writer
 
@@ -127,10 +136,12 @@ async function batchUpsertSourceProducts(
           },
         })
       } else {
-        // Create new
+        // Create new with URL-based identityKey for consistent idempotency
+        const identityKey = `URL_HASH:${computeUrlHash(item.url)}`
         const created = await tx.source_products.create({
           data: {
             sourceId,
+            identityKey,
             title: item.name,
             url: item.url,
             imageUrl: item.imageUrl,
@@ -204,7 +215,7 @@ export async function batchProcessPrices(
     merchantId?: string
     sourceId: string
     sourceProductId?: string // Product Resolver v1.2: Link to source_product
-    ingestionRunType: 'SCRAPE' | 'AFFILIATE_FEED' | 'MERCHANT_FEED' | 'MANUAL'
+    ingestionRunType: 'SCRAPE' | 'AFFILIATE_FEED' | 'RETAILER_FEED' | 'MANUAL'
     ingestionRunId: string
     observedAt: Date
     price: number
@@ -363,9 +374,12 @@ async function processBatch(
           })
           sourceProductId = existingSourceProduct.id
         } else {
+          // Create new with URL-based identityKey for consistent idempotency
+          const identityKey = `URL_HASH:${computeUrlHash(item.url)}`
           const created = await prisma.source_products.create({
             data: {
               sourceId,
+              identityKey,
               title: item.name,
               url: item.url,
               imageUrl: item.imageUrl,
@@ -671,9 +685,12 @@ export const writerWorker = new Worker<WriteJobData>(
         const resolveEnqueueStart = Date.now()
 
         // Enqueue in parallel (debounced by queue)
+        // Pass sourceId for FK constraint; identityKey falls back to sourceProductId
         await Promise.all(
           allSourceProductIds.map(sourceProductId =>
-            enqueueProductResolve(sourceProductId, 'INGEST', RESOLVER_VERSION)
+            enqueueProductResolve(sourceProductId, 'INGEST', RESOLVER_VERSION, {
+              sourceId,
+            })
           )
         )
 

@@ -1,7 +1,7 @@
 /**
- * Merchant Portal Job Scheduler
+ * Retailer Portal Job Scheduler
  *
- * Schedules recurring merchant portal jobs:
+ * Schedules recurring retailer portal jobs:
  * - Feed ingestion (hourly by default, per-feed schedule)
  *
  * Features:
@@ -16,7 +16,7 @@
  * which creates execution_logs and requires explicit singleton enforcement
  * via HARVESTER_SCHEDULER_ENABLED.
  *
- * This merchant scheduler uses BullMQ repeatable jobs which handle
+ * This retailer scheduler uses BullMQ repeatable jobs which handle
  * deduplication internally - multiple instances scheduling the same
  * repeatable job is safe because BullMQ deduplicates by jobId.
  * This achieves the "no duplicate runs" invariant through a different
@@ -27,7 +27,7 @@ import { prisma } from '@ironscout/db'
 import { Worker, Job, Queue } from 'bullmq'
 import { redisConnection } from '../config/redis'
 import {
-  merchantFeedIngestQueue,
+  retailerFeedIngestQueue,
   QUEUE_NAMES,
 } from '../config/queues'
 import { logger } from '../config/logger'
@@ -76,15 +76,15 @@ function getSchedulingJitter(maxJitterMinutes: number = 2): number {
 // ============================================================================
 
 /**
- * Schedule feed ingestion for all active merchant feeds
+ * Schedule feed ingestion for all active retailer feeds
  * - Only schedules enabled feeds
  * - Applies random jitter to prevent thundering herd
  * - Idempotent: uses jobId based on (feedId, schedulingWindow)
  */
-export async function scheduleMerchantFeeds(): Promise<number> {
+export async function scheduleRetailerFeeds(): Promise<number> {
   const schedulingWindow = getSchedulingWindow()
 
-  log.debug('MERCHANT_FEED_SCHEDULE_START', {
+  log.debug('RETAILER_FEED_SCHEDULE_START', {
     schedulingWindow,
     timestamp: new Date().toISOString(),
   })
@@ -112,7 +112,7 @@ export async function scheduleMerchantFeeds(): Promise<number> {
     },
   })
 
-  log.debug('MERCHANT_FEEDS_LOADED', {
+  log.debug('RETAILER_FEEDS_LOADED', {
     feedCount: feeds.length,
     queryDurationMs: Date.now() - queryStart,
     schedulingWindow,
@@ -133,9 +133,9 @@ export async function scheduleMerchantFeeds(): Promise<number> {
 
       if (minutesSinceRun < feed.scheduleMinutes) {
         notDueCount++
-        log.debug('MERCHANT_FEED_NOT_DUE', {
+        log.debug('RETAILER_FEED_NOT_DUE', {
           feedId: feed.id,
-          merchantId: feed.retailerId,
+          retailerId: feed.retailerId,
           minutesSinceRun: Math.round(minutesSinceRun),
           scheduleMinutes: feed.scheduleMinutes,
           nextDueInMinutes: Math.round(feed.scheduleMinutes - minutesSinceRun),
@@ -150,13 +150,13 @@ export async function scheduleMerchantFeeds(): Promise<number> {
       const jobId = `feed-${feed.id}-${sanitizedWindow}`
 
       // Check if job already exists (idempotency check)
-      const existingJob = await merchantFeedIngestQueue.getJob(jobId)
+      const existingJob = await retailerFeedIngestQueue.getJob(jobId)
       if (existingJob) {
         alreadyScheduledCount++
         skippedCount++
-        log.debug('MERCHANT_FEED_ALREADY_SCHEDULED', {
+        log.debug('RETAILER_FEED_ALREADY_SCHEDULED', {
           feedId: feed.id,
-          merchantId: feed.retailerId,
+          retailerId: feed.retailerId,
           jobId,
           existingJobState: await existingJob.getState(),
           decision: 'SKIP_IDEMPOTENT',
@@ -164,9 +164,9 @@ export async function scheduleMerchantFeeds(): Promise<number> {
         continue // Already scheduled in this window
       }
 
-      log.debug('MERCHANT_FEED_SCHEDULING', {
+      log.debug('RETAILER_FEED_SCHEDULING', {
         feedId: feed.id,
-        merchantId: feed.retailerId,
+        retailerId: feed.retailerId,
         minutesSinceRun: Math.round(minutesSinceRun),
         scheduleMinutes: feed.scheduleMinutes,
         jobId,
@@ -187,7 +187,7 @@ export async function scheduleMerchantFeeds(): Promise<number> {
       // Queue the job with idempotent jobId
       // SECURITY: Must add to queue BEFORE updating lastRunAt
       // If Redis fails, the job should be retried on next scheduler run
-      await merchantFeedIngestQueue.add(
+      await retailerFeedIngestQueue.add(
         'ingest',
         {
           retailerId: feed.retailerId,
@@ -214,9 +214,9 @@ export async function scheduleMerchantFeeds(): Promise<number> {
         data: { lastRunAt: now },
       })
 
-      log.debug('MERCHANT_FEED_SCHEDULED', {
+      log.debug('RETAILER_FEED_SCHEDULED', {
         feedId: feed.id,
-        merchantId: feed.retailerId,
+        retailerId: feed.retailerId,
         feedRunId: feedRun.id,
         jobId,
         jitterMs,
@@ -227,16 +227,16 @@ export async function scheduleMerchantFeeds(): Promise<number> {
     } catch (error) {
       // Log error but continue with remaining feeds
       errorCount++
-      log.error('MERCHANT_FEED_SCHEDULE_ERROR', {
+      log.error('RETAILER_FEED_SCHEDULE_ERROR', {
         feedId: feed.id,
-        merchantId: feed.retailerId,
+        retailerId: feed.retailerId,
         error: error instanceof Error ? error.message : String(error),
         decision: 'CONTINUE_LOOP',
       }, error instanceof Error ? error : undefined)
     }
   }
 
-  log.info('MERCHANT_FEED_SCHEDULE_TICK', {
+  log.info('RETAILER_FEED_SCHEDULE_TICK', {
     schedulingWindow,
     feedsEvaluated: feeds.length,
     scheduledCount,
@@ -321,7 +321,7 @@ export async function scheduleImmediateFeedIngest(
   })
 
   // Queue the job with high priority (no jitter for manual triggers)
-  await merchantFeedIngestQueue.add(
+  await retailerFeedIngestQueue.add(
     adminOverride ? 'ingest-admin-override' : 'ingest-immediate',
     {
       retailerId: feed.retailerId,
@@ -458,37 +458,37 @@ async function withRetry<T>(
 // ============================================================================
 
 // Scheduler queue for repeatable jobs
-const MERCHANT_SCHEDULER_QUEUE = 'merchant-scheduler'
+const RETAILER_SCHEDULER_QUEUE = 'retailer-scheduler'
 
-export interface MerchantSchedulerJobData {
+export interface RetailerSchedulerJobData {
   type: 'feeds' | 'benchmarks'
 }
 
 // Create the scheduler queue
-export const merchantSchedulerQueue = new Queue<MerchantSchedulerJobData>(
-  MERCHANT_SCHEDULER_QUEUE,
+export const retailerSchedulerQueue = new Queue<RetailerSchedulerJobData>(
+  RETAILER_SCHEDULER_QUEUE,
   { connection: redisConnection }
 )
 
 // Scheduler worker - processes repeatable scheduler jobs
-let schedulerWorker: Worker<MerchantSchedulerJobData> | null = null
+let schedulerWorker: Worker<RetailerSchedulerJobData> | null = null
 
 /**
- * Start the merchant job scheduler using BullMQ repeatable jobs
+ * Start the retailer job scheduler using BullMQ repeatable jobs
  * Safe for multiple replicas - BullMQ ensures only one instance processes each job
  */
-export async function startMerchantScheduler(): Promise<void> {
+export async function startRetailerScheduler(): Promise<void> {
   log.info('Starting with BullMQ repeatable jobs')
 
   // Create the worker to process scheduler jobs
-  schedulerWorker = new Worker<MerchantSchedulerJobData>(
-    MERCHANT_SCHEDULER_QUEUE,
-    async (job: Job<MerchantSchedulerJobData>) => {
+  schedulerWorker = new Worker<RetailerSchedulerJobData>(
+    RETAILER_SCHEDULER_QUEUE,
+    async (job: Job<RetailerSchedulerJobData>) => {
       const { type } = job.data
 
       try {
         if (type === 'feeds') {
-          await withRetry(() => scheduleMerchantFeeds(), {
+          await withRetry(() => scheduleRetailerFeeds(), {
             label: 'Feed scheduling',
             maxAttempts: 3,
           })
@@ -518,13 +518,13 @@ export async function startMerchantScheduler(): Promise<void> {
   })
 
   // Remove any existing repeatable jobs before adding new ones
-  const existingRepeatableJobs = await merchantSchedulerQueue.getRepeatableJobs()
+  const existingRepeatableJobs = await retailerSchedulerQueue.getRepeatableJobs()
   for (const job of existingRepeatableJobs) {
-    await merchantSchedulerQueue.removeRepeatableByKey(job.key)
+    await retailerSchedulerQueue.removeRepeatableByKey(job.key)
   }
 
   // Add repeatable job for feed scheduling (every 5 minutes)
-  await merchantSchedulerQueue.add(
+  await retailerSchedulerQueue.add(
     'schedule-feeds',
     { type: 'feeds' },
     {
@@ -536,7 +536,7 @@ export async function startMerchantScheduler(): Promise<void> {
   )
 
   // Add repeatable job for benchmark scheduling (every 2 hours)
-  await merchantSchedulerQueue.add(
+  await retailerSchedulerQueue.add(
     'schedule-benchmarks',
     { type: 'benchmarks' },
     {
@@ -550,7 +550,7 @@ export async function startMerchantScheduler(): Promise<void> {
   // Run initial scheduling after startup delay
   setTimeout(async () => {
     try {
-      await withRetry(() => scheduleMerchantFeeds(), {
+      await withRetry(() => scheduleRetailerFeeds(), {
         label: 'Initial feed scheduling',
         maxAttempts: 5,
         initialDelayMs: 5000,
@@ -572,9 +572,9 @@ export async function startMerchantScheduler(): Promise<void> {
 }
 
 /**
- * Stop the merchant job scheduler
+ * Stop the retailer job scheduler
  */
-export async function stopMerchantScheduler(): Promise<void> {
+export async function stopRetailerScheduler(): Promise<void> {
   if (schedulerWorker) {
     await schedulerWorker.close()
     schedulerWorker = null

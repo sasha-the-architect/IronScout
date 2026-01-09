@@ -2,7 +2,7 @@
  * Merchant Subscription Utilities
  *
  * Handles subscription status checks and rate-limited notifications
- * for merchant feed ingestion.
+ * for retailer feed ingestion.
  */
 
 import { prisma } from '@ironscout/db'

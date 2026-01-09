@@ -113,7 +113,7 @@ Required:
 - `JWT_SECRET` - Must match API's `JWT_SECRET` for shared auth
 
 Optional:
-- Merchant onboarding keys if Merchant feeds are pulled from private endpoints
+- Merchant onboarding keys if Retailer feeds are pulled from private endpoints
 
 ---
 

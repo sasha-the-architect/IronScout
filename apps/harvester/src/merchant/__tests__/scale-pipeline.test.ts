@@ -1,11 +1,11 @@
 /**
- * Dealer Pipeline Integration Scale Tests
+ * Retailer Pipeline Integration Scale Tests
  *
- * Tests the complete dealer feed processing pipeline at scale:
+ * Tests the complete retailer feed processing pipeline at scale:
  * 1. Feed Ingest → Parse and classify records
- * 2. SKU Match → Match dealer SKUs to canonical SKUs
+ * 2. SKU Match → Match retailer SKUs to canonical SKUs
  * 3. Benchmark → Calculate price benchmarks
- * 4. Insight → Generate dealer insights
+ * 4. Insight → Generate merchant insights
  *
  * These tests simulate the full pipeline with mocked database operations
  * to identify bottlenecks and verify data flow at scale.
@@ -19,7 +19,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  generateMerchantFeed,
+  generateRetailerFeed,
   TIER_CONFIG,
   measurePerformance,
   formatMetrics,
@@ -47,7 +47,7 @@ function shouldRunTier(tier: MerchantTier): boolean {
 // ============================================================================
 
 /**
- * Simulates DealerSku record creation (feed-ingest.ts)
+ * Simulates RetailerSku record creation (feed-ingest.ts)
  */
 interface MockMerchantSku {
   id: string
@@ -98,7 +98,7 @@ interface MockBenchmark {
 }
 
 /**
- * Simulates DealerInsight
+ * Simulates MerchantInsight
  */
 interface MockMerchantInsight {
   id: string
@@ -230,7 +230,7 @@ class FeedIngestSimulator {
  */
 class SkuMatchSimulator {
   private canonicalSkus: Map<string, MockCanonicalSku> = new Map()
-  private matchedSkus: Map<string, string> = new Map() // dealerSkuId -> canonicalSkuId
+  private matchedSkus: Map<string, string> = new Map() // retailerSkuId -> canonicalSkuId
 
   // Optimized lookup maps (mirrors sku-match.ts)
   private upcMap: Map<string, MockCanonicalSku> = new Map()
@@ -698,7 +698,7 @@ describe('Full Pipeline Scale Tests', () => {
     const tier: MerchantTier = 'hobbyist'
 
     it('processes hobbyist catalog through full pipeline', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 150,
         quality: 'good',
@@ -751,7 +751,7 @@ describe('Full Pipeline Scale Tests', () => {
     const tier: MerchantTier = 'serious'
 
     it('processes serious catalog through full pipeline', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 800,
         quality: 'good',
@@ -802,7 +802,7 @@ describe('Full Pipeline Scale Tests', () => {
     }, 20000)
 
     it('handles high quarantine rate gracefully', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 500,
         quality: 'poor', // High missing UPC rate
@@ -823,7 +823,7 @@ describe('Full Pipeline Scale Tests', () => {
     const tier: MerchantTier = 'national'
 
     it('processes national catalog through full pipeline', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 3000,
         quality: 'good',
@@ -878,7 +878,7 @@ describe('Full Pipeline Scale Tests', () => {
     const tier: MerchantTier = 'top-tier'
 
     it('processes top-tier catalog through full pipeline', async () => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier,
         count: 5000,
         quality: 'good',
@@ -948,7 +948,7 @@ describe.skipIf(!RUN_BOTTLENECK)('Pipeline Bottleneck Analysis', () => {
     const stageTimings: Record<number, Record<string, number>> = {}
 
     for (const size of sizes) {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier: 'national',
         count: size,
         quality: 'good',
@@ -1008,7 +1008,7 @@ describe.skipIf(!RUN_BOTTLENECK)('Pipeline Bottleneck Analysis', () => {
     const results: { size: number; throughput: number; perStage: Record<string, number> }[] = []
 
     for (const size of [500, 1000, 2000, 4000]) {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier: 'national',
         count: size,
         quality: 'good',
@@ -1057,16 +1057,16 @@ describe.skipIf(!RUN_BOTTLENECK)('Pipeline Bottleneck Analysis', () => {
 // CONCURRENT PROCESSING SIMULATION
 // ============================================================================
 
-describe.skipIf(!!RUN_TIER || !RUN_BOTTLENECK)('Concurrent Dealer Processing', () => {
-  it('simulates multiple dealers processing simultaneously', async () => {
-    const dealerCount = 5
-    const skusPerDealer = 500
+describe.skipIf(!!RUN_TIER || !RUN_BOTTLENECK)('Concurrent Merchant Processing', () => {
+  it('simulates multiple merchants processing simultaneously', async () => {
+    const merchantCount = 5
+    const skusPerMerchant = 500
 
-    const pipelines = Array.from({ length: dealerCount }, () => new PipelineSimulator())
-    const feeds = Array.from({ length: dealerCount }, (_, i) =>
-      generateMerchantFeed({
+    const pipelines = Array.from({ length: merchantCount }, () => new PipelineSimulator())
+    const feeds = Array.from({ length: merchantCount }, (_, i) =>
+      generateRetailerFeed({
         tier: 'serious',
-        count: skusPerDealer,
+        count: skusPerMerchant,
         quality: 'good',
         seed: 12345 + i,
         format: 'json',
@@ -1075,19 +1075,19 @@ describe.skipIf(!!RUN_TIER || !RUN_BOTTLENECK)('Concurrent Dealer Processing', (
 
     const startTime = performance.now()
 
-    // Process all dealers concurrently
+    // Process all merchants concurrently
     const results = await Promise.all(
       pipelines.map((pipeline, i) =>
-        pipeline.runPipeline(`dealer-${i}`, `feed-${i}`, feeds[i])
+        pipeline.runPipeline(`merchant-${i}`, `feed-${i}`, feeds[i])
       )
     )
 
     const totalTime = performance.now() - startTime
 
-    console.log(`\nConcurrent Processing (${dealerCount} dealers × ${skusPerDealer} SKUs):`)
+    console.log(`\nConcurrent Processing (${merchantCount} merchants × ${skusPerMerchant} SKUs):`)
     console.log(`Total wall-clock time: ${totalTime.toFixed(2)}ms`)
     console.log(`Individual processing times: ${results.map(r => r.totalTimeMs.toFixed(0)).join(', ')}ms`)
-    console.log(`Combined throughput: ${(dealerCount * skusPerDealer / (totalTime / 1000)).toFixed(0)} items/sec`)
+    console.log(`Combined throughput: ${(merchantCount * skusPerMerchant / (totalTime / 1000)).toFixed(0)} items/sec`)
 
     // All should complete successfully
     for (const result of results) {
@@ -1118,7 +1118,7 @@ describe.skipIf(!!RUN_TIER || !RUN_BOTTLENECK)('Data Quality Impact on Pipeline'
   it.each(['excellent', 'good', 'fair', 'poor'] as const)(
     'measures pipeline efficiency with %s data quality',
     async (quality) => {
-      const feed = generateMerchantFeed({
+      const feed = generateRetailerFeed({
         tier: 'serious',
         count: 1000,
         quality,

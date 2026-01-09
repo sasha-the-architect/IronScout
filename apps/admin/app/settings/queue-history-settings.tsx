@@ -16,10 +16,8 @@ interface QueueHistorySettingsProps {
     normalize: SettingValue;
     write: SettingValue;
     alert: SettingValue;
-    merchantFeedIngest: SettingValue;
-    merchantSkuMatch: SettingValue;
-    merchantBenchmark: SettingValue;
-    merchantInsight: SettingValue;
+    retailerFeedIngest: SettingValue;
+    // Note: retailerSkuMatch, retailerBenchmark, retailerInsight removed (benchmark subsystem removed for v1)
     affiliateFeed: SettingValue;
     affiliateScheduler: SettingValue;
   };
@@ -33,10 +31,7 @@ const QUEUE_SETTINGS = [
   { key: SETTING_KEYS.QUEUE_HISTORY_NORMALIZE, prop: 'normalize' as const },
   { key: SETTING_KEYS.QUEUE_HISTORY_WRITE, prop: 'write' as const },
   { key: SETTING_KEYS.QUEUE_HISTORY_ALERT, prop: 'alert' as const },
-  { key: SETTING_KEYS.QUEUE_HISTORY_MERCHANT_FEED_INGEST, prop: 'merchantFeedIngest' as const },
-  { key: SETTING_KEYS.QUEUE_HISTORY_MERCHANT_SKU_MATCH, prop: 'merchantSkuMatch' as const },
-  { key: SETTING_KEYS.QUEUE_HISTORY_MERCHANT_BENCHMARK, prop: 'merchantBenchmark' as const },
-  { key: SETTING_KEYS.QUEUE_HISTORY_MERCHANT_INSIGHT, prop: 'merchantInsight' as const },
+  { key: SETTING_KEYS.QUEUE_HISTORY_RETAILER_FEED_INGEST, prop: 'retailerFeedIngest' as const },
   { key: SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_FEED, prop: 'affiliateFeed' as const },
   { key: SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_SCHEDULER, prop: 'affiliateScheduler' as const },
 ];

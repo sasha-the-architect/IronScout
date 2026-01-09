@@ -396,7 +396,7 @@ export function visibleRetailerPriceWhere(): Prisma.pricesWhereInput {
  * This filters out prices where:
  * - affiliateFeedRunId points to an ignored affiliate_feed_run
  *
- * Note: For SCRAPE and MERCHANT_FEED run types, the relation is via
+ * Note: For SCRAPE and RETAILER_FEED run types, the relation is via
  * ingestionRunId which requires raw SQL for efficient filtering.
  * For now, we focus on affiliate feeds which are the primary source.
  *

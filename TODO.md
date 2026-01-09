@@ -17,7 +17,7 @@ Implement subscription-based access control for merchants:
 
 2. **Feed Ingestion Automation** *(Complete)*
    - ✅ Skip automatic feed ingestion for merchants with inactive/expired subscriptions
-   - ✅ Modify `merchantFeedIngest` worker to check subscription status before processing
+   - ✅ Modify `retailerFeedIngest` worker to check subscription status before processing
    - ✅ Feeds remain configured but not processed until subscription is active
    - ✅ Rate-limited notifications (once per day) for expired subscriptions
    - ✅ Email + Slack notifications to merchant and IronScout staff
@@ -87,11 +87,9 @@ Implement subscription-based access control for end users (consumers):
 The 10-worker pipeline is architected. **MVP focuses on structured feeds only** - web crawling deferred to post-1.0.
 
 **MVP Scope (Structured Feeds Only):**
-1. **merchant Feed Pipeline**
-   - Test merchantFeedIngest worker with real merchant feeds (CSV, XML, JSON)
-   - Validate merchantSkuMatch matching algorithm
-   - Test merchantBenchmark price calculations
-   - Verify merchantInsight generation quality
+1. **Retailer Feed Pipeline**
+   - Test retailerFeedIngest worker with real retailer feeds (CSV, XML, JSON)
+   - Note: SKU matching, benchmark, and insight features deferred to post-v1
 
 2. **Affiliate Feed Pipeline**
    - Test Impact, AvantLink, ShareASale parsers
@@ -301,10 +299,10 @@ Create actual pages for footer links that were removed as placeholders:
 
 ## Completed
 
-### merchant Feed Subscription Enforcement (December 13, 2025)
+### Retailer Feed Subscription Enforcement (December 13, 2025)
 - Added subscription fields to merchant model (subscriptionStatus, subscriptionExpiresAt, subscriptionGraceDays, lastSubscriptionNotifyAt)
 - Created subscription check utility with grace period support
-- Modified merchantFeedIngest worker to check subscription before processing
+- Modified retailerFeedIngest worker to check subscription before processing
 - Added SKIPPED status to FeedRunStatus enum
 - Created subscription expiry notification (email + Slack) with once-per-day rate limiting
 - Added admin override capability for manual feed triggers

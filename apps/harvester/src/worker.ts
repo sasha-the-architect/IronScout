@@ -32,10 +32,10 @@ import { normalizerWorker } from './normalizer'
 import { writerWorker } from './writer'
 import { alerterWorker, delayedNotificationWorker } from './alerter'
 
-// Merchant Portal Workers
-import { merchantFeedIngestWorker } from './merchant/feed-ingest'
+// Retailer Portal Workers
+import { retailerFeedIngestWorker } from './merchant/feed-ingest'
 // Note: sku-match, benchmark, insight workers removed for v1 (benchmark subsystem removed)
-import { startMerchantScheduler, stopMerchantScheduler } from './merchant/scheduler'
+import { startRetailerScheduler, stopRetailerScheduler } from './merchant/scheduler'
 
 // Affiliate Feed Workers
 import { createAffiliateFeedWorker, createAffiliateFeedScheduler } from './affiliate'
@@ -174,7 +174,7 @@ log.info('Starting IronScout.ai Harvester Workers', {
     'alerter',
     'resolver',
   ],
-  merchantWorkers: [
+  retailerWorkers: [
     'feed-ingest',
   ],
   affiliateWorkers: [
@@ -229,10 +229,10 @@ async function startup() {
   log.info('Starting product resolver sweeper')
   startProcessingSweeper()
 
-  // Start harvester/merchant scheduler if enabled
+  // Start harvester/retailer scheduler if enabled
   if (harvesterSchedulerEnabled) {
-    log.info('Starting merchant scheduler')
-    await startMerchantScheduler()
+    log.info('Starting retailer scheduler')
+    await startRetailerScheduler()
   }
 
   // Start affiliate feed scheduler only if enabled
@@ -267,8 +267,8 @@ const shutdown = async (signal: string) => {
 
     // 1. Stop scheduling new jobs (if scheduler was enabled)
     if (harvesterSchedulerEnabled) {
-      log.info('Stopping merchant scheduler')
-      stopMerchantScheduler()
+      log.info('Stopping retailer scheduler')
+      stopRetailerScheduler()
     }
 
     // 2. Close workers (waits for current jobs to complete)
@@ -281,8 +281,8 @@ const shutdown = async (signal: string) => {
       writerWorker.close(),
       alerterWorker.close(),
       delayedNotificationWorker.close(),
-      // Merchant workers
-      merchantFeedIngestWorker.close(),
+      // Retailer Portal workers
+      retailerFeedIngestWorker.close(),
       // Affiliate workers (if started)
       affiliateFeedWorker?.close(),
       affiliateFeedScheduler?.close(),

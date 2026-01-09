@@ -48,10 +48,8 @@ export interface AllSettings {
     normalize: SettingValue;
     write: SettingValue;
     alert: SettingValue;
-    merchantFeedIngest: SettingValue;
-    merchantSkuMatch: SettingValue;
-    merchantBenchmark: SettingValue;
-    merchantInsight: SettingValue;
+    retailerFeedIngest: SettingValue;
+    // Note: retailerSkuMatch, retailerBenchmark, retailerInsight removed (benchmark subsystem removed for v1)
     affiliateFeed: SettingValue;
     affiliateScheduler: SettingValue;
   };
@@ -115,10 +113,7 @@ export async function getAllSettings(): Promise<{ success: boolean; error?: stri
       queueHistoryNormalize,
       queueHistoryWrite,
       queueHistoryAlert,
-      queueHistoryMerchantFeedIngest,
-      queueHistoryMerchantSkuMatch,
-      queueHistoryMerchantBenchmark,
-      queueHistoryMerchantInsight,
+      queueHistoryRetailerFeedIngest,
       queueHistoryAffiliateFeed,
       queueHistoryAffiliateScheduler,
       // Feature flags
@@ -145,10 +140,7 @@ export async function getAllSettings(): Promise<{ success: boolean; error?: stri
       getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_NORMALIZE),
       getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_WRITE),
       getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_ALERT),
-      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_MERCHANT_FEED_INGEST),
-      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_MERCHANT_SKU_MATCH),
-      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_MERCHANT_BENCHMARK),
-      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_MERCHANT_INSIGHT),
+      getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_RETAILER_FEED_INGEST),
       getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_FEED),
       getSystemSetting(SETTING_KEYS.QUEUE_HISTORY_AFFILIATE_SCHEDULER),
       // Feature flags
@@ -183,10 +175,7 @@ export async function getAllSettings(): Promise<{ success: boolean; error?: stri
           normalize: queueHistoryNormalize,
           write: queueHistoryWrite,
           alert: queueHistoryAlert,
-          merchantFeedIngest: queueHistoryMerchantFeedIngest,
-          merchantSkuMatch: queueHistoryMerchantSkuMatch,
-          merchantBenchmark: queueHistoryMerchantBenchmark,
-          merchantInsight: queueHistoryMerchantInsight,
+          retailerFeedIngest: queueHistoryRetailerFeedIngest,
           affiliateFeed: queueHistoryAffiliateFeed,
           affiliateScheduler: queueHistoryAffiliateScheduler,
         },

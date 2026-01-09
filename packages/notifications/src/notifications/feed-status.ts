@@ -1,7 +1,7 @@
 /**
  * Feed Status Notifications
  *
- * Sent when merchant feed status changes (failures, warnings, recovered).
+ * Sent when retailer feed status changes (failures, warnings, recovered).
  */
 
 import {

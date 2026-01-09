@@ -255,7 +255,13 @@ export async function processProducts(
 
       // Build lookup: sourceProductId -> productId for price writes
       const sourceProductIdToProductId = new Map<string, string | null>()
-      const itemsNeedingResolver: string[] = []
+      // Build lookup: sourceProductId -> identityKey for resolver enqueue
+      const sourceProductIdToIdentityKey = new Map<string, string>()
+      for (const sp of upsertedProducts) {
+        sourceProductIdToIdentityKey.set(sp.id, sp.identityKey)
+      }
+
+      const itemsNeedingResolver: Array<{ sourceProductId: string; identityKey: string }> = []
       let matchedCount = 0
       let linksWrittenCount = 0
 
@@ -268,7 +274,10 @@ export async function processProducts(
           linksWrittenCount++
         }
         if (result.needsResolver) {
-          itemsNeedingResolver.push(result.sourceProductId)
+          const identityKey = sourceProductIdToIdentityKey.get(result.sourceProductId)
+          if (identityKey) {
+            itemsNeedingResolver.push({ sourceProductId: result.sourceProductId, identityKey })
+          }
         }
       }
 
@@ -279,8 +288,11 @@ export async function processProducts(
       if (itemsNeedingResolver.length > 0) {
         const enqueueStart = Date.now()
         await Promise.all(
-          itemsNeedingResolver.map((sourceProductId) =>
-            enqueueProductResolve(sourceProductId, 'INGEST', RESOLVER_VERSION)
+          itemsNeedingResolver.map(({ sourceProductId, identityKey }) =>
+            enqueueProductResolve(sourceProductId, 'INGEST', RESOLVER_VERSION, {
+              sourceId,
+              identityKey,
+            })
           )
         )
         log.debug('RESOLVER_ENQUEUE_OK', {
@@ -838,14 +850,21 @@ async function batchUpsertSourceProducts(
     const updateTitles = toUpdate.map((u) => u.product.product.name)
     const updateUrls = toUpdate.map((u) => u.product.product.url)
     const updateImageUrls = toUpdate.map((u) => u.product.product.imageUrl ?? null)
+    const updateBrands = toUpdate.map((u) => u.product.product.brand ?? null)
+    const updateDescriptions = toUpdate.map((u) => u.product.product.description ?? null)
+    const updateCategories = toUpdate.map((u) => u.product.product.category ?? null)
     const updateNormalizedUrls = toUpdate.map((u) => normalizeUrl(u.product.product.url))
 
     // Batch update using unnest pattern
+    // Note: brand/description/category are persisted for resolver fingerprinting
     await prisma.$executeRaw`
       UPDATE source_products AS sp SET
         "title" = u.title,
         "url" = u.url,
         "imageUrl" = u."imageUrl",
+        "brand" = u.brand,
+        "description" = u.description,
+        "category" = u.category,
         "normalizedUrl" = u."normalizedUrl",
         "lastUpdatedByRunId" = ${runId},
         "updatedAt" = NOW()
@@ -855,6 +874,9 @@ async function batchUpsertSourceProducts(
           unnest(${updateTitles}::text[]) AS title,
           unnest(${updateUrls}::text[]) AS url,
           unnest(${updateImageUrls}::text[]) AS "imageUrl",
+          unnest(${updateBrands}::text[]) AS brand,
+          unnest(${updateDescriptions}::text[]) AS description,
+          unnest(${updateCategories}::text[]) AS category,
           unnest(${updateNormalizedUrls}::text[]) AS "normalizedUrl"
       ) AS u
       WHERE sp.id = u.id
@@ -879,12 +901,16 @@ async function batchUpsertSourceProducts(
     const insertTitles = toInsert.map((i) => i.product.product.name)
     const insertUrls = toInsert.map((i) => i.product.product.url)
     const insertImageUrls = toInsert.map((i) => i.product.product.imageUrl ?? null)
+    const insertBrands = toInsert.map((i) => i.product.product.brand ?? null)
+    const insertDescriptions = toInsert.map((i) => i.product.product.description ?? null)
+    const insertCategories = toInsert.map((i) => i.product.product.category ?? null)
     const insertNormalizedUrls = toInsert.map((i) => normalizeUrl(i.product.product.url))
 
     // Bulk insert - no ON CONFLICT needed since we're generating unique IDs
+    // Note: brand/description/category are persisted for resolver fingerprinting
     await prisma.$executeRaw`
       INSERT INTO source_products (
-        "id", "sourceId", "title", "url", "imageUrl", "normalizedUrl",
+        "id", "sourceId", "title", "url", "imageUrl", "brand", "description", "category", "normalizedUrl",
         "createdByRunId", "lastUpdatedByRunId", "createdAt", "updatedAt"
       )
       SELECT
@@ -893,6 +919,9 @@ async function batchUpsertSourceProducts(
         unnest(${insertTitles}::text[]),
         unnest(${insertUrls}::text[]),
         unnest(${insertImageUrls}::text[]),
+        unnest(${insertBrands}::text[]),
+        unnest(${insertDescriptions}::text[]),
+        unnest(${insertCategories}::text[]),
         unnest(${insertNormalizedUrls}::text[]),
         ${runId},
         ${runId},

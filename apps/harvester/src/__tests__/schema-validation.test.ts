@@ -45,6 +45,9 @@ const SCHEMA: Record<string, string[]> = {
     'title',
     'url',
     'imageUrl',
+    'brand',        // Persisted for resolver fingerprinting
+    'description',  // Persisted for resolver fingerprinting
+    'category',     // Persisted for resolver fingerprinting
     'normalizedUrl',
     'createdByRunId',
     'lastUpdatedByRunId',

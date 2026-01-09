@@ -68,7 +68,7 @@ Harvester is a trust-critical system and requires deeper visibility.
 
 Required signals:
 - Job counts (enqueued, processing, completed, failed)
-- Execution status per source and Merchant feed (legacy naming)
+- Execution status per source and Retailer feed (legacy naming)
 - SKIPPED execution counts and reasons
 - Write counts (prices, inventory, benchmarks)
 - Error summaries by stage (fetch, normalize, write)

@@ -8,10 +8,10 @@ import { z } from 'zod';
 export const dynamic = 'force-dynamic';
 
 // Lazy-load Redis and BullMQ to avoid connection during build
-let merchantFeedIngestQueue: import('bullmq').Queue | null = null;
+let retailerFeedIngestQueue: import('bullmq').Queue | null = null;
 
 async function getQueue() {
-  if (!merchantFeedIngestQueue) {
+  if (!retailerFeedIngestQueue) {
     logger.debug('Initializing BullMQ queue connection');
     const { Queue } = await import('bullmq');
     const Redis = (await import('ioredis')).default;
@@ -23,13 +23,13 @@ async function getQueue() {
       maxRetriesPerRequest: null,
     });
 
-    merchantFeedIngestQueue = new Queue('merchant-feed-ingest', {
+    retailerFeedIngestQueue = new Queue('retailer-feed-ingest', {
       connection: redisConnection,
     });
 
     logger.info('BullMQ queue initialized');
   }
-  return merchantFeedIngestQueue;
+  return retailerFeedIngestQueue;
 }
 
 const refreshSchema = z.object({
