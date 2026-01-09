@@ -48,6 +48,9 @@ const SCHEMA: Record<string, string[]> = {
     'brand',        // Persisted for resolver fingerprinting
     'description',  // Persisted for resolver fingerprinting
     'category',     // Persisted for resolver fingerprinting
+    'caliber',
+    'grainWeight',
+    'roundCount',
     'normalizedUrl',
     'createdByRunId',
     'lastUpdatedByRunId',

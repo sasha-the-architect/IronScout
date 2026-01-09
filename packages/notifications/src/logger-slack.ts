@@ -49,8 +49,9 @@ function notifySlackError(
   error: unknown,
   options: SlackLoggerOptions
 ): void {
-  const webhookUrl = options.webhookUrl
-    ?? SLACK_CONFIG.feedsWebhookUrl
+  const webhookUrl =
+    options.webhookUrl
+    ?? SLACK_CONFIG.datafeedAlertsWebhookUrl
     ?? SLACK_CONFIG.merchantOpsWebhookUrl;
   if (!webhookUrl) return;
 

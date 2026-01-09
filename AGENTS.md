@@ -38,7 +38,7 @@ Before making changes, agents must read in this order:
 3. `context/02_v1_scope_and_cut_list.md`
 4. `context/03_release_criteria.md`
 5. `context/05_security_and_trust.md`
-6. `decisions/ADR-*.md`
+6. `context/decisions/ADR-*.md`
 7. `context/reference/*`
 
 If a change would violate any of the above, **do not implement it**.

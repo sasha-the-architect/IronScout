@@ -15,14 +15,14 @@ All authoritative documentation lives in:
 
 - `AGENTS.md` (root) — agent rules and invariants
 - `context/` — product, architecture, operations, and reference
-- `decisions/` — Architectural Decision Records (ADRs)
+- `context/decisions/` — Architectural Decision Records (ADRs)
 
 The legacy `docs/` folder is deprecated and must not be referenced unless explicitly instructed.
 
 Start with:
 1. `AGENTS.md`
 2. `context/README.md`
-3. `decisions/ADR-*.md`
+3. `context/decisions/ADR-*.md`
 
 ---
 

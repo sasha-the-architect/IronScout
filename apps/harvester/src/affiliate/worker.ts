@@ -17,6 +17,7 @@ import {
   affiliateFeedQueue,
 } from '../config/queues'
 import { logger } from '../config/logger'
+import { createRunFileLogger, createDualLogger, type RunFileLogger } from '../config/run-file-logger'
 import {
   notifyAffiliateFeedRunFailed,
   notifyCircuitBreakerTriggered,
@@ -205,6 +206,7 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
 
   let run: Awaited<ReturnType<typeof prisma.affiliate_feed_runs.findUniqueOrThrow>>
   let lockAcquired: boolean
+  let runFileLogger: RunFileLogger | null = null
 
   if (existingRunId) {
     // ═══════════════════════════════════════════════════════════════════════
@@ -329,6 +331,16 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
     // ONLY NOW is it safe to proceed with throwable I/O
   }
 
+  // Create per-run file logger for archival (writes to logs/datafeeds/affiliate/<retailer>/)
+  const retailerName = feed.sources.retailers?.name
+  runFileLogger = createRunFileLogger({
+    type: 'affiliate',
+    retailerName: retailerName || feed.sources.name,
+    runId: run.id,
+    feedId: feed.id,
+  })
+  log.info('Run file logger created', { filePath: runFileLogger.filePath, runId: run.id })
+
   const context: FeedRunContext = {
     feed,
     run,
@@ -358,6 +370,12 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
       skipped: result.skipped,
       skippedReason: result.skippedReason,
       metrics: result.skipped ? null : result.metrics,
+    })
+    runFileLogger.info('Phase 1 complete', {
+      durationMs: phase1Duration,
+      skipped: result.skipped,
+      skippedReason: result.skippedReason,
+      ...(result.skipped ? {} : result.metrics),
     })
 
     if (result.skipped) {
@@ -389,6 +407,11 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
         productsPromoted: phase2Result.productsPromoted,
         circuitBreakerBlocked: phase2Result.circuitBreakerBlocked,
       })
+      runFileLogger.info('Phase 2 complete', {
+        durationMs: phase2Duration,
+        productsPromoted: phase2Result.productsPromoted,
+        circuitBreakerBlocked: phase2Result.circuitBreakerBlocked,
+      })
 
       // Check for processing failure:
       // - File has rows but all failed validation (rowsRead > 0, rowsParsed == 0)
@@ -404,9 +427,17 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
             ? `All ${result.metrics.rowsRead} rows failed validation (check CSV column names)`
             : `All ${result.metrics.rowsParsed} validated products failed to upsert`
 
-        log.warn('Processing failure detected - no products saved', {
+        log.error('Processing failure detected - no products saved', {
           feedId: feed.id,
           runId: run.id,
+          rowsRead: result.metrics.rowsRead,
+          rowsParsed: result.metrics.rowsParsed,
+          productsUpserted: result.metrics.productsUpserted,
+          productsRejected: result.metrics.productsRejected,
+          errorCount: result.metrics.errorCount,
+          failureReason,
+        })
+        runFileLogger.error('PROCESSING FAILURE - no products saved', {
           rowsRead: result.metrics.rowsRead,
           rowsParsed: result.metrics.rowsParsed,
           productsUpserted: result.metrics.productsUpserted,
@@ -431,6 +462,14 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
           phase1Ms: phase1Duration,
           phase2Ms: phase2Duration,
         })
+        runFileLogger.info('Run SUCCEEDED', {
+          totalDurationMs: phase1Duration + phase2Duration,
+          rowsRead: result.metrics.rowsRead,
+          rowsParsed: result.metrics.rowsParsed,
+          productsUpserted: result.metrics.productsUpserted,
+          productsPromoted: phase2Result.productsPromoted,
+          pricesWritten: result.metrics.pricesWritten,
+        })
         await finalizeRun(context, 'SUCCEEDED', {
           ...result.metrics,
           productsPromoted: phase2Result.productsPromoted,
@@ -450,6 +489,13 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
       correlationId,
       feedId,
       runId: run.id,
+      failureKind: feedError.kind,
+      failureCode: feedError.code,
+      retryable: feedError.retryable,
+      errorMessage: feedError.message,
+    }, error as Error)
+    runFileLogger?.error('Run FAILED - exception thrown', {
+      correlationId,
       failureKind: feedError.kind,
       failureCode: feedError.code,
       retryable: feedError.retryable,
@@ -513,10 +559,17 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
     // Step 5: Release lock (AFTER reading manualRunPending - see invariant above)
     await releaseAdvisoryLock(feedLockId)
     log.debug('ADVISORY_LOCK_RELEASED', { feedLockId: feedLockId.toString(), runId: run.id })
+
+    // Step 6: Close run file logger
+    if (runFileLogger) {
+      await runFileLogger.close().catch((err) => {
+        log.warn('Failed to close run file logger', { runId: run.id }, err)
+      })
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Step 6: Enqueue follow-up AFTER lock release (if needed)
+  // Step 7: Enqueue follow-up AFTER lock release (if needed)
   // Per spec §6.4: Only enqueue if: (1) pending flag was set, (2) feed is still ENABLED
   // This prevents surprise runs after admin pauses feed mid-run
   // ═══════════════════════════════════════════════════════════════════════════
@@ -528,7 +581,7 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
       { jobId: `${feedId}-manual-followup-${Date.now()}` }
     )
 
-    // Step 7: Clear manualRunPending AFTER successfully enqueueing follow-up
+    // Step 8: Clear manualRunPending AFTER successfully enqueueing follow-up
     // Per spec §6.4: This ensures we don't lose the follow-up if we crash between
     // reading the flag and enqueueing the job.
     await prisma.affiliate_feeds.update({
@@ -910,7 +963,7 @@ async function finalizeRun(
 
     // Auto-disable after MAX_CONSECUTIVE_FAILURES
     if (newFailureCount >= MAX_CONSECUTIVE_FAILURES) {
-      log.warn('Auto-disabling feed after consecutive failures', {
+      log.error('Auto-disabling feed after consecutive failures', {
         feedId: feed.id,
         runId: run.id,
         sourceName: feed.sources.name,

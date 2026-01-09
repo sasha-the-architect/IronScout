@@ -20,40 +20,40 @@ interface CaliberPattern {
 const CALIBER_PATTERNS: CaliberPattern[] = [
   // Pistol calibers
   { pattern: /\b9\s?mm|9x19|9\s?luger\b/i, normalized: '9mm' },
-  { pattern: /\b\.45\s?acp|45\s?acp\b/i, normalized: '.45 ACP' },
-  { pattern: /\b\.40\s?s&w|40\s?s&w\b/i, normalized: '.40 S&W' },
-  { pattern: /\b\.38\s?special|38\s?spl\b/i, normalized: '.38 Special' },
-  { pattern: /\b\.357\s?mag|357\s?magnum\b/i, normalized: '.357 Magnum' },
+  { pattern: /(?:^|\s|\W)\.?\s?45\s?acp\b|45\s?acp\b/i, normalized: '.45 ACP' },
+  { pattern: /(?:^|\s|\W)\.?\s?40\s?s&w\b|40\s?s&w\b/i, normalized: '.40 S&W' },
+  { pattern: /(?:^|\s|\W)\.?\s?38\s?special\b|38\s?spl\b/i, normalized: '.38 Special' },
+  { pattern: /(?:^|\s|\W)\.?\s?357\s?mag\b|357\s?magnum\b/i, normalized: '.357 Magnum' },
   { pattern: /\b10\s?mm|10mm\s?auto\b/i, normalized: '10mm Auto' },
-  { pattern: /\b\.380\s?acp|380\s?auto\b/i, normalized: '.380 ACP' },
-  { pattern: /\b\.32\s?acp|32\s?auto\b/i, normalized: '.32 ACP' },
-  { pattern: /\b\.25\s?acp|25\s?auto\b/i, normalized: '.25 ACP' },
+  { pattern: /(?:^|\s|\W)\.?\s?380\s?acp\b|380\s?auto\b/i, normalized: '.380 ACP' },
+  { pattern: /(?:^|\s|\W)\.?\s?32\s?acp\b|32\s?auto\b/i, normalized: '.32 ACP' },
+  { pattern: /(?:^|\s|\W)\.?\s?25\s?acp\b|25\s?auto\b/i, normalized: '.25 ACP' },
 
   // Rifle calibers - 5.56/.223
-  { pattern: /\b5\.56\s?nato|5\.56x45\b/i, normalized: '5.56 NATO' },
-  { pattern: /\b\.223\s?rem|223\s?remington\b/i, normalized: '.223 Remington' },
-  { pattern: /\b\.22\s?lr|22\s?long\s?rifle\b/i, normalized: '.22 LR' },
+  { pattern: /\b5\.56\s?nato|5\.56x45(?:mm)?\b/i, normalized: '5.56 NATO' },
+  { pattern: /(?:^|\s|\W)\.?\s?223\s?rem(?:ington)?\b/i, normalized: '.223 Remington' },
+  { pattern: /(?:^|\s|\W)\.?\s?22\s?lr\b|22\s?long\s?rifle\b/i, normalized: '.22 LR' },
 
   // Rifle calibers - 7.62
   { pattern: /\b7\.62x39\b/i, normalized: '7.62x39mm' },
-  { pattern: /\b7\.62\s?nato|7\.62x51|\.308\s?win\b/i, normalized: '.308 Winchester' },
+  { pattern: /\b7\.62\s?nato|7\.62x51|(?:^|\s|\W)\.?\s?308\s?win(?:chester)?\b/i, normalized: '.308 Winchester' },
   { pattern: /\b7\.62x54r\b/i, normalized: '7.62x54R' },
 
   // Rifle calibers - .30
-  { pattern: /\b\.30-06|30-06\s?springfield\b/i, normalized: '.30-06 Springfield' },
-  { pattern: /\b\.30\s?carbine|30\s?carbine\b/i, normalized: '.30 Carbine' },
+  { pattern: /(?:^|\s|\W)\.?\s?30-06\b|30-06\s?springfield\b/i, normalized: '.30-06 Springfield' },
+  { pattern: /(?:^|\s|\W)\.?\s?30\s?carbine\b|30\s?carbine\b/i, normalized: '.30 Carbine' },
 
   // .300 variants (need context from name)
-  { pattern: /\b\.300\s?blk|300\s?blackout\b/i, normalized: '.300 Blackout' },
-  { pattern: /\b\.300\s?win\s?mag|300\s?winchester\s?mag\b/i, normalized: '.300 Winchester Magnum' },
-  { pattern: /\b\.300\s?wby|300\s?weatherby\b/i, normalized: '.300 Weatherby' },
+  { pattern: /(?:^|\s|\W)\.?\s?300\s?(?:aac\s*)?blk\b|300\s?(?:aac\s*)?blackout\b/i, normalized: '.300 Blackout' },
+  { pattern: /(?:^|\s|\W)\.?\s?300\s?win\s?mag\b|300\s?winchester\s?mag\b/i, normalized: '.300 Winchester Magnum' },
+  { pattern: /(?:^|\s|\W)\.?\s?300\s?wby\b|300\s?weatherby\b/i, normalized: '.300 Weatherby' },
 
   // Other rifle calibers
   { pattern: /\b6\.5\s?creedmoor|6\.5\s?cm\b/i, normalized: '6.5 Creedmoor' },
   { pattern: /\b6\.5\s?grendel\b/i, normalized: '6.5 Grendel' },
-  { pattern: /\b\.270\s?win|270\s?winchester\b/i, normalized: '.270 Winchester' },
-  { pattern: /\b\.243\s?win|243\s?winchester\b/i, normalized: '.243 Winchester' },
-  { pattern: /\b\.50\s?bmg|50\s?bmg\b/i, normalized: '.50 BMG' },
+  { pattern: /(?:^|\s|\W)\.?\s?270\s?win(?:chester)?\b/i, normalized: '.270 Winchester' },
+  { pattern: /(?:^|\s|\W)\.?\s?243\s?win(?:chester)?\b/i, normalized: '.243 Winchester' },
+  { pattern: /(?:^|\s|\W)\.?\s?50\s?bmg\b|50\s?bmg\b/i, normalized: '.50 BMG' },
 
   // Shotgun gauges
   { pattern: /\b12\s?ga|12\s?gauge\b/i, normalized: '12 Gauge' },
@@ -64,7 +64,12 @@ const CALIBER_PATTERNS: CaliberPattern[] = [
 ]
 
 export function extractCaliber(productName: string): string | null {
-  const name = productName.toLowerCase()
+  return normalizeCaliberString(productName)
+}
+
+export function normalizeCaliberString(value: string): string | null {
+  if (!value) return null
+  const name = value.toLowerCase()
 
   for (const { pattern, normalized } of CALIBER_PATTERNS) {
     if (pattern.test(name)) {

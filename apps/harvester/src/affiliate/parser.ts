@@ -10,6 +10,11 @@
 import { parse as parseCSV } from 'csv-parse/sync'
 import { createHash } from 'crypto'
 import { logger } from '../config/logger'
+import {
+  extractGrainWeight,
+  extractRoundCount,
+  normalizeCaliberString,
+} from '../normalizer/ammo-utils'
 import type { ParsedFeedProduct, ParseResult, ParseError, ErrorCode } from './types'
 import { ERROR_CODES } from './types'
 
@@ -73,7 +78,7 @@ export async function parseFeed(
     } catch (err) {
       // CSV parse errors are anticipated for malformed feeds - return gracefully
       const message = err instanceof Error ? err.message : 'Parse failed'
-      parseLog.warn('PARSE_CSV_FAILED', {
+      parseLog.error('PARSE_CSV_FAILED', {
         phase: 'csv_parse',
         errorMessage: message,
         contentPreview: content.slice(0, 200),
@@ -417,6 +422,13 @@ function mapRecord(record: Record<string, string>, rowNumber: number): ParsedFee
   // Get and normalize URL
   const url = normalizeProductUrl(getValue('Url', 'URL', 'ProductURL', 'Product URL', 'Link', 'url', 'link'))
 
+  // Parse attribute payload (if present) for structured hints
+  const attributeSignals = parseAttributes(getValue('Attributes', 'attributes'))
+  const urlSignals = parseUrlSignals(url)
+  const caliber = attributeSignals.caliber ?? urlSignals.caliber
+  const grainWeight = attributeSignals.grainWeight ?? urlSignals.grainWeight
+  const roundCount = attributeSignals.roundCount ?? urlSignals.roundCount
+
   // Extract and normalize original price
   // If we used SalePrice, the list price (Price column) becomes the original/MSRP
   // Otherwise check explicit OriginalPrice/MSRP fields
@@ -439,6 +451,9 @@ function mapRecord(record: Record<string, string>, rowNumber: number): ParsedFee
     category: normalizeString(getValue('Category', 'ProductCategory', 'category', 'Product Type')),
     originalPrice: originalPrice > 0 ? originalPrice : undefined,
     currency: normalizeCurrency(getValue('Currency', 'CurrencyCode', 'currency')),
+    caliber: caliber ?? undefined,
+    grainWeight: grainWeight ?? undefined,
+    roundCount: roundCount ?? undefined,
     rowNumber,
   }
 }
@@ -558,6 +573,73 @@ function validateProduct(
   }
 
   return null
+}
+
+/**
+ * Parse and normalize the Attributes JSON payload, if present.
+ */
+function parseAttributes(value: string | undefined): {
+  caliber?: string
+  grainWeight?: number
+  roundCount?: number
+} {
+  if (!value) return {}
+
+  try {
+    const raw = JSON.parse(value) as Record<string, unknown>
+    const caliberRaw =
+      typeof raw.caliber === 'string'
+        ? raw.caliber
+        : typeof raw.gauge === 'string' || typeof raw.gauge === 'number'
+          ? `${raw.gauge} Gauge`
+          : undefined
+    const grainRaw = parseNumber(raw.grain)
+    const roundsRaw = parseNumber(raw.rounds)
+
+    return {
+      caliber: caliberRaw ? normalizeCaliberString(caliberRaw) ?? caliberRaw : undefined,
+      grainWeight: grainRaw ?? undefined,
+      roundCount: roundsRaw ?? undefined,
+    }
+  } catch {
+    return {}
+  }
+}
+
+function parseNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number.parseInt(value, 10)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
+/**
+ * Parse signal fields from the URL slug (deterministic fallback).
+ */
+function parseUrlSignals(url: string): {
+  caliber?: string
+  grainWeight?: number
+  roundCount?: number
+} {
+  try {
+    const parsed = new URL(url)
+    const rawSlug = parsed.pathname.split('/').filter(Boolean).pop()
+    if (!rawSlug) return {}
+
+    const slug = decodeURIComponent(rawSlug)
+      .replace(/\.[a-z0-9]+$/i, '')
+      .replace(/[-_]+/g, ' ')
+
+    return {
+      caliber: normalizeCaliberString(slug) ?? undefined,
+      grainWeight: extractGrainWeight(slug) ?? undefined,
+      roundCount: extractRoundCount(slug) ?? undefined,
+    }
+  } catch {
+    return {}
+  }
 }
 
 /**

@@ -515,14 +515,14 @@ describe('B. Matching Logic', () => {
       // Create candidates with different scores
       const bestMatch = createProduct({
         id: 'best_match',
-        brandNorm: 'federal',
+        brandNorm: 'federal premium',
         caliberNorm: '9mm',
         roundCount: 50,
         grainWeight: 124, // Matches extracted grain
       })
       const poorMatch = createProduct({
         id: 'poor_match',
-        brandNorm: 'federal',
+        brandNorm: 'federal premium',
         caliberNorm: '9mm',
         roundCount: 20, // Different round count
         grainWeight: 115, // Different grain

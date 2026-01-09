@@ -262,6 +262,8 @@ export interface ProductResolveJobData {
   sourceProductId: string
   trigger: 'INGEST' | 'RECONCILE' | 'MANUAL'
   resolverVersion: string
+  /** Originating feed run ID for log correlation (optional for RECONCILE/MANUAL) */
+  affiliateFeedRunId?: string
 }
 
 /**
@@ -309,7 +311,7 @@ export async function enqueueProductResolve(
   sourceProductId: string,
   trigger: ProductResolveJobData['trigger'],
   resolverVersion: string,
-  options?: { delay?: number; sourceId?: string; identityKey?: string }
+  options?: { delay?: number; sourceId?: string; identityKey?: string; affiliateFeedRunId?: string }
 ): Promise<string | null> {
   // ADR-009: Fail-closed when sourceId is missing
   // sourceId has FK constraint to sources table, so 'unknown' will fail with 23503
@@ -372,7 +374,7 @@ export async function enqueueProductResolve(
       const jobId = `RESOLVE_SOURCE_PRODUCT_${sourceProductId}`
       await productResolveQueue.add(
         'RESOLVE_SOURCE_PRODUCT',
-        { sourceProductId, trigger, resolverVersion },
+        { sourceProductId, trigger, resolverVersion, affiliateFeedRunId: options?.affiliateFeedRunId },
         {
           jobId,
           delay: options?.delay ?? 10_000, // 10s debounce default

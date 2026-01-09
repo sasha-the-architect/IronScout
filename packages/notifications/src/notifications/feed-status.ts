@@ -125,7 +125,7 @@ Need help? Contact support@ironscout.ai`,
       ),
       slackContext(`Feed ID: ${feed.id} • Merchant ID: ${feed.merchantId}`),
     ],
-  }, SLACK_CONFIG.feedsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl);
+  }, SLACK_CONFIG.datafeedAlertsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl);
 
   return { email: emailResult, slack: slackResult };
 }
@@ -189,7 +189,7 @@ View Feed Dashboard: ${feedsUrl}`,
       ),
       slackContext(`Feed ID: ${feed.id} • Merchant ID: ${feed.merchantId}`),
     ],
-  }, SLACK_CONFIG.feedsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl);
+  }, SLACK_CONFIG.datafeedAlertsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl);
 
   return { email: emailResult, slack: slackResult };
 }
@@ -259,7 +259,7 @@ View Feed Settings: ${feedsUrl}`,
       ),
       slackContext(`Feed ID: ${feed.id} • Merchant ID: ${feed.merchantId}`),
     ],
-  }, SLACK_CONFIG.feedsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl);
+  }, SLACK_CONFIG.datafeedAlertsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl);
 
   return { email: emailResult, slack: slackResult };
 }

@@ -902,6 +902,9 @@ model source_products {
   brand                   String?
   description             String?
   category                String?
+  caliber                 String?
+  grainWeight             Int?
+  roundCount              Int?
   normalizedUrl           String?
 
   // Legacy: Direct product linkage (deprecated, use product_links instead)

@@ -76,6 +76,9 @@ export interface ParsedFeedProduct {
   category?: string
   originalPrice?: number
   currency?: string
+  caliber?: string
+  grainWeight?: number
+  roundCount?: number
 
   // Raw row number for error reporting
   rowNumber: number

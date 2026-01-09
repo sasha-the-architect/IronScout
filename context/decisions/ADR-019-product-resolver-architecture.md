@@ -261,3 +261,37 @@ Roadmap:
 - Appear in Review Queue
 - Subject to same status guards
 - May be consolidated in future migration
+
+---
+
+## Amendment: Resolver Input Enrichment (2026-01-09)
+
+To improve resolution rates without relaxing trust boundaries, the resolver now
+consumes additional structured signals from `source_products` when available.
+These are derived at ingestion time from affiliate feed Attributes and URL slugs.
+
+### New Inputs (source_products)
+
+- `caliber` (normalized string)
+- `grainWeight` (int)
+- `roundCount` (int)
+
+These fields are **optional** and do not override trusted UPC matching rules.
+They only improve fingerprint readiness when titles are incomplete or inconsistent.
+
+### Input Precedence (Normalization)
+
+1. Structured source fields (`source_products.caliber`, `grainWeight`, `roundCount`)
+2. Title-derived extraction (regex patterns)
+3. Missing → `INSUFFICIENT_DATA`
+
+### Source of Structured Fields
+
+- Affiliate feed `Attributes` JSON (if present)
+- URL slug parsing as deterministic fallback
+
+### Invariants Preserved
+
+- UPC matching is still gated by `source_trust_config.upcTrusted`
+- Fingerprint ambiguity still fails closed
+- No change to resolver state machine or evidence model

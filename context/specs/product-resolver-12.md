@@ -258,6 +258,15 @@ normalization dictionaries
 
 source_trust_config
 
+Structured input enrichment (v1.2+):
+
+- Resolver may use optional fields on source_products:
+  - caliber (normalized)
+  - grainWeight (int)
+  - roundCount (int)
+- These fields are derived at ingestion time from affiliate Attributes JSON or URL slug parsing.
+- They are used only to improve fingerprint readiness when title parsing is insufficient.
+
 Output
 
 Upserted product_links row

@@ -43,6 +43,8 @@ services:
         sync: false  # Set manually in Render dashboard
       - key: RESEND_API_KEY
         sync: false  # Set manually in Render dashboard
+      - key: SLACK_DATAFEED_ALERTS_WEBHOOK_URL
+        sync: false  # Set manually in Render dashboard
       - key: FROM_EMAIL
         sync: false  # Set manually in Render dashboard
       - key: OPENAI_API_KEY
@@ -103,6 +105,8 @@ services:
       - key: REDIS_PORT
         sync: false  # Set manually after creating Redis instance
       - key: RESEND_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: SLACK_DATAFEED_ALERTS_WEBHOOK_URL
         sync: false  # Set manually in Render dashboard
       - key: FROM_EMAIL
         sync: false  # Set manually in Render dashboard

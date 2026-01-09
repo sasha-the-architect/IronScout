@@ -22,6 +22,7 @@ import {
 } from '../config/queues'
 import { resolveSourceProduct, RESOLVER_VERSION } from './resolver'
 import { logger } from '../config/logger'
+import { logResolverResult, logResolverError, closeResolverLogger } from '../config/run-file-logger'
 import type { ResolverResult } from './types'
 import {
   recordRequest,
@@ -110,7 +111,7 @@ export function startProductResolverWorker(options?: {
   })
 
   productResolverWorker.on('stalled', (jobId: string) => {
-    log.warn('RESOLVER_JOB_STALLED', {
+    log.error('RESOLVER_JOB_STALLED', {
       event: 'RESOLVER_JOB_STALLED',
       jobId,
       reason: 'Job processing took too long or worker crashed',
@@ -133,6 +134,10 @@ export async function stopProductResolverWorker(): Promise<void> {
     })
     await productResolverWorker.close()
     productResolverWorker = null
+
+    // Close the daily rolling file logger
+    await closeResolverLogger()
+
     log.info('RESOLVER_WORKER_STOPPED', {
       event: 'RESOLVER_WORKER_STOPPED',
       finalProcessedCount: processedCount,
@@ -304,6 +309,21 @@ async function processResolveJob(
       durationMs,
     })
 
+    // Log to per-run file (or daily fallback for RECONCILE/MANUAL)
+    logResolverResult({
+      sourceProductId,
+      matchType: result.matchType,
+      status: result.status,
+      reasonCode: result.reasonCode,
+      confidence: Number(result.confidence.toFixed(4)),
+      productId: result.productId,
+      durationMs,
+      trigger,
+      skipped: result.skipped,
+      createdProduct: !!result.createdProduct,
+      affiliateFeedRunId: job.data.affiliateFeedRunId,
+    })
+
     return result
   } catch (error: any) {
     // Record failure metrics for system errors
@@ -348,6 +368,14 @@ async function processResolveJob(
       isFinalAttempt,
       willRetry: !isFinalAttempt,
     }, error)
+
+    // Log error to per-run file (or daily fallback)
+    logResolverError(sourceProductId, 'RESOLVER_ERROR', {
+      trigger,
+      durationMs,
+      attemptsMade: job.attemptsMade,
+      isFinalAttempt,
+    }, error, job.data.affiliateFeedRunId)
 
     // For system errors, rethrow to trigger BullMQ retry
     // For business logic errors (captured in result), we don't retry
@@ -627,7 +655,7 @@ async function sweepStuckProcessing(): Promise<void> {
       })
       failedCount++
 
-      log.warn('SWEEPER_REQUEST_FAILED', {
+      log.error('SWEEPER_REQUEST_FAILED', {
         event: 'SWEEPER_REQUEST_FAILED',
         requestId: request.id,
         sourceProductId: request.sourceProductId,

@@ -178,7 +178,7 @@ export function createProduct(overrides: Partial<MockProduct> = {}): MockProduct
     name: 'Federal Premium 9mm Luger 124gr JHP',
     category: 'ammunition',
     brand: 'Federal',
-    brandNorm: 'federal',
+    brandNorm: 'federal premium',
     caliberNorm: '9mm',
     roundCount: 50,
     grainWeight: 124,

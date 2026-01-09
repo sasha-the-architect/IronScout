@@ -10,7 +10,7 @@
  * 4. Add webhook to desired channel
  * 5. Copy webhook URL to SLACK_MERCHANT_OPS_WEBHOOK_URL env var
  *
- * Optional: Use SLACK_FEEDS_WEBHOOK_URL for a separate feed alerts channel
+ * Optional: Use SLACK_DATAFEED_ALERTS_WEBHOOK_URL for a separate feed alerts channel
  */
 
 // =============================================================================
@@ -96,7 +96,7 @@ const merchantOpsWebhookUrl = process.env.SLACK_MERCHANT_OPS_WEBHOOK_URL;
 
 export const SLACK_CONFIG = {
   merchantOpsWebhookUrl,
-  feedsWebhookUrl: process.env.SLACK_FEEDS_WEBHOOK_URL,
+  datafeedAlertsWebhookUrl: process.env.SLACK_DATAFEED_ALERTS_WEBHOOK_URL,
   enabled: !!merchantOpsWebhookUrl,
   adminPortalUrl: process.env.ADMIN_PORTAL_URL || 'https://admin.ironscout.ai',
 };

@@ -35,6 +35,7 @@ import {
 } from './subscription'
 import { fetchFeedViaFtp } from './ftp-fetcher'
 import { logger } from '../config/logger'
+import { createRunFileLogger, type RunFileLogger } from '../config/run-file-logger'
 
 const log = logger.merchant
 
@@ -218,6 +219,13 @@ async function processFeedIngest(job: Job<RetailerFeedIngestJobData>) {
   const merchantName = retailerInfo?.merchant_retailers[0]?.merchants.businessName || retailerInfo?.name || 'Unknown'
   const merchantId = retailerInfo?.merchant_retailers[0]?.merchants.id
 
+  // Create per-run file logger (writes to logs/datafeeds/retailers/<timestamp>.log)
+  const runFileLogger = createRunFileLogger({
+    type: 'retailer',
+    runId: feedRunId,
+    feedId,
+  })
+
   log.info('MERCHANT_JOB_START', {
     jobId: job.id,
     feedId,
@@ -284,6 +292,11 @@ async function processFeedIngest(job: Job<RetailerFeedIngestJobData>) {
           durationMs: Date.now() - startTime,
           workerPid: process.pid,
         })
+        runFileLogger.info('Run skipped - subscription expired', {
+          subscriptionStatus: subscriptionResult.status,
+          reason: subscriptionResult.reason,
+        })
+        await runFileLogger.close().catch(() => {})
 
         return {
           skipped: true,
@@ -326,6 +339,10 @@ async function processFeedIngest(job: Job<RetailerFeedIngestJobData>) {
       durationMs: fetchDurationMs,
       contentBytes: content.length,
     })
+    runFileLogger.info('Fetch complete', {
+      durationMs: fetchDurationMs,
+      contentBytes: content.length,
+    })
 
     // Calculate content hash for change detection
     const contentHash = createHash('sha256').update(content).digest('hex')
@@ -362,6 +379,10 @@ async function processFeedIngest(job: Job<RetailerFeedIngestJobData>) {
         durationMs: Date.now() - startTime,
         workerPid: process.pid,
       })
+      runFileLogger.info('Run skipped - no changes detected', {
+        durationMs: Date.now() - startTime,
+      })
+      await runFileLogger.close().catch(() => {})
       return { skipped: true, reason: 'no_changes' }
     }
 
@@ -404,6 +425,13 @@ async function processFeedIngest(job: Job<RetailerFeedIngestJobData>) {
       quarantineCount: parseResult.quarantineCount,
       rejectCount: parseResult.rejectCount,
       errorCodes: Object.keys(parseResult.errorCodes),
+    })
+    runFileLogger.info('Parse complete', {
+      durationMs: parseDurationMs,
+      totalRows: parseResult.totalRows,
+      indexableCount: parseResult.indexableCount,
+      quarantineCount: parseResult.quarantineCount,
+      rejectCount: parseResult.rejectCount,
     })
 
     // Process records
@@ -569,6 +597,22 @@ async function processFeedIngest(job: Job<RetailerFeedIngestJobData>) {
       workerPid: process.pid,
     })
 
+    // Log summary to run file
+    runFileLogger.info(`Run ${feedStatus === 'FAILED' ? 'FAILED' : feedStatus === 'WARNING' ? 'WARNING' : 'SUCCEEDED'}`, {
+      durationMs: totalDurationMs,
+      totalRows: parseResult.totalRows,
+      indexedCount: merchantSkuIds.length,
+      quarantinedCount: quarantinedIds.length,
+      rejectedCount: errors.length,
+      quarantineRatio: quarantineRatio.toFixed(3),
+      rejectRatio: rejectRatio.toFixed(3),
+    })
+
+    // Close run file logger
+    await runFileLogger.close().catch((err) => {
+      log.warn('Failed to close run file logger', { feedRunId }, err)
+    })
+
     return {
       rowCount: parseResult.totalRows,
       indexedCount: merchantSkuIds.length,
@@ -652,6 +696,16 @@ async function processFeedIngest(job: Job<RetailerFeedIngestJobData>) {
         errorMessage: String(error),
       })
     }
+
+    // Log error to run file and close
+    runFileLogger.error('Run FAILED - exception thrown', {
+      durationMs,
+      primaryErrorCode,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    }, error instanceof Error ? error : undefined)
+    await runFileLogger.close().catch((err) => {
+      log.warn('Failed to close run file logger', { feedRunId }, err)
+    })
 
     throw error
   }

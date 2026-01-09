@@ -21,7 +21,7 @@
  * - EMAIL_FROM: From address for emails (default: IronScout <noreply@ironscout.ai>)
  * - ADMIN_NOTIFICATION_EMAIL: Admin email for notifications (default: operations@ironscout.ai)
  * - SLACK_MERCHANT_OPS_WEBHOOK_URL: Slack webhook URL for merchant operations notifications
- * - SLACK_FEEDS_WEBHOOK_URL: Optional separate webhook for feed alerts
+ * - SLACK_DATAFEED_ALERTS_WEBHOOK_URL: Optional separate webhook for datafeed alerts
  * - NEXT_PUBLIC_MERCHANT_URL: Merchant portal URL
  * - ADMIN_PORTAL_URL: Admin portal URL
  */

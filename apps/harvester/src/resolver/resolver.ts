@@ -603,7 +603,11 @@ function normalizeInput(
   const extractedGrain = extractGrainWeight(rawTitle || '')
   const extractedRoundCount = extractRoundCount(rawTitle || '')
 
-  if (rawTitle && !extractedCaliber) {
+  const resolvedCaliber = sourceProduct.caliber || extractedCaliber
+  const resolvedGrain = sourceProduct.grainWeight ?? extractedGrain
+  const resolvedRoundCount = sourceProduct.roundCount ?? extractedRoundCount
+
+  if (rawTitle && !extractedCaliber && !sourceProduct.caliber) {
     rlog.debug('CALIBER_EXTRACTION_FAILED', {
       phase: 'normalize',
       rawTitle: rawTitle?.slice(0, 80),
@@ -625,9 +629,9 @@ function normalizeInput(
       upcNorm: normalizedUpc,
     },
     extractedFields: {
-      caliber: extractedCaliber,
-      grain: extractedGrain,
-      roundCount: extractedRoundCount,
+      caliber: resolvedCaliber,
+      grain: resolvedGrain,
+      roundCount: resolvedRoundCount,
     },
     identifierCount: identifiers.length,
     identifierTypes: identifiers.map(i => i.idType),
@@ -639,12 +643,12 @@ function normalizeInput(
     titleSignature,
     brand: sourceProduct.brand,
     brandNorm: normalizedBrand,
-    caliber: extractedCaliber ?? undefined,
-    caliberNorm: extractedCaliber ?? undefined, // extractCaliber already returns normalized form
+    caliber: resolvedCaliber ?? undefined,
+    caliberNorm: resolvedCaliber ?? undefined, // extractCaliber/normalizer returns normalized form
     upc: rawUpc,
     upcNorm: normalizedUpc,
-    packCount: extractedRoundCount ?? undefined,
-    grain: extractedGrain ?? undefined,
+    packCount: resolvedRoundCount ?? undefined,
+    grain: resolvedGrain ?? undefined,
     url: sourceProduct.url,
     normalizedUrl: sourceProduct.normalizedUrl,
   }
@@ -676,11 +680,21 @@ function computeTitleSignature(title: string): string {
  */
 function normalizeBrand(brand?: string | null): string | undefined {
   if (!brand) return undefined
-  return brand
+  const normalized = brand
     .toLowerCase()
     .replace(/[^\w\s]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+
+  const alias = BRAND_ALIASES[normalized]
+  return alias ?? normalized
+}
+
+const BRAND_ALIASES: Record<string, string> = {
+  'pmc ammunition': 'pmc',
+  'cci ammunition': 'cci',
+  'federal': 'federal premium',
+  'federal ammunition': 'federal premium',
 }
 
 /**

@@ -292,6 +292,7 @@ export async function processProducts(
             enqueueProductResolve(sourceProductId, 'INGEST', RESOLVER_VERSION, {
               sourceId,
               identityKey,
+              affiliateFeedRunId: run.id,
             })
           )
         )
@@ -854,6 +855,9 @@ async function batchUpsertSourceProducts(
     const updateDescriptions = toUpdate.map((u) => u.product.product.description ?? null)
     const updateCategories = toUpdate.map((u) => u.product.product.category ?? null)
     const updateNormalizedUrls = toUpdate.map((u) => normalizeUrl(u.product.product.url))
+    const updateCalibers = toUpdate.map((u) => u.product.product.caliber ?? null)
+    const updateGrainWeights = toUpdate.map((u) => u.product.product.grainWeight ?? null)
+    const updateRoundCounts = toUpdate.map((u) => u.product.product.roundCount ?? null)
 
     // Batch update using unnest pattern
     // Note: brand/description/category are persisted for resolver fingerprinting
@@ -865,6 +869,9 @@ async function batchUpsertSourceProducts(
         "brand" = u.brand,
         "description" = u.description,
         "category" = u.category,
+        "caliber" = u.caliber,
+        "grainWeight" = u."grainWeight",
+        "roundCount" = u."roundCount",
         "normalizedUrl" = u."normalizedUrl",
         "lastUpdatedByRunId" = ${runId},
         "updatedAt" = NOW()
@@ -877,6 +884,9 @@ async function batchUpsertSourceProducts(
           unnest(${updateBrands}::text[]) AS brand,
           unnest(${updateDescriptions}::text[]) AS description,
           unnest(${updateCategories}::text[]) AS category,
+          unnest(${updateCalibers}::text[]) AS caliber,
+          unnest(${updateGrainWeights}::int[]) AS "grainWeight",
+          unnest(${updateRoundCounts}::int[]) AS "roundCount",
           unnest(${updateNormalizedUrls}::text[]) AS "normalizedUrl"
       ) AS u
       WHERE sp.id = u.id
@@ -905,12 +915,16 @@ async function batchUpsertSourceProducts(
     const insertDescriptions = toInsert.map((i) => i.product.product.description ?? null)
     const insertCategories = toInsert.map((i) => i.product.product.category ?? null)
     const insertNormalizedUrls = toInsert.map((i) => normalizeUrl(i.product.product.url))
+    const insertCalibers = toInsert.map((i) => i.product.product.caliber ?? null)
+    const insertGrainWeights = toInsert.map((i) => i.product.product.grainWeight ?? null)
+    const insertRoundCounts = toInsert.map((i) => i.product.product.roundCount ?? null)
 
     // Bulk insert - no ON CONFLICT needed since we're generating unique IDs
     // Note: brand/description/category are persisted for resolver fingerprinting
     await prisma.$executeRaw`
       INSERT INTO source_products (
-        "id", "sourceId", "title", "url", "imageUrl", "brand", "description", "category", "normalizedUrl",
+        "id", "sourceId", "title", "url", "imageUrl", "brand", "description", "category",
+        "caliber", "grainWeight", "roundCount", "normalizedUrl",
         "createdByRunId", "lastUpdatedByRunId", "createdAt", "updatedAt"
       )
       SELECT
@@ -922,6 +936,9 @@ async function batchUpsertSourceProducts(
         unnest(${insertBrands}::text[]),
         unnest(${insertDescriptions}::text[]),
         unnest(${insertCategories}::text[]),
+        unnest(${insertCalibers}::text[]),
+        unnest(${insertGrainWeights}::int[]),
+        unnest(${insertRoundCounts}::int[]),
         unnest(${insertNormalizedUrls}::text[]),
         ${runId},
         ${runId},

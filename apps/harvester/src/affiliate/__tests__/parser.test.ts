@@ -110,6 +110,30 @@ Out Stock 3,https://example.com/5,10,0`
       expect(result.products[3].inStock).toBe(false)
       expect(result.products[4].inStock).toBe(false)
     })
+
+    it('should parse Attributes payload for structured fields', async () => {
+      const csv = `Name,URL,Price,Stock,Attributes
+Test Product,https://example.com/product1,29.99,Yes,"{""caliber"": "".300 AAC Blackout"", ""grain"": 125, ""rounds"": 20}"`
+
+      const result = await parseFeed(csv, 'CSV', 1000)
+
+      expect(result.rowsParsed).toBe(1)
+      expect(result.products[0].caliber).toBe('.300 Blackout')
+      expect(result.products[0].grainWeight).toBe(125)
+      expect(result.products[0].roundCount).toBe(20)
+    })
+
+    it('should derive structured fields from URL slug when missing', async () => {
+      const csv = `Name,URL,Price,Stock
+Basic Product,https://example.com/cci-stinger-22lr-32gr-50rd.html,9.99,Yes`
+
+      const result = await parseFeed(csv, 'CSV', 1000)
+
+      expect(result.rowsParsed).toBe(1)
+      expect(result.products[0].caliber).toBe('.22 LR')
+      expect(result.products[0].grainWeight).toBe(32)
+      expect(result.products[0].roundCount).toBe(50)
+    })
   })
 
   // Note: TSV/XML/JSON parsing tests removed - v1 only supports CSV

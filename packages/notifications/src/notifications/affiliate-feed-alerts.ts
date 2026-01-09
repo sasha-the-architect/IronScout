@@ -74,7 +74,7 @@ export async function notifyAffiliateFeedRunFailed(
         ),
       ],
     },
-    SLACK_CONFIG.feedsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl
+    SLACK_CONFIG.datafeedAlertsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl
   );
 
   return result;
@@ -124,7 +124,7 @@ export async function notifyCircuitBreakerTriggered(
         ),
       ],
     },
-    SLACK_CONFIG.feedsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl
+    SLACK_CONFIG.datafeedAlertsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl
   );
 
   return result;
@@ -167,7 +167,7 @@ export async function notifyAffiliateFeedAutoDisabled(
         ),
       ],
     },
-    SLACK_CONFIG.feedsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl
+    SLACK_CONFIG.datafeedAlertsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl
   );
 
   return result;
@@ -209,7 +209,7 @@ export async function notifyAffiliateFeedRecovered(
         slackContext(`Feed ID: ${feed.feedId}`),
       ],
     },
-    SLACK_CONFIG.feedsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl
+    SLACK_CONFIG.datafeedAlertsWebhookUrl || SLACK_CONFIG.merchantOpsWebhookUrl
   );
 
   return result;
