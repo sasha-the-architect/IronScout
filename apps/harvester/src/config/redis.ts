@@ -7,6 +7,10 @@ const redisHost = process.env.REDIS_HOST || 'localhost'
 const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10)
 const redisPassword = process.env.REDIS_PASSWORD || undefined
 
+// Circuit breaker state for reducing log spam during prolonged outages
+let consecutiveFailures = 0
+let lastCircuitBreakerLog = 0
+
 export const redisConnection = {
   host: redisHost,
   port: redisPort,
@@ -25,15 +29,43 @@ export const redisConnection = {
   lazyConnect: false,
   // Reconnection settings for dropped connections
   retryStrategy(times: number) {
+    consecutiveFailures = times
+
+    // Circuit breaker: after 20 attempts, reduce logging frequency
+    if (times > 20) {
+      const now = Date.now()
+      // Log once per minute during prolonged outage
+      if (now - lastCircuitBreakerLog > 60000) {
+        lastCircuitBreakerLog = now
+        log.error('Redis circuit breaker: prolonged outage', {
+          attempts: times,
+          host: redisHost,
+          port: redisPort,
+        })
+      }
+      return 30000 // Cap at 30s, keep trying
+    }
+
     const delay = Math.min(times * 500, 30000)
     log.info('Reconnecting', { attempt: times, delayMs: delay })
     return delay
   },
   // Log reconnection events
   reconnectOnError(err: Error) {
-    const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED']
+    const targetErrors = [
+      'READONLY',
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'ECONNREFUSED',
+      'EHOSTUNREACH',
+      'ENETUNREACH',
+      'ENOTFOUND',
+    ]
     if (targetErrors.some(e => err.message.includes(e))) {
-      log.warn('Reconnecting due to error', { error: err.message })
+      // Only log if not in circuit breaker mode
+      if (consecutiveFailures <= 20) {
+        log.warn('Reconnecting due to error', { error: err.message })
+      }
       return true
     }
     return false
