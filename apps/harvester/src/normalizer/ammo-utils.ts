@@ -301,6 +301,13 @@ export function extractRoundCount(productName: string): number | null {
     // Range pack patterns
     /range\s?pack\s?(?:of\s?)?(\d+)/i,
     /(\d+)\s?(?:rd|round)s?\s?range\s?pack/i,
+    // Box/pack shorthand patterns
+    /(\d+)\/box\b/i,                        // "20/box"
+    /(?:pk|pack)\s?of\s?(\d+)/i,            // "pk of 20", "pack of 20"
+    /(\d+)\s?-?\s?pk\b/i,                   // "20pk", "20-pk", "20 pk"
+    /(\d+)\s?-?\s?pack\b/i,                 // "20-pack", "20 pack"
+    /qty[:\s]*(\d+)/i,                      // "qty 20", "qty: 20"
+    /\((\d+)\)\s*$/,                        // "(50)" at end of title
   ]
 
   for (const pattern of patterns) {

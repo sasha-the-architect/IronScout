@@ -300,6 +300,60 @@
         "roundCount": 25,
         "brand": "Winchester"
       }
+    },
+    {
+      "id": "pmc-9mm-box-shorthand",
+      "description": "Round count from 50/box shorthand",
+      "input": {
+        "name": "PMC Bronze 9mm Luger 115gr FMJ 50/box",
+        "url": "https://example.com/pmc-9mm-50box",
+        "price": 16.99,
+        "inStock": true,
+        "brand": "PMC",
+        "sku": "9A"
+      },
+      "expected": {
+        "caliber": "9mm",
+        "grainWeight": 115,
+        "roundCount": 50,
+        "brand": "PMC"
+      }
+    },
+    {
+      "id": "hornady-308-qty-pattern",
+      "description": "Round count from qty: notation",
+      "input": {
+        "name": "Hornady Match .308 Win 168gr BTHP qty: 20",
+        "url": "https://example.com/hornady-308-match",
+        "price": 42.99,
+        "inStock": true,
+        "brand": "Hornady",
+        "sku": "8097"
+      },
+      "expected": {
+        "caliber": ".308 Winchester",
+        "grainWeight": 168,
+        "roundCount": 20,
+        "brand": "Hornady"
+      }
+    },
+    {
+      "id": "federal-45acp-parenthetical",
+      "description": "Round count from (50) at end of title",
+      "input": {
+        "name": "Federal American Eagle .45 ACP 230gr FMJ (50)",
+        "url": "https://example.com/federal-45acp-ae",
+        "price": 32.99,
+        "inStock": true,
+        "brand": "Federal",
+        "sku": "AE45A"
+      },
+      "expected": {
+        "caliber": ".45 ACP",
+        "grainWeight": 230,
+        "roundCount": 50,
+        "brand": "Federal"
+      }
     }
   ],
   "knownGaps": []

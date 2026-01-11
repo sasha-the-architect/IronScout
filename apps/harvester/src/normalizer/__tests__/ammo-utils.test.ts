@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeCaliberString, extractGrainWeight } from '../ammo-utils'
+import { normalizeCaliberString, extractGrainWeight, extractRoundCount } from '../ammo-utils'
 
 describe('extractGrainWeight', () => {
   it('extracts integer grain weight', () => {
@@ -47,5 +47,51 @@ describe('normalizeCaliberString', () => {
   it('normalizes 7.62x39mm', () => {
     const result = normalizeCaliberString('7.62x39mm 123gr FMJ')
     expect(result).toBe('7.62x39mm')
+  })
+})
+
+describe('extractRoundCount', () => {
+  it('extracts standard round patterns', () => {
+    expect(extractRoundCount('Federal 9mm 115gr FMJ - 50 Rounds')).toBe(50)
+    expect(extractRoundCount('Winchester 100rd Value Pack')).toBe(100)
+    expect(extractRoundCount('Hornady 20-count box')).toBe(20)
+  })
+
+  it('extracts box/pack shorthand patterns', () => {
+    expect(extractRoundCount('PMC Bronze .45 ACP 230gr 50/box')).toBe(50)
+    expect(extractRoundCount('Federal 9mm pk of 50')).toBe(50)
+    expect(extractRoundCount('CCI .22LR pack of 100')).toBe(100)
+    expect(extractRoundCount('Blazer 9mm 50pk')).toBe(50)
+    expect(extractRoundCount('Speer Gold Dot 20-pk')).toBe(20)
+    expect(extractRoundCount('Winchester 25-pack')).toBe(25)
+  })
+
+  it('extracts qty patterns', () => {
+    expect(extractRoundCount('Federal 9mm FMJ qty 50')).toBe(50)
+    expect(extractRoundCount('Hornady .308 qty: 20')).toBe(20)
+  })
+
+  it('extracts parenthetical count at end', () => {
+    expect(extractRoundCount('Federal American Eagle 9mm 115gr FMJ (50)')).toBe(50)
+    expect(extractRoundCount('Winchester .223 55gr (20)')).toBe(20)
+  })
+
+  it('does not false-match caliber dimensions', () => {
+    // "7.62x39" should NOT extract 39 as round count
+    expect(extractRoundCount('Federal 7.62x39mm 123gr SP')).toBeNull()
+    // "5.56x45" should NOT extract 45 as round count
+    expect(extractRoundCount('Winchester 5.56x45mm M855')).toBeNull()
+    // "x50" notation intentionally not supported (too many false positives with model names)
+    expect(extractRoundCount('Acme X50 Premium Ammo')).toBeNull()
+  })
+
+  it('extracts bulk/case patterns', () => {
+    expect(extractRoundCount('Blazer Brass 9mm Bulk 1000')).toBe(1000)
+    expect(extractRoundCount('Federal 9mm case of 500')).toBe(500)
+  })
+
+  it('rejects counts outside valid range', () => {
+    expect(extractRoundCount('Test ammo 3 rounds')).toBeNull() // too small
+    expect(extractRoundCount('Test ammo 15000 rounds')).toBeNull() // too large
   })
 })
