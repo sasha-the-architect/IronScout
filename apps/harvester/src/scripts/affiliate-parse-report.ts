@@ -4,7 +4,7 @@ import * as path from 'path'
 import { parseAttributes, parseUrlSignals } from '../affiliate/signal-extraction'
 import { extractGrainWeight, extractRoundCount, normalizeCaliberString } from '../normalizer/ammo-utils'
 
-type SignalSource = 'ATTRIBUTES' | 'URL' | 'TITLE' | 'MISSING'
+type SignalSource = 'ATTRIBUTES' | 'URL' | 'TITLE' | 'COLUMN' | 'MISSING'
 
 interface FieldPick<T> {
   value?: T
@@ -100,6 +100,8 @@ function run(): void {
     'rowNumber',
     'name',
     'url',
+    'brand',
+    'brandSource',
     'caliber',
     'caliberSource',
     'grainWeight',
@@ -111,9 +113,10 @@ function run(): void {
 
   const stats = {
     totalRows: 0,
-    caliber: { filled: 0, bySource: { ATTRIBUTES: 0, URL: 0, TITLE: 0, MISSING: 0 } },
-    grain: { filled: 0, bySource: { ATTRIBUTES: 0, URL: 0, TITLE: 0, MISSING: 0 } },
-    round: { filled: 0, bySource: { ATTRIBUTES: 0, URL: 0, TITLE: 0, MISSING: 0 } },
+    brand: { filled: 0, bySource: { ATTRIBUTES: 0, URL: 0, TITLE: 0, COLUMN: 0, MISSING: 0 } },
+    caliber: { filled: 0, bySource: { ATTRIBUTES: 0, URL: 0, TITLE: 0, COLUMN: 0, MISSING: 0 } },
+    grain: { filled: 0, bySource: { ATTRIBUTES: 0, URL: 0, TITLE: 0, COLUMN: 0, MISSING: 0 } },
+    round: { filled: 0, bySource: { ATTRIBUTES: 0, URL: 0, TITLE: 0, COLUMN: 0, MISSING: 0 } },
   }
 
   for (const file of files) {
@@ -123,6 +126,7 @@ function run(): void {
     rawRecords.forEach((record, index) => {
       const name = getValue(record, 'Name', 'ProductName', 'Product Name', 'title', 'Title') ?? ''
       const url = getValue(record, 'Url', 'URL', 'ProductURL', 'Product URL', 'Link', 'url', 'link') ?? ''
+      const brand = getValue(record, 'Manufacturer', 'Brand', 'brand', 'manufacturer') ?? ''
       const attributesRaw = getValue(record, 'Attributes', 'attributes')
 
       const attributeSignals = parseAttributes(attributesRaw)
@@ -136,16 +140,20 @@ function run(): void {
       const caliberPick = pickField(attributeSignals.caliber, urlSignals.caliber, titleSignals.caliber)
       const grainPick = pickField(attributeSignals.grainWeight, urlSignals.grainWeight, titleSignals.grainWeight)
       const roundPick = pickField(attributeSignals.roundCount, urlSignals.roundCount, titleSignals.roundCount)
+      const brandPick: FieldPick<string> = brand ? { value: brand, source: 'COLUMN' } : { source: 'MISSING' }
 
       const missingFields: string[] = []
+      if (!brandPick.value) missingFields.push('brand')
       if (!caliberPick.value) missingFields.push('caliber')
       if (!grainPick.value) missingFields.push('grainWeight')
       if (!roundPick.value) missingFields.push('roundCount')
 
       stats.totalRows += 1
+      stats.brand.bySource[brandPick.source] += 1
       stats.caliber.bySource[caliberPick.source] += 1
       stats.grain.bySource[grainPick.source] += 1
       stats.round.bySource[roundPick.source] += 1
+      if (brandPick.value !== undefined) stats.brand.filled += 1
       if (caliberPick.value !== undefined) stats.caliber.filled += 1
       if (grainPick.value !== undefined) stats.grain.filled += 1
       if (roundPick.value !== undefined) stats.round.filled += 1
@@ -155,6 +163,8 @@ function run(): void {
         escapeCsv(index + 1),
         escapeCsv(name),
         escapeCsv(url),
+        escapeCsv(brandPick.value),
+        escapeCsv(brandPick.source),
         escapeCsv(caliberPick.value),
         escapeCsv(caliberPick.source),
         escapeCsv(grainPick.value),
@@ -175,10 +185,12 @@ function run(): void {
   console.log('Affiliate parse report generated:')
   console.log(`- Output: ${outputPath}`)
   console.log(`- Rows: ${stats.totalRows}`)
+  console.log(`- Brand coverage: ${pct(stats.brand.filled)}%`)
   console.log(`- Caliber coverage: ${pct(stats.caliber.filled)}%`)
   console.log(`- Grain coverage: ${pct(stats.grain.filled)}%`)
   console.log(`- Round count coverage: ${pct(stats.round.filled)}%`)
   console.log('- Source breakdown:')
+  console.log(`  - Brand: COLUMN ${stats.brand.bySource.COLUMN}, MISSING ${stats.brand.bySource.MISSING}`)
   console.log(`  - Caliber: ATTR ${stats.caliber.bySource.ATTRIBUTES}, URL ${stats.caliber.bySource.URL}, TITLE ${stats.caliber.bySource.TITLE}, MISSING ${stats.caliber.bySource.MISSING}`)
   console.log(`  - Grain: ATTR ${stats.grain.bySource.ATTRIBUTES}, URL ${stats.grain.bySource.URL}, TITLE ${stats.grain.bySource.TITLE}, MISSING ${stats.grain.bySource.MISSING}`)
   console.log(`  - Round: ATTR ${stats.round.bySource.ATTRIBUTES}, URL ${stats.round.bySource.URL}, TITLE ${stats.round.bySource.TITLE}, MISSING ${stats.round.bySource.MISSING}`)
