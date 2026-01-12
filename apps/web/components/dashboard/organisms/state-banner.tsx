@@ -2,15 +2,11 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import {
   Search,
   Bell,
   CheckCircle2,
-  TrendingDown,
-  Zap,
   Plus,
-  Settings,
   ChevronRight,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -40,15 +36,23 @@ interface StateBannerProps {
 }
 
 /**
- * Popular calibers for quick-add chips in NEW state
- * Per plan: hard-coded, covers 80%+ of users
+ * Example queries for BRAND_NEW state
+ * Focused on natural language use cases
  */
-const POPULAR_CALIBERS = [
-  { label: '9mm', query: '9mm' },
-  { label: '.223/5.56', query: '.223 5.56' },
-  { label: '.22 LR', query: '.22 lr' },
-  { label: '.45 ACP', query: '.45 acp' },
-  { label: '.308 Win', query: '.308' },
+const EXAMPLE_QUERIES = [
+  'cheap 9mm range ammo',
+  'bulk .223 training ammo',
+  'home defense 9mm',
+  '.308 hunting ammo',
+]
+
+/**
+ * Quick-add calibers for NEW state
+ */
+const QUICK_ADD_CALIBERS = [
+  { label: '+9mm bulk', query: '9mm bulk' },
+  { label: '+.223 brass', query: '.223 brass' },
+  { label: '+5.56 NATO', query: '5.56 nato' },
 ]
 
 /**
@@ -87,36 +91,33 @@ export function StateBanner({ state, context }: StateBannerProps) {
  */
 function BrandNewBanner() {
   return (
-    <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
-      <CardContent className="py-8 md:py-12">
+    <Card className="bg-card border-border">
+      <CardContent className="py-8 md:py-10">
         <div className="max-w-2xl mx-auto text-center">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
-            Buy now at the best price.
+          <h1 className="text-xl md:text-2xl font-semibold text-foreground mb-2">
+            Save items to watch. We'll monitor price changes.
           </h1>
-          <p className="text-lg text-muted-foreground mb-6">
-            We'll watch what happens next.
+          <p className="text-muted-foreground mb-6">
+            Add items to your watchlist so we can monitor prices.
           </p>
 
-          <Link href="/dashboard/search">
+          <Link href="/search">
             <Button size="lg" className="gap-2">
-              <Search className="h-5 w-5" />
+              <Search className="h-4 w-4" />
               Find ammo deals
             </Button>
           </Link>
 
-          {/* Suggested search chips */}
+          {/* Example query chips */}
           <div className="mt-6 flex flex-wrap justify-center gap-2">
-            {POPULAR_CALIBERS.slice(0, 3).map((caliber) => (
+            {EXAMPLE_QUERIES.map((query) => (
               <Link
-                key={caliber.query}
-                href={`/dashboard/search?q=${encodeURIComponent(caliber.query)}`}
+                key={query}
+                href={`/search?q=${encodeURIComponent(query)}`}
               >
-                <Badge
-                  variant="outline"
-                  className="cursor-pointer hover:bg-primary/10 transition-colors"
-                >
-                  {caliber.label}
-                </Badge>
+                <span className="inline-flex px-4 py-2 text-sm rounded-full border border-border hover:border-primary/50 hover:bg-muted/50 transition-colors text-muted-foreground cursor-pointer">
+                  {query}
+                </span>
               </Link>
             ))}
           </div>
@@ -131,48 +132,45 @@ function BrandNewBanner() {
  * Goal: Reach minimum effective watchlist size (5+)
  */
 function NewUserBanner({ watchlistCount }: { watchlistCount: number }) {
+  const itemsNeeded = Math.max(5 - watchlistCount, 3)
+
   return (
-    <Card className="border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/30">
-      <CardContent className="py-4 md:py-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <Card className="bg-card border-border">
+      <CardContent className="py-5">
+        <div className="space-y-4">
+          {/* Main message */}
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingDown className="h-5 w-5 text-amber-600" />
-              <span className="font-semibold text-amber-800 dark:text-amber-200">
-                Your watchlist has {watchlistCount} item{watchlistCount !== 1 ? 's' : ''}
-              </span>
-            </div>
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              Most price drops are still invisible. Add more to catch deals.
+            <p className="font-medium text-foreground">
+              Your watchlist has {watchlistCount} item{watchlistCount !== 1 ? 's' : ''}. Most price drops are still invisible.
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Recommended: 5–10 items
+            <p className="text-sm text-muted-foreground mt-1">
+              Add {itemsNeeded}+ more items so we can catch real savings.
             </p>
           </div>
 
-          <Link href="/dashboard/search">
-            <Button className="gap-2 whitespace-nowrap">
-              <Plus className="h-4 w-4" />
+          {/* CTA Button */}
+          <Link href="/search">
+            <Button className="w-full gap-2">
               Add ammo to watchlist
             </Button>
           </Link>
-        </div>
 
-        {/* Quick-add caliber chips */}
-        <div className="mt-4 flex flex-wrap gap-2">
-          {POPULAR_CALIBERS.map((caliber) => (
-            <Link
-              key={caliber.query}
-              href={`/dashboard/search?q=${encodeURIComponent(caliber.query)}`}
-            >
-              <Badge
-                variant="outline"
-                className="cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900 transition-colors text-xs"
+          {/* Quick-add caliber chips */}
+          <div className="flex flex-wrap items-center gap-2">
+            {QUICK_ADD_CALIBERS.map((caliber) => (
+              <Link
+                key={caliber.query}
+                href={`/search?q=${encodeURIComponent(caliber.query)}`}
               >
-                + {caliber.label}
-              </Badge>
-            </Link>
-          ))}
+                <span className="inline-flex px-3 py-1.5 text-xs rounded-full border border-border hover:border-primary/50 hover:bg-muted/50 transition-colors text-muted-foreground cursor-pointer">
+                  {caliber.label}
+                </span>
+              </Link>
+            ))}
+            <span className="text-xs text-muted-foreground/70 ml-2">
+              Search by caliber, use case, or brand
+            </span>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -185,31 +183,23 @@ function NewUserBanner({ watchlistCount }: { watchlistCount: number }) {
  */
 function NeedsAlertsBanner({ alertsMissing }: { alertsMissing: number }) {
   return (
-    <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30">
-      <CardContent className="py-4 md:py-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Bell className="h-5 w-5 text-blue-600" />
-              <span className="font-semibold text-blue-800 dark:text-blue-200">
-                {alertsMissing} watchlist item{alertsMissing !== 1 ? 's' : ''} don't have
-                price drop alerts active
-              </span>
-            </div>
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              Enable notifications to get alerted when prices drop.
+    <Card className="bg-card border-border">
+      <CardContent className="py-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Bell className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            <p className="text-foreground">
+              {alertsMissing} watchlist item{alertsMissing !== 1 ? 's' : ''} don't have price drop alerts active.
             </p>
           </div>
 
-          <div className="flex gap-2">
-            <Link href="/dashboard/saved">
-              <Button className="gap-2 whitespace-nowrap">
-                <Settings className="h-4 w-4" />
-                Configure alerts
-              </Button>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <Link href="/dashboard/saved" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              View watchlist
             </Link>
             <Link href="/dashboard/saved">
-              <Button variant="outline" size="icon">
+              <Button className="gap-1">
+                Configure alerts
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </Link>
@@ -226,27 +216,26 @@ function NeedsAlertsBanner({ alertsMissing }: { alertsMissing: number }) {
  */
 function HealthyBanner({ watchlistCount }: { watchlistCount: number }) {
   return (
-    <Card className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
-      <CardContent className="py-4 md:py-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <Card className="bg-card border-border">
+      <CardContent className="py-4">
+        <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-6 w-6 text-green-600" />
-            <div>
-              <span className="font-semibold text-green-800 dark:text-green-200">
-                Watchlist ready
-              </span>
-              <p className="text-sm text-green-700 dark:text-green-300">
-                {watchlistCount} items with price drop alerts
-              </p>
-            </div>
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+            <p className="text-foreground">
+              Watchlist ready. {watchlistCount} item{watchlistCount !== 1 ? 's' : ''} with price drop alerts.
+            </p>
           </div>
 
-          <Link href="/dashboard/search">
-            <Button variant="outline" className="gap-2 whitespace-nowrap">
-              <Plus className="h-4 w-4" />
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <Link href="/search" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              <Plus className="h-3 w-3" />
               Add more to watchlist
-            </Button>
-          </Link>
+            </Link>
+            <Link href="/dashboard/saved" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              View
+              <ChevronRight className="h-3 w-3" />
+            </Link>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -259,28 +248,26 @@ function HealthyBanner({ watchlistCount }: { watchlistCount: number }) {
  */
 function ReturningBanner({ priceDropsThisWeek }: { priceDropsThisWeek: number }) {
   return (
-    <Card className="border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30">
-      <CardContent className="py-4 md:py-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <Card className="bg-card border-border">
+      <CardContent className="py-4">
+        <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <TrendingDown className="h-6 w-6 text-green-600" />
-            <div>
-              <span className="font-semibold text-green-800 dark:text-green-200">
-                {priceDropsThisWeek} price drop{priceDropsThisWeek !== 1 ? 's' : ''} caught
-                this week
-              </span>
-              <p className="text-sm text-green-700 dark:text-green-300">
-                Your watchlist is working for you
-              </p>
-            </div>
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+            <p className="text-foreground">
+              {priceDropsThisWeek} price drop{priceDropsThisWeek !== 1 ? 's' : ''} caught this week.
+            </p>
           </div>
 
-          <Link href="/dashboard/search">
-            <Button variant="outline" className="gap-2 whitespace-nowrap">
-              <Plus className="h-4 w-4" />
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <Link href="/search" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              <Plus className="h-3 w-3" />
               Add more to watchlist
-            </Button>
-          </Link>
+            </Link>
+            <Link href="/dashboard/saved" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              View
+              <ChevronRight className="h-3 w-3" />
+            </Link>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -299,34 +286,29 @@ function PowerUserBanner({
   priceDropsThisWeek: number
 }) {
   return (
-    <Card className="border-primary/30 bg-primary/5">
-      <CardContent className="py-3 md:py-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+    <Card className="bg-card border-border">
+      <CardContent className="py-3">
+        <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Zap className="h-5 w-5 text-primary" />
-            <span className="font-medium">
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+            <p className="text-foreground">
               Watchlist: {watchlistCount} items.{' '}
               {priceDropsThisWeek > 0 && (
-                <span className="text-green-600">
-                  {priceDropsThisWeek} price drop{priceDropsThisWeek !== 1 ? 's' : ''}{' '}
-                  caught this week.
+                <span className="text-emerald-500">
+                  {priceDropsThisWeek} price drop{priceDropsThisWeek !== 1 ? 's' : ''} caught this week.
                 </span>
               )}
-            </span>
+            </p>
           </div>
 
-          <div className="flex gap-2">
-            <Link href="/dashboard/search">
-              <Button variant="outline" size="sm" className="gap-1 text-xs">
-                <Plus className="h-3 w-3" />
-                Add another caliber
-              </Button>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <Link href="/search" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              <Plus className="h-3 w-3" />
+              Add another caliber
             </Link>
-            <Link href="/dashboard/saved">
-              <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                Manage
-                <ChevronRight className="h-3 w-3" />
-              </Button>
+            <Link href="/dashboard/saved" className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              Manage
+              <ChevronRight className="h-3 w-3" />
             </Link>
           </div>
         </div>

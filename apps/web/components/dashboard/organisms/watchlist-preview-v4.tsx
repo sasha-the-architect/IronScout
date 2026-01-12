@@ -1,11 +1,9 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Bookmark, ChevronRight, Bell, BellOff } from 'lucide-react'
+import { ChevronRight, ChevronDown, TrendingDown } from 'lucide-react'
 import Link from 'next/link'
-import { ProductImage } from '@/components/products/product-image'
 import type { DashboardState } from './state-banner'
 
 /**
@@ -48,120 +46,86 @@ export function WatchlistPreviewV4({
   state,
 }: WatchlistPreviewV4Props) {
   const displayItems = items.slice(0, maxItems)
-  const showMore = totalCount > displayItems.length
+
+  // Show recommended count hint for NEW state
+  const showRecommendedHint = state === 'NEW' && totalCount < 5
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground uppercase tracking-wide">
-            <Bookmark className="h-4 w-4" />
-            Your Watchlist ({totalCount} item{totalCount !== 1 ? 's' : ''})
-          </CardTitle>
-          <Link href="/dashboard/saved">
-            <Button variant="ghost" size="sm" className="text-xs h-7 gap-1">
-              Manage
-              <ChevronRight className="h-3 w-3" />
-            </Button>
-          </Link>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {displayItems.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
-            Your watchlist is empty
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {displayItems.map((item) => (
-              <WatchlistPreviewRow
-                key={item.id}
-                item={item}
-                showAlertStatus={state === 'NEEDS_ALERTS'}
-              />
-            ))}
-          </div>
-        )}
+    <div className="space-y-2">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <button className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <ChevronDown className="h-3 w-3" />
+          Your Watchlist ({totalCount} item{totalCount !== 1 ? 's' : ''}
+          {showRecommendedHint && ' · recommended 5-10'})
+        </button>
+        <Link href="/dashboard/saved">
+          <span className="text-xs text-primary hover:text-primary/80 transition-colors flex items-center gap-0.5 cursor-pointer">
+            Manage
+            <ChevronRight className="h-3 w-3" />
+          </span>
+        </Link>
+      </div>
 
-        {/* Show more indicator */}
-        {showMore && (
-          <div className="pt-3 text-center">
-            <Link href="/dashboard/saved">
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
-                {displayItems.length} of {totalCount} shown · View all
-              </Button>
-            </Link>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {/* Items */}
+      {displayItems.length === 0 ? (
+        <div className="py-6 text-center text-sm text-muted-foreground">
+          Your watchlist is empty
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {displayItems.map((item) => (
+            <WatchlistPreviewRow key={item.id} item={item} />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
 interface WatchlistPreviewRowProps {
   item: WatchlistPreviewItem
-  showAlertStatus?: boolean
 }
 
-function WatchlistPreviewRow({ item, showAlertStatus = false }: WatchlistPreviewRowProps) {
+function WatchlistPreviewRow({ item }: WatchlistPreviewRowProps) {
+  // Format price as cents per round (e.g., "24.50¢")
+  const formatPrice = () => {
+    if (item.pricePerRound !== null) {
+      return `${(item.pricePerRound * 100).toFixed(2)}¢`
+    }
+    if (item.price !== null) {
+      return `$${item.price.toFixed(2)}`
+    }
+    return '—'
+  }
+
   return (
     <Link
       href={`/products/${item.productId}`}
-      className="flex items-center gap-3 py-3 hover:bg-accent/50 transition-colors -mx-4 px-4"
+      className="flex items-center gap-3 py-2 hover:bg-muted/30 transition-colors rounded px-2 -mx-2"
     >
-      {/* Product Image */}
-      <div className="w-10 h-10 relative flex-shrink-0 rounded overflow-hidden bg-gray-100">
-        <ProductImage
-          imageUrl={item.imageUrl}
-          caliber={item.caliber}
-          brand={item.brand}
-          alt={item.name}
-          fill
-        />
-      </div>
+      {/* Trend indicator */}
+      <TrendingDown className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />
 
-      {/* Product Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          {/* Alert status indicator for NEEDS_ALERTS state */}
-          {showAlertStatus && (
-            <span
-              className={`flex-shrink-0 ${
-                item.notificationsEnabled ? 'text-blue-500' : 'text-muted-foreground'
-              }`}
-              title={item.notificationsEnabled ? 'Alerts active' : 'Alerts paused'}
-            >
-              {item.notificationsEnabled ? (
-                <Bell className="h-3 w-3" />
-              ) : (
-                <BellOff className="h-3 w-3" />
-              )}
-            </span>
-          )}
-          <span className="font-medium text-sm truncate">{item.name}</span>
-        </div>
-      </div>
+      {/* Product Name */}
+      <span className="flex-1 text-sm text-foreground truncate">
+        {item.name}
+      </span>
 
       {/* Caliber Badge */}
       {item.caliber && (
-        <Badge variant="secondary" className="text-xs flex-shrink-0">
+        <Badge
+          variant="outline"
+          className="text-xs flex-shrink-0 border-primary/30 text-primary bg-primary/5"
+        >
           {item.caliber}
         </Badge>
       )}
 
       {/* Price */}
-      <div className="text-right flex-shrink-0">
-        {item.pricePerRound !== null ? (
-          <span className="text-sm font-medium text-primary">
-            {(item.pricePerRound * 100).toFixed(1)}¢
-            <span className="text-xs text-muted-foreground">/rd</span>
-          </span>
-        ) : item.price !== null ? (
-          <span className="text-sm font-medium">${item.price.toFixed(2)}</span>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )}
-      </div>
+      <span className="text-sm text-muted-foreground flex-shrink-0 tabular-nums">
+        {formatPrice()}
+      </span>
     </Link>
   )
 }

@@ -61,6 +61,14 @@ export default function DashboardPage() {
   // Determine max preview items based on state
   const maxPreviewItems = state.state === 'POWER_USER' ? 7 : 3
 
+  // Footer text varies by state
+  const getBestPricesFooter = () => {
+    if (state.state === 'BRAND_NEW') {
+      return 'Add items to your watchlist to catch price drops like these.'
+    }
+    return 'Deals like these are caught when items are in your watchlist.'
+  }
+
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-4xl mx-auto">
       {/* State Banner (contextual per user state) */}
@@ -82,8 +90,15 @@ export default function DashboardPage() {
 
       {/* Best Prices (always shown) */}
       <section>
-        <BestPrices items={bestPrices} />
+        <BestPrices items={bestPrices} footerText={getBestPricesFooter()} />
       </section>
+
+      {/* Additional footer for BRAND_NEW */}
+      {state.state === 'BRAND_NEW' && (
+        <p className="text-xs text-center text-muted-foreground/70">
+          Prices verified across major retailers. Updated continuously.
+        </p>
+      )}
     </div>
   )
 }

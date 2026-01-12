@@ -1,16 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   ChevronDown,
   ChevronUp,
-  ExternalLink,
+  ChevronRight,
   TrendingDown,
 } from 'lucide-react'
-import { ProductImage } from '@/components/products/product-image'
 
 /**
  * Best price item - matches backend deals response for scope=global
@@ -40,105 +37,101 @@ export interface BestPriceItem {
 
 interface BestPricesProps {
   items: BestPriceItem[]
+  /** Footer text varies by dashboard state */
+  footerText?: string
 }
 
 /**
- * BestPrices - Dashboard "Best Prices You Can Buy Right Now" section
+ * BestPrices - Dashboard "Current Prices We're Seeing" section
  *
  * Per dashboard-product-spec.md:
  * - Always shown in every state
  * - Never framed as recommendation
  * - Copy must imply opportunity, not advice
- * - Footer: "Deals like these are caught when items are in your watchlist."
+ * - Footer varies by state
  */
-export function BestPrices({ items }: BestPricesProps) {
+export function BestPrices({ items, footerText }: BestPricesProps) {
   const [isExpanded, setIsExpanded] = useState(true)
 
+  // Default footer text if not provided
+  const defaultFooter = "Deals like these are caught when items are in your watchlist."
+
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-2">
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center justify-between w-full text-left"
-        >
-          <CardTitle className="flex items-center gap-2 text-sm font-medium text-primary uppercase tracking-wide">
-            <TrendingDown className="h-4 w-4" />
-            Best Prices You Can Buy Right Now
-          </CardTitle>
-          {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          )}
-        </button>
-      </CardHeader>
+    <div className="space-y-3">
+      {/* Header */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-1.5 text-xs font-medium text-primary uppercase tracking-wide"
+      >
+        {isExpanded ? (
+          <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronUp className="h-3 w-3" />
+        )}
+        <TrendingDown className="h-3 w-3" />
+        Current Prices We're Seeing
+      </button>
 
       {isExpanded && (
-        <CardContent className="pt-0">
+        <>
           {items.length === 0 ? (
             <div className="py-6 text-center text-sm text-muted-foreground">
               No deals available right now. Check back later.
             </div>
           ) : (
-            <>
-              <div className="space-y-3">
-                {items.map((item) => (
-                  <BestPriceCard key={item.id} item={item} />
-                ))}
-              </div>
-
-              {/* Footer copy per spec */}
-              <p className="mt-4 text-xs text-center text-muted-foreground">
-                Deals like these are caught when items are in your watchlist.
-              </p>
-            </>
+            <div className="space-y-2">
+              {items.map((item) => (
+                <BestPriceRow key={item.id} item={item} />
+              ))}
+            </div>
           )}
-        </CardContent>
+
+          {/* Footer copy per spec */}
+          <p className="text-xs text-center text-muted-foreground pt-2">
+            {footerText || defaultFooter}
+          </p>
+        </>
       )}
-    </Card>
+    </div>
   )
 }
 
-interface BestPriceCardProps {
+interface BestPriceRowProps {
   item: BestPriceItem
 }
 
-function BestPriceCard({ item }: BestPriceCardProps) {
-  const { product, retailer, price, pricePerRound, url } = item
+function BestPriceRow({ item }: BestPriceRowProps) {
+  const { product, retailer, pricePerRound, url } = item
+
+  // Format price per round as dollars with dot indicator
+  const formatPrice = () => {
+    if (pricePerRound !== null) {
+      return `$${pricePerRound.toFixed(2)}`
+    }
+    return `$${item.price.toFixed(2)}`
+  }
 
   return (
-    <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-      {/* Product Image */}
-      <div className="w-12 h-12 relative flex-shrink-0 rounded overflow-hidden bg-gray-100">
-        <ProductImage
-          imageUrl={product.imageUrl}
-          caliber={product.caliber}
-          brand={product.brand}
-          alt={product.name}
-          fill
-        />
-      </div>
-
+    <div className="flex items-center gap-4 py-3 px-4 rounded-lg bg-muted/20 hover:bg-muted/30 transition-colors">
       {/* Product Info */}
       <div className="flex-1 min-w-0">
         {/* Caliber */}
         <div className="text-xs text-muted-foreground mb-0.5">
-          {product.caliber || 'Unknown caliber'}
+          {product.caliber || 'Unknown'}
         </div>
         {/* Product Name */}
-        <div className="font-medium text-sm truncate">{product.name}</div>
+        <div className="font-medium text-sm text-foreground truncate">
+          {product.name}
+        </div>
       </div>
 
-      {/* Price */}
-      <div className="text-right flex-shrink-0">
-        {pricePerRound !== null ? (
-          <div className="text-lg font-bold text-primary">
-            {(pricePerRound * 100).toFixed(1)}
-            <span className="text-sm font-normal text-muted-foreground">¢/rd</span>
-          </div>
-        ) : (
-          <div className="text-lg font-bold">${price.toFixed(2)}</div>
-        )}
+      {/* Price with dot indicator */}
+      <div className="flex items-baseline gap-1 flex-shrink-0">
+        <span className="text-lg font-bold text-primary font-mono">
+          {formatPrice()}
+        </span>
+        <span className="text-primary">•</span>
+        <span className="text-xs text-muted-foreground">/rd delivered</span>
       </div>
 
       {/* Retailer Button */}
@@ -148,9 +141,13 @@ function BestPriceCard({ item }: BestPriceCardProps) {
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
       >
-        <Button variant="outline" size="sm" className="gap-1 whitespace-nowrap">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1 whitespace-nowrap h-8 text-xs bg-muted/50 border-border hover:bg-muted"
+        >
           {retailer.name}
-          <ExternalLink className="h-3 w-3" />
+          <ChevronRight className="h-3 w-3" />
         </Button>
       </a>
     </div>
