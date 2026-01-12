@@ -16,7 +16,7 @@ This document defines **mechanics and enforcement**, not pricing language. Prici
 
 Subscriptions apply to **Merchants** (B2B portal accounts). Merchants authenticate. Retailers do not.
 
-- Subscription is Merchant-level: it gates portal capabilities and premium Merchant features (feeds configuration, benchmarking depth, analytics, support levels).
+- Subscription is Merchant-level: it gates portal capabilities and Merchant features (feeds configuration, benchmarking depth, analytics, support levels).
 - Billing unit = per Retailer listing (entitlement). Merchants pay per Retailer listing.
 - Pricing and consumer visibility are per-Retailer listing (entitlement) and eligibility, not subscription.
 - Eligibility applies to **Retailer visibility**, not Merchant existence. Listing is an explicit Merchant↔Retailer entitlement.
@@ -46,49 +46,11 @@ v1 prioritizes correctness and simplicity over billing sophistication.
 
 ## Subscription Domains
 
-IronScout has two distinct subscription domains:
+IronScout has one subscription domain in v1:
 
-1. **Consumers**
-2. **Dealers**
+1. **Merchants**
 
-They must remain isolated in data, logic, and enforcement.
-
----
-
-## Consumer Subscriptions
-
-### Model
-
-- Consumers have a `User` record with a tier enum:
-  - `FREE`
-  - `PREMIUM`
-- Billing is subscription-based
-- There is no usage-based consumer billing in v1
-
-### Enforcement Points
-
-Consumer tier affects:
-- History depth
-- Alert limits and cadence
-- Advanced filters and ranking
-- AI-assisted explanations
-
-**Required invariant**
-- Tier enforcement must occur server-side, before data is returned.
-- UI hiding alone is insufficient.
-
-### Observed Implementation
-
-- Tier configuration appears centralized in `apps/api/src/config/tiers.ts`
-- API helpers shape responses based on tier
-
-### Required Tightening
-
-**Decision / Code change required**
-- Some API paths appear to derive tier using client-provided headers.
-- Tier must instead be derived from verified auth context (session/JWT).
-
-If tier cannot be verified, default to `FREE`.
+Consumer subscriptions are not offered in v1.
 
 ---
 
@@ -119,7 +81,7 @@ Subscription state governs portal feature access (depth, speed, analytics) and o
 - Consumer visibility unchanged: eligibility + listing predicate still applies
 
 #### SUSPENDED / CANCELLED
-- Merchant portal access allowed for remediation; premium features gated by tier/status.
+- Merchant portal access allowed for remediation; merchant features gated by tier/status.
 - Consumer visibility is controlled by entitlement: delinquency/suspension should auto-unlist listings; recovery remains unlisted until explicitly listed.
 
 **Required invariant**
@@ -143,7 +105,7 @@ Consumer visibility is enforced by eligibility + entitlement, not subscription. 
    - Retailer inventory must not trigger alerts when Retailer is ineligible or unlisted
 
 4. **Merchant Portal**
-   - Restrict premium features based on tier/status; keep access for remediation even when delinquent/suspended.
+   - Restrict merchant portal features based on tier/status; keep access for remediation even when delinquent/suspended.
 
 Failure at any one surface is a trust violation.
 
@@ -153,9 +115,7 @@ Failure at any one surface is a trust violation.
 
 ### Consumer Billing
 
-- Managed via subscription provider (e.g. Stripe)
-- Linked via `stripeCustomerId` / `stripeSubscriptionId`
-- Subscription state is authoritative
+Consumer billing is not offered in v1. Any consumer billing fields are legacy and must not be used for access control.
 
 No metered billing exists for consumers in v1.
 
@@ -238,7 +198,7 @@ Impersonation must be explicit in session context and must not elevate privilege
 If subscription or billing state is unclear:
 - Default to restricted access
 - Do not expose Retailer inventory
-- Do not enable Premium features
+- Do not enable consumer premium features in v1
 
 ### Manual Overrides
 

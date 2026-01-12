@@ -76,24 +76,9 @@ All AI output is treated as assistive, not authoritative.
 
 ---
 
-## Premium Consumer Promises
+## Premium Availability (v1)
 
-Premium is an enhancement of context and speed, not a change in guarantees.
-
-IronScout promises that Premium users receive:
-
-- Deeper historical price context
-- Faster and more flexible alerts
-- Advanced filters and ranking options
-- AI-assisted explanations where available
-
-Premium does **not** promise:
-- Better outcomes
-- Guaranteed savings
-- Correct decisions
-- Exclusive access to deals
-
-Premium increases information density, not certainty.
+Premium is not offered in v1. All consumer capabilities are available to every user.
 
 ---
 
@@ -134,7 +119,6 @@ IronScout does not provide legal, regulatory, or compliance advice.
 ## Enforcement
 
 These promises are enforced by:
-- Server-side tier gating
 - Retailer eligibility + listing rules (query-time predicate)
 - Subscription enforcement for Merchant portal features (not consumer visibility)
 - Conservative UI language

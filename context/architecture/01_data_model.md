@@ -22,10 +22,10 @@ Per `reference/Merchant-and-Retailer-Reference.md`:
 
 - Represent ammunition products in a canonical, comparable way.
 - Represent consumer-facing Retailers whose prices appear in search results.
-- Track price history in a queryable, tier-shapeable format.
+- Track price history in a queryable, uniform format.
 - Support alerts and watchlists without cross-account leakage.
 - Support merchant ingestion, feed health, benchmarking, and insights.
-- Support subscription enforcement and admin auditability.
+- Support merchant subscription enforcement and admin auditability.
 
 ---
 
@@ -53,22 +53,16 @@ Represents a consumer account.
 
 Key responsibilities:
 - Owns alerts.
-- Owns subscription tier (FREE vs PREMIUM).
-- Links to billing identities (Stripe IDs).
+- Links to billing identities (legacy fields; not used in v1).
 
 Invariants:
-- Tier must be derived from authenticated identity (not client headers).
 - User-owned data must be isolated (alerts, watchlists, saved items).
 
 **Doc excerpt shows:**
-- `tier: UserTier (FREE | PREMIUM)`
-- `stripeCustomerId`, `stripeSubscriptionId`
+- `tier: UserTier` (legacy field; not used in v1)
+- `stripeCustomerId`, `stripeSubscriptionId` (legacy fields; not used in v1)
 - relations to `Alert[]` and auth tables.
 
-**Potential inconsistency needing decision/code change**
-- Current API tier resolution may rely on `X-User-Id` header in some flows (see `architecture/00_system_overview.md`). That violates isolation and must be replaced with verified auth.
-
----
 
 ### Product (Canonical Product)
 Represents a canonically grouped ammunition product.
@@ -114,7 +108,7 @@ Represents a time series record for a consumer price from a Retailer.
 
 Key responsibilities:
 - Support "current price" (latest record) and "historical context" (series).
-- Support tier-based history shaping (free sees less).
+- Support uniform history shaping (no consumer tiers in v1).
 - Support alert evaluation.
 
 **Important design constraint**
@@ -139,7 +133,7 @@ Key responsibilities:
 
 Invariants:
 - Alerts must be isolated to the owning user.
-- Alerts should evaluate against data that matches the user's tier limits.
+- Alerts should evaluate against data that matches consumer visibility rules.
 - Alert language must remain conservative (signals, not advice).
 
 ---
@@ -301,12 +295,12 @@ Invariants:
 ## Key Enums and Constraints
 
 From `database.md`, the model relies on enums such as:
-- `UserTier`: FREE, PREMIUM
+- `UserTier` (legacy field; not enforced in v1)
 - Ammo attribute enums (bullet type, casing, pressure, etc.)
 - Merchant subscription and tier enums (documented elsewhere)
 
 **Decision to confirm**
-- Ensure all tier/eligibility enums are centralized and referenced consistently across:
+- Ensure eligibility-related enums are centralized and referenced consistently across:
   - API shaping
   - merchant portal
   - admin portal
@@ -321,10 +315,9 @@ From `database.md`, the model relies on enums such as:
    - merchant-to-merchant
    - consumer-to-merchant sensitive data
 
-2. **Tier enforcement is server-side**
-   - history depth
-   - explanation visibility
-   - advanced features
+2. **Uniform consumer capabilities in v1**
+   - no consumer-tier gating
+   - consistent response shaping
 
 3. **Retailer visibility is deterministic**
    - ineligible Retailers never appear in consumer flows
@@ -376,5 +369,5 @@ These need explicit decisions and may require code changes:
 `architecture/02_search_and_ai.md` should define:
 - what AI signals exist
 - how canonical grouping interacts with embeddings
-- exactly what is returned to Free vs Premium
-- how explanations are gated and degraded
+- exactly what is returned to all users in v1
+- how explanations are gated and degraded (if ever reintroduced)

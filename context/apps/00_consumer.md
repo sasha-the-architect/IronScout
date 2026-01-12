@@ -185,19 +185,9 @@ If an alert is sent, the Dashboard may reflect the change without duplicating ur
 
 ---
 
-## Premium
+## Premium Availability (v1)
 
-Premium unlocks:
-- Automated monitoring
-- Faster detection of eligible events
-- Reduced chance of missing time-sensitive moments
-
-Premium does not:
-- Increase alert volume
-- Lower thresholds
-- Introduce recommendations or predictions
-
-Premium improves speed, not judgment.
+Premium is not offered in v1. All consumer capabilities are available to every user.
 
 ---
 

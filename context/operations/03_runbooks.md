@@ -155,16 +155,12 @@ Examples:
 ### Runbook: Tier Enforcement Failure
 
 **Symptoms**
-- Free users accessing Premium features
-- Premium features visible without subscription
 
 **Immediate Actions**
 1. Identify affected endpoints
 2. Disable feature flags if applicable
-3. Force tier re-evaluation server-side
 
 **Verification**
-- Premium features no longer accessible to Free users
 
 **Follow-Up**
 - Remove client-side enforcement paths

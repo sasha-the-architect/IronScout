@@ -52,14 +52,14 @@ IronScout is a multi-app system with a shared database and a queue-backed ingest
    - Parses intent (AI-assisted).
    - Applies explicit filters (Zod schema).
    - Queries canonical products and offers from Postgres.
-   - Applies tier-based shaping (limits, history access, premium ranking).
+   - Applies uniform v1 shaping (no consumer tiers).
 4. Response is rendered in consumer UI (search results, product page, dashboard).
 
 **Key components in API**
 - `src/services/ai-search/*`
   - intent parsing
   - embedding service
-  - ranking strategies (including premium ranking hooks)
+  - ranking strategies
 - `src/routes/search.ts`, `src/routes/products.ts`
 
 **Primary output**
@@ -162,14 +162,14 @@ IronScout is a multi-app system with a shared database and a queue-backed ingest
    - Parses intent (AI-assisted).
    - Applies explicit filters (Zod schema).
    - Queries canonical products and offers from Postgres.
-   - Applies tier-based shaping (limits, history access, premium ranking).
+   - Applies uniform v1 shaping (no consumer tiers).
 4. Response is rendered in consumer UI (search results, product page, dashboard).
 
 **Key components in API**
 - `src/services/ai-search/*`
   - intent parsing
   - embedding service
-  - ranking strategies (including premium ranking hooks)
+  - ranking strategies
 - `src/routes/search.ts`, `src/routes/products.ts`
 
 **Primary output**
@@ -232,7 +232,7 @@ This stack must be enforced in all consumer reads (search, product, dashboard, a
 ### Consumer identity
 
 - Consumer auth for web surfaces appears to be handled in Next.js route handlers under `apps/web/app/api/auth/*`.
-- API enforces tier/limits through a tier configuration module in `apps/api/src/config/tiers.ts`.
+- API uses uniform v1 capabilities for all users (no consumer tier enforcement).
 
 ### Merchant identity
 
@@ -244,9 +244,8 @@ This stack must be enforced in all consumer reads (search, product, dashboard, a
 - Admin portal uses NextAuth under `apps/admin/app/api/auth/[...nextauth]/route.ts`.
 - Admin routes exist for Merchant approval and lifecycle actions under `apps/admin/app/api/dealers/*` (legacy path naming).
 
-### Subscription and tier enforcement
+### Subscription enforcement (merchant)
 
-- API tier gating is driven by `TIER_CONFIG` and helper functions (limits/history access/etc).
 - Consumer visibility is governed by the visibility stack: Retailer eligibility (`visibilityStatus = ELIGIBLE`) + Merchant↔Retailer entitlement (`listingStatus = LISTED` and relationship `status = ACTIVE`). Subscription status is not a consumer visibility predicate.
 
 ---
@@ -266,44 +265,7 @@ Operational needs are documented separately in `context/operations/*`.
 
 This section calls out concrete mismatches between code and current context docs. These require decisions and likely code changes.
 
-### 1) API tier resolution trusts `X-User-Id` header (must change)
-**Where**
-- `apps/api/src/routes/search.ts` defines `getUserTier()` and explicitly states it checks `X-User-Id`.
-
-**Why it conflicts**
-- `context/03_release_criteria.md` and `context/05_security_and_trust.md` require server-side enforcement and no client spoofing.
-
-**Decision needed**
-- Choose a single identity mechanism for API:
-  - verify a JWT from your web auth, or
-  - use server-to-server auth from web to API, or
-  - consolidate to a single Next.js API surface.
-  
-**Likely code change**
-- Remove header-based tier lookup.
-- Resolve tier from verified auth (JWT/session) or internal trusted token.
-
----
-
-### 2) Out-of-scope features appear in tier config (must remain disabled)
-**Where**
-- `apps/api/src/config/tiers.ts` includes flags such as `buyWaitScore` and `verifiedSavings`.
-
-**Why it conflicts**
-- `context/02_v1_scope_and_cut_list.md` explicitly cuts verdicts and savings attribution.
-
-**Decision needed**
-- Keep flags as internal placeholders, but ensure:
-  - no UI surfaces them,
-  - no marketing references them,
-  - no endpoints return these fields.
-
-**Likely code change**
-- Ensure response shaping strips any verdict/savings fields (even if computed) unless explicitly enabled later.
-
----
-
-### 3) Merchant scheduler uses in-process interval scheduling (legacy dealer naming)
+### 1) Merchant scheduler uses in-process interval scheduling (legacy dealer naming)
 **Where**
 - `apps/harvester/src/dealer/scheduler.ts` contains `setInterval(...)` via `startMerchantScheduler()` (legacy `startDealerScheduler()`).
 
@@ -364,6 +326,9 @@ This section calls out concrete mismatches between code and current context docs
 ## Guiding Principle
 
 > The architecture exists to enforce trust boundaries and keep ingestion predictable, not to maximize feature count.
+
+
+
 
 
 

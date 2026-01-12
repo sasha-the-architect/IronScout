@@ -70,7 +70,7 @@ All changes must go through the standard deployment process.
 Staging is used to:
 - Validate deployments
 - Test ingestion and eligibility behavior
-- Verify subscription and tier enforcement
+- Verify merchant subscription enforcement
 - Reproduce production issues safely
 
 Staging should be **as close to production as possible** without risking live data.

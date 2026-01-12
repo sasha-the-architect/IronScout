@@ -13,7 +13,7 @@ If you want machine-level precision, add `openapi.yaml` and treat it as the sour
 
 ## Core Principles
 
-- All tier enforcement is server-side (ADR-002).
+- Tier enforcement, if reintroduced, must be server-side (ADR-002).
 - Retailer visibility is filtered at query time (ADR-005) using eligibility + listing entitlement; subscription status is not a consumer visibility gate.
 - v1: each Retailer belongs to exactly one Merchant; Merchants pay per Retailer listing.
 - Price history is append-only (ADR-004).
@@ -101,18 +101,18 @@ Query params (typical):
 - `q` free text
 - structured filters like `caliber`, `brand`, `grain`, `case`, `bulletType`
 - paging: `page`, `pageSize`
-- sorting: `sort` (limited by tier)
+- sorting: `sort`
 
 Response (conceptual):
 - `results[]`: canonical products
   - `product` (canonical fields)
   - `offers[]` (eligible Retailer offers)
-  - optional `historySummary` (tier-shaped)
+  - optional `historySummary` (uniform)
 - `meta`: paging, query interpretation (optional)
 
 MUST:
 - Enforce Retailer eligibility + listing entitlement at query time (ADR-005 predicate).
-- Enforce tier shaping at response time.
+- Enforce uniform response shaping in v1.
 - Avoid recommendation language or "deal verdict" fields in response for v1.
 
 ---
@@ -127,7 +127,7 @@ Purpose:
 Response (conceptual):
 - canonical product fields
 - current offers
-- history (tier-shaped)
+- history (uniform)
 - related products (optional)
 
 MUST:
@@ -148,7 +148,7 @@ Response:
 - coverage metadata (optional)
 
 MUST:
-- Respect tier depth limits.
+- Respect uniform history depth limits.
 - Preserve append-only semantics (no rewriting history via API).
 
 ---
@@ -165,7 +165,7 @@ Payload (conceptual):
 
 MUST:
 - Validate server-side.
-- Enforce tier limits (max alerts, cadence).
+- Enforce alert limits and cadence (uniform for all users).
 
 ### GET /alerts
 List alerts for authenticated user.
@@ -207,7 +207,7 @@ Quarantine a feed.
 
 MUST:
 - Never expose other Merchants' data.
-- Enforce subscription/tier for premium portal features.
+- Enforce subscription for merchant portal features.
 - Manage listing/entitlement explicitly (list/unlist retailers) rather than gating consumer visibility by subscription.
 
 ---
@@ -223,7 +223,7 @@ Suspend Merchant (affects Retailer visibility for administered Retailers).
 Reactivate Merchant.
 
 ### POST /admin/dealers/:id/subscription (legacy path)
-Change tier/status/billing method.
+Change subscription status/billing method.
 
 ### GET /admin/rate-limits
 Get rate limit metrics for all auth endpoints.
@@ -254,7 +254,6 @@ MUST:
 ## AI Search Endpoints (If Exposed)
 
 If AI-related endpoints exist (embeddings, explanation generation), they must be:
-- gated by tier
 - safe-language
 - removable without breaking search
 

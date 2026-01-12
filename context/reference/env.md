@@ -89,7 +89,7 @@ Stripe (consumer subscriptions):
 - `STRIPE_WEBHOOK_SECRET`
 
 Required behavior:
-- API must not resolve tier from client-provided headers. It must use verified auth (ADR-002).
+- If tiering is reintroduced, API must not resolve tier from client-provided headers. It must use verified auth (ADR-002).
 
 ---
 
@@ -125,7 +125,7 @@ Required:
 - `ADMIN_EMAILS` - Comma-separated list of admin email addresses
 
 Important:
-- Admin impersonation must not bypass tier/eligibility enforcement.
+- Admin impersonation must not bypass eligibility enforcement (or tier enforcement if reintroduced).
 
 ---
 

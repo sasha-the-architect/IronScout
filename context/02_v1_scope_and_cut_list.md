@@ -37,14 +37,10 @@ v1 is **not** required to be feature-complete or optimized for scale.
 - AI-powered, intent-aware ammo search
 - Canonical product grouping across retailers
 - Current price and availability display
-- Historical price context (tier-limited)
+- Historical price context (uniform for all users)
 - Basic price and availability alerts
 - Watchlists
-- Consumer Premium subscription with:
-  - deeper historical context
-  - faster and more flexible alerts
-  - advanced filters and ranking
-  - AI-assisted explanations where available
+- No consumer Premium in v1; all consumer capabilities are available to every user
 
 ---
 
@@ -57,7 +53,7 @@ v1 is **not** required to be feature-complete or optimized for scale.
 - Retailer inventory (administered by the Merchant) appearing in consumer search when eligible AND listed
 - Plan-based access to market pricing context
 - Historical benchmarks where available
-- Merchant subscription enforcement
+- Merchant subscription enforcement (portal access and feed processing)
 - Subscription is never a consumer visibility predicate.
 
 Merchant portal functionality is limited to **visibility and context**, not automation.

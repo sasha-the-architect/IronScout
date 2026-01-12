@@ -43,7 +43,7 @@ Likely structure (verify in repo):
 - `apps/api/src/services/`
   - `ai-search/` AI search, embeddings, ranking, explanations
 - `apps/api/src/config/`
-  - `tiers.ts` Tier config and feature gates
+  - `tiers.ts` V1 capabilities (uniform for all users)
 - `apps/api/src/middleware/` auth, rate limiting, request context
 - `apps/api/src/lib/` shared utilities
 
@@ -96,7 +96,7 @@ Likely structure (legacy path `apps/dealer/`):
 
 Primary responsibilities:
 - Merchant lifecycle actions (approve, suspend, reactivate)
-- Subscription tier and status changes
+- Subscription status changes
 - Billing method management
 - Audit visibility
 - Safe impersonation (must not bypass enforcement)
@@ -155,7 +155,7 @@ If code changes violate any ADR, write a new ADR or fix the code.
 
 ## Invariants Agents Must Not Break
 
-- Server-side tier enforcement (ADR-002)
+- Tier enforcement, if reintroduced, must be server-side (ADR-002)
 - Retailer visibility filtered at query time (ADR-005)
 - Append-only price history (ADR-004)
 - Fail closed on ambiguity (ADR-009)

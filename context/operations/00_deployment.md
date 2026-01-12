@@ -77,12 +77,12 @@ Requirements:
 
 - Deployed as a stateless Node service
 - Scaled horizontally if needed
-- Responsible for enforcing tier, eligibility, listing entitlement, and trust rules
+- Responsible for enforcing eligibility, listing entitlement, and trust rules
 
 Requirements:
 - Must not rely on client-provided identity headers
 - Must enforce consumer visibility predicate (eligibility + listing entitlement; no subscription gating)
-- Must fail closed if auth or tier resolution fails
+- Must fail closed if auth or eligibility resolution fails
 
 ---
 
@@ -179,7 +179,7 @@ Any exposure of secrets is a security incident.
 Before deploying to production, confirm:
 
 - [ ] Migrations applied successfully
-- [ ] API tier enforcement verified
+- [ ] API capability shaping verified (uniform)
 - [ ] Retailer eligibility + listing entitlement enforcement verified (query-time predicate)
 - [ ] Delinquency/suspension auto-unlist job/webhook verified
 - [ ] Harvester scheduler mode confirmed

@@ -121,19 +121,9 @@ The Dashboard is the confirmation.
 
 ---
 
-## Premium Boundary
+## Premium Availability (v1)
 
-Premium users receive:
-- Automated alerts
-- Faster detection
-- Reduced chance of missing key moments
-
-Premium does **not**:
-- Increase alert volume
-- Lower alert thresholds
-- Add new alert types in v1
-
-Premium improves timing, not noise.
+Premium is not offered in v1. Alert behavior is uniform for all users.
 
 ---
 

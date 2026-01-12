@@ -143,12 +143,12 @@ Alert fatigue is a failure mode.
 
 ## Tier and Eligibility Monitoring
 
-Because tier and eligibility are trust boundaries, they require explicit observability.
+Because eligibility is a trust boundary, it requires explicit observability.
 
 Required checks:
 - Count of results filtered due to ineligibility
 - Count of alerts suppressed due to eligibility
-- Attempts to access Premium features by Free users
+- Attempts to access restricted features (if any) in v1
 - Attempts by suspended Merchants to ingest data
 
 Unexpected spikes in these signals indicate bugs or abuse.
@@ -223,7 +223,7 @@ Exact retention periods are flexible, but:
 
 - Trust-critical paths must be observable
 - Silent failures are unacceptable
-- Eligibility and tier enforcement must be visible
+- Eligibility enforcement must be visible
 - Operators must not rely on memory or guesswork
 
 ---

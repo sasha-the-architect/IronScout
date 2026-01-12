@@ -22,7 +22,7 @@ v1 favors **high-signal tests over exhaustive coverage**.
 IronScout testing prioritizes:
 
 1. **Trust enforcement**
-2. **Eligibility and tier correctness**
+2. **Eligibility correctness**
 3. **Deterministic behavior**
 4. **Safe failure modes**
 
@@ -33,16 +33,12 @@ Breaking trust is unacceptable.
 
 ## Required Test Categories (v1)
 
-### 1. Tier Enforcement Tests
+### 1. Uniform Capability Tests
 
 Must verify:
-- Free users cannot access Premium-only fields
-- Premium users receive expanded context
-- Tier enforcement occurs server-side
-
-These tests should:
-- Call APIs directly
-- Avoid relying on UI hiding
+- All users receive identical capability sets
+- No consumer-tier gating exists in API responses
+- UI does not hide or restrict features based on tier
 
 ---
 
@@ -107,7 +103,7 @@ Do not waste test budget here.
 
 - Use synthetic data only
 - Never use real Merchant or user data
-- Make eligibility and tier state explicit in fixtures
+- Make eligibility state explicit in fixtures
 
 Tests must be reproducible from scratch.
 

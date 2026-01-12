@@ -58,20 +58,17 @@ All criteria below exist to enforce this rule.
 
 ---
 
-## Subscription & Tier Enforcement
+## Merchant Subscription Enforcement
 
 ### Required
 
-- Subscription tier is enforced server-side
-- Premium features cannot be accessed by manipulating the client
-- Tier limits affect data shape, not just UI visibility
+- Merchant subscription status is enforced server-side for portal access and feed processing
 - Expired subscriptions correctly transition through grace states
 - Blocked subscriptions result in loss of access where defined
 
 ### Must Not Ship If
 
-- Premium behavior is only hidden in the UI
-- Tier logic is duplicated inconsistently across services
+- Subscription enforcement is only hidden in the UI
 - Admin impersonation bypasses subscription enforcement
 - Merchants receive portal access while suspended, or Retailer visibility is granted while ineligible
 

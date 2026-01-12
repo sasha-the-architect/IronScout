@@ -117,9 +117,7 @@ Ranking does not imply value judgment or recommendation.
 
 ## Premium
 
-A paid tier that unlocks increased automation and faster detection of eligible events.
-
-Premium improves speed and convenience, not certainty or decision quality.
+Not offered in v1. All consumer capabilities are available to every user.
 
 ---
 

@@ -1,0 +1,135 @@
+Please run a Postgres database usage audit to verify all tables, columns, and indexes are actively used by the current application. I’m worried we have orphaned objects from earlier dev.
+
+Scope
+
+Tables, columns, indexes (btree/gin/gist/hash/brin), constraints, sequences
+
+App code, migrations, views/functions/triggers, background jobs, ETL, BI
+
+What to do
+
+Inventory everything (per schema).
+
+Map code usage: link each table/column/index to ORM models, migrations, and query call sites.
+
+Runtime usage evidence (Postgres stats):
+
+Tables: reads/writes, seq scans vs index scans, vacuum/analyze patterns.
+
+Indexes: actual usage counts, size, redundancy candidates.
+
+Columns: infer “likely unused” from codebase + query logs (if enabled) since Postgres does not provide native per-column usage stats.
+
+Classify: Active, Indirect, Possibly unused, Orphaned.
+
+Deliverables:
+
+Spreadsheet-style report: object, evidence, stats, last activity signals, recommendation.
+
+Prioritized cleanup plan with safe deprecation steps and monitoring window.
+
+Run these Postgres queries (paste outputs into the report)
+1) Table activity and scan patterns
+SELECT
+  schemaname, relname,
+  n_live_tup, n_dead_tup,
+  seq_scan, seq_tup_read,
+  idx_scan, idx_tup_fetch,
+  n_tup_ins, n_tup_upd, n_tup_del,
+  last_vacuum, last_autovacuum,
+  last_analyze, last_autoanalyze
+FROM pg_stat_user_tables
+ORDER BY (seq_scan + idx_scan) ASC, n_live_tup DESC;
+
+2) Index usage (find unused or low-use indexes)
+SELECT
+  s.schemaname, s.relname AS table_name,
+  i.relname AS index_name,
+  idx_scan,
+  pg_size_pretty(pg_relation_size(i.oid)) AS index_size,
+  pg_get_indexdef(i.oid) AS index_def
+FROM pg_stat_user_indexes s
+JOIN pg_class i ON i.oid = s.indexrelid
+ORDER BY idx_scan ASC, pg_relation_size(i.oid) DESC;
+
+3) Big indexes that never get scanned
+SELECT
+  s.schemaname, s.relname AS table_name,
+  i.relname AS index_name,
+  pg_relation_size(i.oid) AS bytes
+FROM pg_stat_user_indexes s
+JOIN pg_class i ON i.oid = s.indexrelid
+WHERE s.idx_scan = 0
+ORDER BY bytes DESC;
+
+4) Redundant index candidates (same leading columns)
+WITH idx AS (
+  SELECT
+    ns.nspname AS schemaname,
+    t.relname AS table_name,
+    ic.relname AS index_name,
+    i.indexrelid,
+    i.indrelid,
+    i.indisunique,
+    i.indisprimary,
+    (SELECT string_agg(a.attname, ',' ORDER BY x.n)
+     FROM unnest(i.indkey) WITH ORDINALITY AS x(attnum,n)
+     JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = x.attnum
+    ) AS cols
+  FROM pg_index i
+  JOIN pg_class t ON t.oid = i.indrelid
+  JOIN pg_class ic ON ic.oid = i.indexrelid
+  JOIN pg_namespace ns ON ns.oid = t.relnamespace
+  WHERE ns.nspname NOT IN ('pg_catalog','information_schema')
+)
+SELECT a.schemaname, a.table_name,
+       a.index_name AS maybe_redundant, b.index_name AS covers_it,
+       a.cols AS redundant_cols, b.cols AS covering_cols,
+       a.indisunique AS redundant_unique, b.indisunique AS covering_unique
+FROM idx a
+JOIN idx b
+  ON a.indrelid = b.indrelid
+ AND a.index_name <> b.index_name
+ AND b.cols LIKE a.cols || '%'
+WHERE NOT a.indisprimary
+ORDER BY a.schemaname, a.table_name, a.index_name;
+
+5) Tables with no recorded activity (candidate orphans)
+SELECT schemaname, relname
+FROM pg_stat_user_tables
+WHERE (coalesce(seq_scan,0) + coalesce(idx_scan,0)) = 0
+  AND (coalesce(n_tup_ins,0) + coalesce(n_tup_upd,0) + coalesce(n_tup_del,0)) = 0
+ORDER BY schemaname, relname;
+
+6) Column inventory (for join against code search)
+SELECT
+  n.nspname AS schema,
+  c.relname AS table,
+  a.attname AS column,
+  pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
+  a.attnotnull AS not_null
+FROM pg_attribute a
+JOIN pg_class c ON c.oid = a.attrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE a.attnum > 0 AND NOT a.attisdropped
+  AND n.nspname NOT IN ('pg_catalog','information_schema')
+ORDER BY 1,2,3;
+
+7) Table sizes (to prioritize payoff)
+SELECT
+  n.nspname AS schema,
+  c.relname AS table,
+  pg_size_pretty(pg_total_relation_size(c.oid)) AS total_size
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind = 'r'
+  AND n.nspname NOT IN ('pg_catalog','information_schema')
+ORDER BY pg_total_relation_size(c.oid) DESC;
+
+Notes you should reflect in the writeup
+
+Index and table usage stats reset on DB restart and can be skewed by maintenance queries.
+
+Postgres has no native per-column usage counters. Column “unused” must be proven via code search and query logging (e.g., pg_stat_statements, log_statement, pgbadger), plus stakeholder validation.
+
+Don’t drop anything until we run a monitoring window and confirm no rare workflows depend on it.

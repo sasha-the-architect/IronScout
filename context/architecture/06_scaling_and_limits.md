@@ -125,7 +125,7 @@ AI degradation must:
 ### Alert Evaluation
 
 - Alerts are evaluated asynchronously
-- Evaluation frequency is tier-dependent
+- Evaluation frequency is uniform in v1 (no consumer tiers)
 - Deduplication is required to prevent spam
 
 **Limits:**

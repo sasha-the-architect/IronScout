@@ -110,20 +110,20 @@ The following guides are required for v1 operations.
 
 ---
 
-### Guide: Validating Tier Enforcement
+### Guide: Validating Uniform Capabilities
 
 **When to use**
 - New feature deployment
-- Pricing or tier changes
+- Pricing changes
 
 **Steps**
-1. Test endpoint access as Free user
-2. Test endpoint access as Premium user
+1. Test endpoint access as a standard consumer
+2. Confirm responses are uniform across users
 3. Inspect API responses directly
 4. Confirm UI reflects server-shaped data
 
 **Verification**
-- No Premium-only fields appear for Free users
+- No consumer-tier gating appears in responses
 
 ---
 

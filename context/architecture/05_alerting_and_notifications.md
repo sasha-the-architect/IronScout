@@ -92,15 +92,9 @@ If an alert resembles advertising, it violates this policy.
 - Subject to strict global caps and cooldowns
 - No user-defined conditions
 
-### Premium Tier
+### Premium Availability (v1)
 
-- Faster alert evaluation cadence
-- Priority delivery within global caps
-- Reduced chance of missing eligible events
-
-Premium improves **timing and automation**, not alert scope, volume, or urgency.
-
-Tiering must not override alert policy.
+Premium is not offered in v1. Alert cadence and delivery are uniform for all users.
 
 ---
 
@@ -179,7 +173,7 @@ In v1, alerts do not:
 - Support user-defined thresholds
 - Provide AI explanations
 - Predict outcomes
-- Increase frequency for Premium users
+- Increase frequency based on tier or subscription
 
 Any expansion requires an ADR amendment.
 

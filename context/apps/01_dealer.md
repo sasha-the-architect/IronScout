@@ -183,7 +183,7 @@ Pro increases **resolution**, not authority.
 ## Subscription States and Effects
 
 ### Active
-- Full access to tier-appropriate features
+- Full access to subscription-appropriate features
 - Inventory may be listed; consumer visibility still depends on eligibility + listing
 
 ### Expired (Grace)
@@ -192,7 +192,7 @@ Pro increases **resolution**, not authority.
 
 ### Suspended / Cancelled
 - Inventory auto-unlisted; consumer visibility blocked until explicitly relisted after recovery
-- Portal access allowed for remediation; premium context still gated by tier/status
+- Portal access allowed for remediation; merchant features remain gated by subscription status
 
 If state is ambiguous, access must default to restricted.
 
