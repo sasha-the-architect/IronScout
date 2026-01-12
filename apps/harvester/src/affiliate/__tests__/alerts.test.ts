@@ -6,98 +6,57 @@
  * - Back-in-stock alerts: oldInStock === false && newInStock === true
  * - No alerts when productId is null
  * - No alerts for signature-only changes
- * - No alerts for currency mismatches
+ * - No alerts for currency mismatches (fail-closed per ADR-009)
  * - No stock alerts when prior inStock is unknown (null)
+ *
+ * IMPORTANT: These tests exercise the PRODUCTION code path via the exported
+ * detectAlertChanges() function, not a local mock implementation.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
-// Types for testing (mirrors processor.ts)
-interface LastPriceEntry {
-  sourceProductId: string
-  priceSignatureHash: string
-  createdAt: Date
-  price: number
-  inStock: boolean
-  currency: string
-}
+// Mock all dependencies BEFORE importing processor
+vi.mock('@ironscout/db', () => ({
+  prisma: {
+    $executeRaw: vi.fn(),
+    $queryRaw: vi.fn(),
+  },
+}))
 
-interface AffiliatePriceChange {
-  productId: string
-  sourceProductId: string
-  oldPrice: number
-  newPrice: number
-}
-
-interface AffiliateStockChange {
-  productId: string
-  sourceProductId: string
-  inStock: true
-}
-
-interface PriceWriteResult {
-  pricesToWrite: any[]
-  priceChanges: AffiliatePriceChange[]
-  stockChanges: AffiliateStockChange[]
-}
-
-/**
- * Test implementation of change detection logic
- * This mirrors what will be implemented in decidePriceWrites()
- */
-function detectChanges(
-  currentPrice: number,
-  currentInStock: boolean,
-  currentCurrency: string,
-  productId: string | null,
-  lastPrice: LastPriceEntry | null
-): { priceChange: AffiliatePriceChange | null; stockChange: AffiliateStockChange | null } {
-  // Skip if no productId (can't send alerts for unresolved products)
-  if (!productId) {
-    return { priceChange: null, stockChange: null }
+vi.mock('../../config/logger', () => {
+  const mockLogMethods = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   }
-
-  // No prior price = new product, no alerts
-  if (!lastPrice) {
-    return { priceChange: null, stockChange: null }
+  return {
+    logger: {
+      affiliate: mockLogMethods,
+    },
+    rootLogger: {
+      child: vi.fn(() => mockLogMethods),
+    },
   }
+})
 
-  let priceChange: AffiliatePriceChange | null = null
-  let stockChange: AffiliateStockChange | null = null
+vi.mock('../../config/queues', () => ({
+  enqueueProductResolve: vi.fn(),
+  alertQueue: {
+    addBulk: vi.fn(),
+  },
+}))
 
-  // Normalize currency
-  const normalizedCurrentCurrency = currentCurrency || 'USD'
-  const oldCurrency = lastPrice.currency
+// Now import after mocks are set up
+import {
+  detectAlertChanges,
+  type LastPriceEntry,
+  type AffiliatePriceChange,
+  type AffiliateStockChange,
+  type AlertDetectionResult,
+} from '../processor'
 
-  // Price drop detection: same currency AND price decreased
-  if (
-    oldCurrency &&
-    oldCurrency === normalizedCurrentCurrency &&
-    lastPrice.price > currentPrice
-  ) {
-    priceChange = {
-      productId,
-      sourceProductId: lastPrice.sourceProductId,
-      oldPrice: lastPrice.price,
-      newPrice: currentPrice,
-    }
-  }
-
-  // Back-in-stock detection: was false, now true
-  // Per spec: oldInStock must be explicitly false (not null/undefined)
-  const normalizedNewInStock = currentInStock === true
-  if (lastPrice.inStock === false && normalizedNewInStock) {
-    stockChange = {
-      productId,
-      sourceProductId: lastPrice.sourceProductId,
-      inStock: true,
-    }
-  }
-
-  return { priceChange, stockChange }
-}
-
-describe('Affiliate Alert Detection', () => {
+describe('Affiliate Alert Detection (Production Code)', () => {
   const baseSourceProductId = 'sp-123'
   const baseProductId = 'prod-456'
   const baseLastPrice: LastPriceEntry = {
@@ -111,11 +70,12 @@ describe('Affiliate Alert Detection', () => {
 
   describe('Price Drop Alerts', () => {
     it('queues alert when price decreases', () => {
-      const result = detectChanges(
+      const result = detectAlertChanges(
         24.99, // new price (lower)
         true,
         'USD',
         baseProductId,
+        baseSourceProductId,
         baseLastPrice
       )
 
@@ -123,73 +83,98 @@ describe('Affiliate Alert Detection', () => {
       expect(result.priceChange?.oldPrice).toBe(29.99)
       expect(result.priceChange?.newPrice).toBe(24.99)
       expect(result.priceChange?.productId).toBe(baseProductId)
+      expect(result.skipReason).toBeNull()
     })
 
     it('does not queue alert when price increases', () => {
-      const result = detectChanges(
+      const result = detectAlertChanges(
         34.99, // new price (higher)
         true,
         'USD',
         baseProductId,
+        baseSourceProductId,
         baseLastPrice
       )
 
       expect(result.priceChange).toBeNull()
+      expect(result.skipReason).toBeNull()
     })
 
     it('does not queue alert when price unchanged', () => {
-      const result = detectChanges(
+      const result = detectAlertChanges(
         29.99, // same price
         true,
         'USD',
         baseProductId,
+        baseSourceProductId,
         baseLastPrice
       )
 
       expect(result.priceChange).toBeNull()
+      expect(result.skipReason).toBeNull()
     })
 
-    it('does not queue alert when currency changes (mismatch)', () => {
-      const result = detectChanges(
+    it('does not queue alert when currency changes (mismatch) - fail closed per ADR-009', () => {
+      const result = detectAlertChanges(
         19.99, // lower in CAD but different currency
         true,
         'CAD',
         baseProductId,
+        baseSourceProductId,
         baseLastPrice // USD
       )
 
       expect(result.priceChange).toBeNull()
+      expect(result.skipReason).toBe('CURRENCY_MISMATCH')
     })
 
-    it('does not queue alert when prior currency is null', () => {
+    it('does not queue alert when prior currency is null (unknown state)', () => {
       const lastPriceNullCurrency: LastPriceEntry = {
         ...baseLastPrice,
-        currency: null as any, // DB returned null
+        currency: null,
       }
 
-      const result = detectChanges(
+      const result = detectAlertChanges(
         19.99,
         true,
         'USD',
         baseProductId,
+        baseSourceProductId,
         lastPriceNullCurrency
       )
 
       expect(result.priceChange).toBeNull()
+      expect(result.skipReason).toBe('CURRENCY_MISMATCH')
+    })
+
+    it('does not queue alert when current currency is null - fail closed per ADR-009', () => {
+      const result = detectAlertChanges(
+        19.99,
+        true,
+        null, // unknown current currency
+        baseProductId,
+        baseSourceProductId,
+        baseLastPrice
+      )
+
+      expect(result.priceChange).toBeNull()
+      expect(result.skipReason).toBe('CURRENCY_MISMATCH')
     })
 
     it('handles originalPrice change without price drop (signature change only)', () => {
       // originalPrice changed from null to 39.99, but current price stayed same
       // This triggers a signature change but NOT a price drop alert
-      const result = detectChanges(
+      const result = detectAlertChanges(
         29.99, // same price
         true,
         'USD',
         baseProductId,
+        baseSourceProductId,
         baseLastPrice
       )
 
       expect(result.priceChange).toBeNull()
+      expect(result.skipReason).toBeNull()
     })
   })
 
@@ -200,41 +185,47 @@ describe('Affiliate Alert Detection', () => {
         inStock: false,
       }
 
-      const result = detectChanges(
+      const result = detectAlertChanges(
         29.99,
         true, // now in stock
         'USD',
         baseProductId,
+        baseSourceProductId,
         outOfStockLastPrice
       )
 
       expect(result.stockChange).not.toBeNull()
       expect(result.stockChange?.inStock).toBe(true)
       expect(result.stockChange?.productId).toBe(baseProductId)
+      expect(result.skipReason).toBeNull()
     })
 
     it('does not queue alert when stock transitions true → false', () => {
-      const result = detectChanges(
+      const result = detectAlertChanges(
         29.99,
         false, // now out of stock
         'USD',
         baseProductId,
+        baseSourceProductId,
         baseLastPrice // was in stock
       )
 
       expect(result.stockChange).toBeNull()
+      expect(result.skipReason).toBeNull()
     })
 
     it('does not queue alert when stock stays true', () => {
-      const result = detectChanges(
+      const result = detectAlertChanges(
         29.99,
         true, // still in stock
         'USD',
         baseProductId,
+        baseSourceProductId,
         baseLastPrice // was in stock
       )
 
       expect(result.stockChange).toBeNull()
+      expect(result.skipReason).toBeNull()
     })
 
     it('does not queue alert when stock stays false', () => {
@@ -243,60 +234,68 @@ describe('Affiliate Alert Detection', () => {
         inStock: false,
       }
 
-      const result = detectChanges(
+      const result = detectAlertChanges(
         29.99,
         false, // still out of stock
         'USD',
         baseProductId,
+        baseSourceProductId,
         outOfStockLastPrice
       )
 
       expect(result.stockChange).toBeNull()
+      expect(result.skipReason).toBeNull()
     })
 
     it('does not queue alert when prior inStock is null (unknown state)', () => {
       const unknownStockLastPrice: LastPriceEntry = {
         ...baseLastPrice,
-        inStock: null as any, // DB returned null (unknown state)
+        inStock: null,
       }
 
-      const result = detectChanges(
+      const result = detectAlertChanges(
         29.99,
         true,
         'USD',
         baseProductId,
+        baseSourceProductId,
         unknownStockLastPrice
       )
 
       // Per spec: inStock null = unknown, should not trigger alert
       expect(result.stockChange).toBeNull()
+      expect(result.skipReason).toBe('UNKNOWN_PRIOR_STATE')
     })
 
     it('does not trigger on new products (no prior state)', () => {
-      const result = detectChanges(
+      const result = detectAlertChanges(
         29.99,
         true,
         'USD',
         baseProductId,
+        baseSourceProductId,
         null // no prior price = new product
       )
 
       expect(result.stockChange).toBeNull()
+      expect(result.skipReason).toBe('NEW_PRODUCT')
     })
   })
 
   describe('ProductId Validation', () => {
     it('skips alert when productId is null', () => {
-      const result = detectChanges(
+      const result = detectAlertChanges(
         19.99, // price drop
         true,
         'USD',
         null, // no canonical product match
+        baseSourceProductId,
         baseLastPrice
       )
 
       expect(result.priceChange).toBeNull()
       expect(result.stockChange).toBeNull()
+      expect(result.skipReason).toBe('NULL_PRODUCT_ID')
     })
 
     it('skips stock alert when productId is null', () => {
@@ -305,15 +304,17 @@ describe('Affiliate Alert Detection', () => {
         inStock: false,
       }
 
-      const result = detectChanges(
+      const result = detectAlertChanges(
         29.99,
         true, // back in stock
         'USD',
         null, // no canonical product match
+        baseSourceProductId,
         outOfStockLastPrice
       )
 
       expect(result.stockChange).toBeNull()
+      expect(result.skipReason).toBe('NULL_PRODUCT_ID')
     })
   })
 
@@ -325,11 +326,12 @@ describe('Affiliate Alert Detection', () => {
         price: 39.99,
       }
 
-      const result = detectChanges(
+      const result = detectAlertChanges(
         29.99, // price drop from 39.99
         true, // back in stock
         'USD',
         baseProductId,
+        baseSourceProductId,
         outOfStockLastPrice
       )
 
@@ -339,6 +341,8 @@ describe('Affiliate Alert Detection', () => {
 
       expect(result.stockChange).not.toBeNull()
       expect(result.stockChange?.inStock).toBe(true)
+
+      expect(result.skipReason).toBeNull()
     })
 
     it('price increase with back-in-stock only triggers stock alert', () => {
@@ -348,50 +352,80 @@ describe('Affiliate Alert Detection', () => {
         price: 19.99,
       }
 
-      const result = detectChanges(
+      const result = detectAlertChanges(
         29.99, // price increase from 19.99
         true, // back in stock
         'USD',
         baseProductId,
+        baseSourceProductId,
         outOfStockLastPrice
       )
 
       expect(result.priceChange).toBeNull() // no price drop
       expect(result.stockChange).not.toBeNull() // back in stock
+      expect(result.skipReason).toBeNull()
+    })
+
+    it('price drop with unknown prior inStock still returns price change', () => {
+      const unknownStockLastPrice: LastPriceEntry = {
+        ...baseLastPrice,
+        inStock: null,
+        price: 39.99,
+      }
+
+      const result = detectAlertChanges(
+        29.99, // price drop
+        true,
+        'USD',
+        baseProductId,
+        baseSourceProductId,
+        unknownStockLastPrice
+      )
+
+      // Price drop should still be detected
+      expect(result.priceChange).not.toBeNull()
+      expect(result.priceChange?.oldPrice).toBe(39.99)
+      expect(result.priceChange?.newPrice).toBe(29.99)
+
+      // Stock alert should be skipped due to unknown prior state
+      expect(result.stockChange).toBeNull()
+      expect(result.skipReason).toBeNull() // No skip reason since we got a price change
     })
   })
 
-  describe('Write Condition: Stock-Only Changes', () => {
-    it('should write price row for stock-only change (false → true)', () => {
-      const outOfStockLastPrice: LastPriceEntry = {
+  describe('Skip Reason Coverage', () => {
+    it('returns NULL_PRODUCT_ID for unresolved products', () => {
+      const result = detectAlertChanges(19.99, true, 'USD', null, 'sp-1', baseLastPrice)
+      expect(result.skipReason).toBe('NULL_PRODUCT_ID')
+    })
+
+    it('returns NEW_PRODUCT for first-time products', () => {
+      const result = detectAlertChanges(19.99, true, 'USD', 'prod-1', 'sp-1', null)
+      expect(result.skipReason).toBe('NEW_PRODUCT')
+    })
+
+    it('returns CURRENCY_MISMATCH for null current currency', () => {
+      const result = detectAlertChanges(19.99, true, null, 'prod-1', 'sp-1', baseLastPrice)
+      expect(result.skipReason).toBe('CURRENCY_MISMATCH')
+    })
+
+    it('returns CURRENCY_MISMATCH for null prior currency with price drop', () => {
+      const nullCurrencyLastPrice: LastPriceEntry = {
         ...baseLastPrice,
-        inStock: false,
+        currency: null,
+        price: 39.99,
       }
-
-      // Same price, same signature, but stock changed
-      const normalizedOldInStock = outOfStockLastPrice.inStock === true
-      const normalizedNewInStock = true
-      const stockChanged = normalizedOldInStock !== normalizedNewInStock
-
-      expect(stockChanged).toBe(true)
+      const result = detectAlertChanges(19.99, true, 'USD', 'prod-1', 'sp-1', nullCurrencyLastPrice)
+      expect(result.skipReason).toBe('CURRENCY_MISMATCH')
     })
 
-    it('should write price row for stock-only change (true → false)', () => {
-      // Stock went from true to false - we still want to write the row
-      // but NOT queue a back-in-stock alert
-      const normalizedOldInStock = baseLastPrice.inStock === true
-      const normalizedNewInStock = false
-      const stockChanged = normalizedOldInStock !== normalizedNewInStock
-
-      expect(stockChanged).toBe(true)
-    })
-
-    it('should not mark stockChanged when stock stays the same', () => {
-      const normalizedOldInStock = baseLastPrice.inStock === true
-      const normalizedNewInStock = true
-      const stockChanged = normalizedOldInStock !== normalizedNewInStock
-
-      expect(stockChanged).toBe(false)
+    it('returns UNKNOWN_PRIOR_STATE for null prior inStock without price change', () => {
+      const unknownStockLastPrice: LastPriceEntry = {
+        ...baseLastPrice,
+        inStock: null,
+      }
+      const result = detectAlertChanges(29.99, true, 'USD', 'prod-1', 'sp-1', unknownStockLastPrice)
+      expect(result.skipReason).toBe('UNKNOWN_PRIOR_STATE')
     })
   })
 })

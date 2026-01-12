@@ -56,14 +56,15 @@ const HEARTBEAT_MS = HEARTBEAT_HOURS * 60 * 60 * 1000
 // ============================================================================
 
 /** Cached last price entry for a sourceProduct */
-interface LastPriceEntry {
+export interface LastPriceEntry {
   sourceProductId: string
   priceSignatureHash: string
   createdAt: Date
   // Extended for alert detection (per affiliate-feed-alerts-v1 spec)
+  // Nullable fields reflect DB reality per spec Known Limitations
   price: number
-  inStock: boolean
-  currency: string
+  inStock: boolean | null
+  currency: string | null
 }
 
 /** New price record to insert */
@@ -85,7 +86,7 @@ interface NewPriceRecord {
  * Price change detected for alert queueing
  * Per affiliate-feed-alerts-v1 spec §3.3
  */
-interface AffiliatePriceChange {
+export interface AffiliatePriceChange {
   productId: string
   sourceProductId: string
   oldPrice: number
@@ -96,10 +97,31 @@ interface AffiliatePriceChange {
  * Stock change detected for alert queueing
  * Per affiliate-feed-alerts-v1 spec §3.3
  */
-interface AffiliateStockChange {
+export interface AffiliateStockChange {
   productId: string
   sourceProductId: string
   inStock: true // Only back-in-stock triggers alerts
+}
+
+/**
+ * Skip counters for alert detection observability
+ * Per affiliate-feed-alerts-v1 spec: Structured skip logging
+ */
+export interface AlertDetectionSkips {
+  nullProductId: number
+  noChange: number
+  currencyMismatch: number
+  unknownPriorState: number
+}
+
+/**
+ * Result of alert change detection for a single product
+ * Per affiliate-feed-alerts-v1 spec §6
+ */
+export interface AlertDetectionResult {
+  priceChange: AffiliatePriceChange | null
+  stockChange: AffiliateStockChange | null
+  skipReason: 'NULL_PRODUCT_ID' | 'NEW_PRODUCT' | 'CURRENCY_MISMATCH' | 'UNKNOWN_PRIOR_STATE' | null
 }
 
 /**
@@ -110,6 +132,7 @@ interface PriceWriteResult {
   pricesToWrite: NewPriceRecord[]
   priceChanges: AffiliatePriceChange[]
   stockChanges: AffiliateStockChange[]
+  alertSkips: AlertDetectionSkips
 }
 
 /** Resolved identity for a product (canonical identity for backward compat) */
@@ -1339,6 +1362,85 @@ async function batchFetchLastPrices(
 }
 
 /**
+ * Detect alert-worthy changes for a single product
+ * Exported for unit testing per spec requirement
+ *
+ * Per affiliate-feed-alerts-v1 spec §6:
+ * - Price drop: same currency AND price decreased
+ * - Back-in-stock: was explicitly false, now true
+ * - Skip if productId null, new product, currency mismatch, or unknown prior state
+ *
+ * Per ADR-009: Fail closed on ambiguous data (skip + log when currency unknown)
+ */
+export function detectAlertChanges(
+  currentPrice: number,
+  currentInStock: boolean,
+  currentCurrency: string | null,
+  productId: string | null,
+  sourceProductId: string,
+  lastPrice: LastPriceEntry | null
+): AlertDetectionResult {
+  // Skip if no productId (can't send alerts for unresolved products per spec §5)
+  if (!productId) {
+    return { priceChange: null, stockChange: null, skipReason: 'NULL_PRODUCT_ID' }
+  }
+
+  // No prior price = new product, no alerts (no prior state to compare)
+  if (!lastPrice) {
+    return { priceChange: null, stockChange: null, skipReason: 'NEW_PRODUCT' }
+  }
+
+  let priceChange: AffiliatePriceChange | null = null
+  let stockChange: AffiliateStockChange | null = null
+
+  // Per ADR-009: Fail closed when current currency is unknown
+  // Do not default to USD - skip alert detection entirely
+  if (!currentCurrency) {
+    return { priceChange: null, stockChange: null, skipReason: 'CURRENCY_MISMATCH' }
+  }
+
+  const oldCurrency = lastPrice.currency
+
+  // Price drop detection (per spec §6.1):
+  // - Same currency AND price decreased
+  // - Skip if prior currency is null (unknown state)
+  if (oldCurrency && oldCurrency === currentCurrency && lastPrice.price > currentPrice) {
+    priceChange = {
+      productId,
+      sourceProductId,
+      oldPrice: lastPrice.price,
+      newPrice: currentPrice,
+    }
+  } else if (!oldCurrency || oldCurrency !== currentCurrency) {
+    // Currency mismatch or unknown prior currency - could be real price drop but we can't tell
+    // Only return this skip reason if we would have detected a price drop otherwise
+    if (lastPrice.price > currentPrice) {
+      return { priceChange: null, stockChange: null, skipReason: 'CURRENCY_MISMATCH' }
+    }
+  }
+
+  // Back-in-stock detection (per spec §6.2):
+  // - Was explicitly false, now true
+  // - Skip if prior inStock is null (unknown state per spec Known Limitations)
+  const normalizedNewInStock = currentInStock === true
+  if (lastPrice.inStock === false && normalizedNewInStock) {
+    stockChange = {
+      productId,
+      sourceProductId,
+      inStock: true,
+    }
+  } else if (lastPrice.inStock === null && normalizedNewInStock) {
+    // Unknown prior state - can't determine if this is back-in-stock
+    // Only flag if we have no price change either
+    if (!priceChange) {
+      return { priceChange: null, stockChange: null, skipReason: 'UNKNOWN_PRIOR_STATE' }
+    }
+  }
+
+  return { priceChange, stockChange, skipReason: null }
+}
+
+/**
  * Decide which prices to write based on cache
  * Per spec §4.2.1: All decisions use run-local cache, no per-row DB reads
  * Per affiliate-feed-alerts-v1 spec: Returns structured change lists for alert queueing
@@ -1356,6 +1458,14 @@ function decidePriceWrites(
   const priceChanges: AffiliatePriceChange[] = []
   const stockChanges: AffiliateStockChange[] = []
 
+  // Per affiliate-feed-alerts-v1 spec: Track skip reasons for observability
+  const alertSkips: AlertDetectionSkips = {
+    nullProductId: 0,
+    noChange: 0,
+    currencyMismatch: 0,
+    unknownPriorState: 0,
+  }
+
   // Build lookup from identityKey to sourceProductId
   const idLookup = new Map<string, string>()
   for (const sp of upsertedProducts) {
@@ -1369,7 +1479,8 @@ function decidePriceWrites(
     const priceSignatureHash = computePriceSignature(product)
     const lastPrice = lastPriceCache.get(sourceProductId)
 
-    // Normalize current values
+    // Normalize currency for PRICE WRITES (default to USD for data integrity)
+    // Per ADR-009: Alert detection handles missing currency separately (fail-closed)
     const normalizedCurrency = product.currency || 'USD'
     const normalizedNewInStock = product.inStock === true
 
@@ -1386,6 +1497,7 @@ function decidePriceWrites(
 
     if (!isNew && !signatureChanged && !heartbeatDue && !stockChanged) {
       // Skip write - no changes detected
+      alertSkips.noChange++
       continue
     }
 
@@ -1411,49 +1523,59 @@ function decidePriceWrites(
 
     // ═══════════════════════════════════════════════════════════════════════════
     // ALERT CHANGE DETECTION
-    // Per affiliate-feed-alerts-v1 spec §6
+    // Per affiliate-feed-alerts-v1 spec §6 - using exported helper for testability
+    // Per ADR-009: Pass raw currency (possibly null) to fail-closed on unknown
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Skip alert detection if no productId (per spec §5: can't alert for unresolved products)
-    if (!productId) {
-      continue
+    const alertResult = detectAlertChanges(
+      product.price,
+      product.inStock,
+      product.currency ?? null, // Pass raw value for fail-closed behavior
+      productId,
+      sourceProductId,
+      lastPrice
+    )
+
+    // Track skip reasons for observability logging
+    if (alertResult.skipReason) {
+      switch (alertResult.skipReason) {
+        case 'NULL_PRODUCT_ID':
+          alertSkips.nullProductId++
+          break
+        case 'NEW_PRODUCT':
+          // New products are expected, don't count as skips
+          break
+        case 'CURRENCY_MISMATCH':
+          alertSkips.currencyMismatch++
+          break
+        case 'UNKNOWN_PRIOR_STATE':
+          alertSkips.unknownPriorState++
+          break
+      }
     }
 
-    // Skip alert detection for new products (no prior state to compare)
-    if (isNew) {
-      continue
+    // Collect detected changes
+    if (alertResult.priceChange) {
+      priceChanges.push(alertResult.priceChange)
     }
-
-    // Price drop detection (per spec §6.1):
-    // - Same currency AND price decreased
-    // - Skip if prior currency is null (unknown state)
-    const oldCurrency = lastPrice.currency
-    if (
-      oldCurrency &&
-      oldCurrency === normalizedCurrency &&
-      lastPrice.price > product.price
-    ) {
-      priceChanges.push({
-        productId,
-        sourceProductId,
-        oldPrice: lastPrice.price,
-        newPrice: product.price,
-      })
-    }
-
-    // Back-in-stock detection (per spec §6.2):
-    // - Was explicitly false, now true
-    // - Skip if prior inStock is null (unknown state per spec Known Limitations)
-    if (lastPrice.inStock === false && normalizedNewInStock) {
-      stockChanges.push({
-        productId,
-        sourceProductId,
-        inStock: true,
-      })
+    if (alertResult.stockChange) {
+      stockChanges.push(alertResult.stockChange)
     }
   }
 
-  return { pricesToWrite, priceChanges, stockChanges }
+  // Per affiliate-feed-alerts-v1 spec: Log skip summary for observability
+  const totalSkips = alertSkips.nullProductId + alertSkips.currencyMismatch + alertSkips.unknownPriorState
+  if (totalSkips > 0) {
+    log.info('Alert detection skips', {
+      runId,
+      retailerId,
+      skips: alertSkips,
+      priceChangesDetected: priceChanges.length,
+      stockChangesDetected: stockChanges.length,
+    })
+  }
+
+  return { pricesToWrite, priceChanges, stockChanges, alertSkips }
 }
 
 /**
