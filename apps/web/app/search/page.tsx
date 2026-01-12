@@ -38,10 +38,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams
   const query = params.q || ''
   
-  // Get session for user tier
+  // Get session for access token
   const session = await auth()
-  const userTier = (session?.user as any)?.tier || 'FREE'
-  const isPremium = userTier === 'PREMIUM'
+  const isPremium = true
 
   return (
     <div className="container mx-auto px-4 py-6">

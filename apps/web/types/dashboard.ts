@@ -404,9 +404,10 @@ export type UseWatchlistResult = BaseHookResult<WatchlistResponse> & {
 
 /** Centralized upgrade copy for A/B testing (ADR-006 compliant) */
 export const UPGRADE_COPY = {
-  MARKET_PULSE_EXPAND: 'Unlock price timing and historical context →',
-  PRICE_HISTORY: 'See full price history with Premium',
-  PRICE_CONTEXT: 'Premium users see detailed price context',
-  WATCHLIST_LIMIT: 'Upgrade to Premium for unlimited tracking.',
-  COLLECTIONS: 'Organize into collections with Premium',
+  MARKET_PULSE_EXPAND: 'Price timing and historical context',
+  PRICE_HISTORY: 'Price history availability varies by product',
+  PRICE_CONTEXT: 'Detailed price context is provided when available',
+  WATCHLIST_LIMIT: 'Watchlist limits are not enforced in v1.',
+  COLLECTIONS: 'Collections are not available in v1.',
 } as const
+

@@ -10,7 +10,7 @@ export default function PricingPage() {
       <div className="max-w-md mx-auto text-center">
         <h1 className="text-2xl font-bold mb-4">Pricing</h1>
         <p className="text-muted-foreground mb-6">
-          Premium plans are not currently available. All features are free during our launch period.
+          Plans are not currently available. All features are available during our launch period.
         </p>
         <Link
           href="/"
