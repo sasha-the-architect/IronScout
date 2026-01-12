@@ -6,13 +6,14 @@
 import { Shield, Chrome } from 'lucide-react'
 import { signIn } from '@/lib/auth-config'
 
-export default function AdminSignInPage({
+export default async function AdminSignInPage({
   searchParams,
 }: {
-  searchParams: { callbackUrl?: string; error?: string }
+  searchParams: Promise<{ callbackUrl?: string; error?: string }>
 }) {
-  const callbackUrl = searchParams.callbackUrl || '/merchants'
-  const error = searchParams.error
+  const resolvedSearchParams = await searchParams
+  const callbackUrl = resolvedSearchParams.callbackUrl || '/merchants'
+  const error = resolvedSearchParams.error
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">

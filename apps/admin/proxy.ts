@@ -14,7 +14,10 @@ export default function proxy(request: NextRequest) {
   loggers.auth.debug('Session cookie check', { sessionCookiePresent: !!sessionCookie });
 
   // Allow the request to continue - auth check happens in layout
-  return NextResponse.next();
+  // Set pathname header for layout to detect auth routes
+  const response = NextResponse.next();
+  response.headers.set('x-pathname', request.nextUrl.pathname);
+  return response;
 }
 
 export const config = {

@@ -476,31 +476,9 @@ export async function runDataIntegrityChecks(): Promise<{ success: boolean; erro
     const checks: IntegrityCheckResult[] = [];
     const now = new Date();
 
-    // Check 1: pricing_snapshots retailerId↔merchantId alignment
-    const misalignedSnapshots = await prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(*) as count
-      FROM pricing_snapshots ps
-      WHERE ps."retailerId" IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM merchant_retailers mr
-          WHERE mr."retailerId" = ps."retailerId"
-            AND mr."merchantId" = ps."merchantId"
-            AND mr.status = 'ACTIVE'
-        )
-    `;
-    const misalignedCount = Number(misalignedSnapshots[0]?.count ?? 0);
-    checks.push({
-      name: 'Pricing Snapshots Alignment',
-      description: 'Validates retailerId↔merchantId pairs match merchant_retailers',
-      status: misalignedCount === 0 ? 'ok' : 'warning',
-      count: misalignedCount,
-      message: misalignedCount === 0
-        ? 'All pricing snapshots have valid retailer↔merchant alignment'
-        : `${misalignedCount} snapshots have invalid retailer↔merchant pairs`,
-      lastChecked: now,
-    });
+    // NOTE: pricing_snapshots checks removed - table deleted (benchmark subsystem removed for v1)
 
-    // Check 2: Orphaned prices (sourceId points to deleted source)
+    // Check 1: Orphaned prices (sourceId points to deleted source)
     const orphanedPrices = await prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(*) as count
       FROM prices p
@@ -578,24 +556,7 @@ export async function runDataIntegrityChecks(): Promise<{ success: boolean; erro
       lastChecked: now,
     });
 
-    // Check 6: Recent pricing_snapshots missing provenance (ADR-015 requirement)
-    const recentSnapshotsWithoutProvenance = await prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(*) as count
-      FROM pricing_snapshots ps
-      WHERE ps."createdAt" > NOW() - INTERVAL '24 hours'
-        AND (ps."ingestionRunType" IS NULL OR ps."ingestionRunId" IS NULL)
-    `;
-    const snapshotsWithoutProvenanceCount = Number(recentSnapshotsWithoutProvenance[0]?.count ?? 0);
-    checks.push({
-      name: 'Recent Snapshots Without Provenance',
-      description: 'ADR-015: New pricing_snapshots must include ingestionRunType and ingestionRunId',
-      status: snapshotsWithoutProvenanceCount === 0 ? 'ok' : 'warning',
-      count: snapshotsWithoutProvenanceCount,
-      message: snapshotsWithoutProvenanceCount === 0
-        ? 'All recent snapshots have provenance fields'
-        : `${snapshotsWithoutProvenanceCount} snapshots in last 24h missing provenance`,
-      lastChecked: now,
-    });
+    // NOTE: pricing_snapshots provenance check removed - table deleted (benchmark subsystem removed for v1)
 
     // Determine overall status
     let overallStatus: 'ok' | 'warning' | 'error' = 'ok';

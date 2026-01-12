@@ -3,6 +3,11 @@ import { z } from 'zod'
 
 const router: any = Router()
 
+const placeholderAdImage = (label: string) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200" role="img" aria-label="${label}"><rect width="400" height="200" fill="#e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#374151" font-family="Arial, sans-serif" font-size="20">${label}</text></svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
 const placementSchema = z.object({
   position: z.enum(['top', 'middle', 'bottom', 'sidebar']).default('middle'),
   category: z.string().optional(),
@@ -19,7 +24,7 @@ router.get('/placement', async (req: Request, res: Response) => {
         id: '1',
         title: 'Premium Electronics Sale',
         description: 'Up to 50% off on premium electronics. Limited time offer!',
-        imageUrl: 'https://images.unsplash.com/photo-1510552776732-01acc9a4c1d6?w=400&h=200&fit=crop',
+        imageUrl: placeholderAdImage('Featured Offer'),
         targetUrl: 'https://example.com/sale/electronics',
         adType: 'DISPLAY',
         priority: 10
@@ -28,7 +33,7 @@ router.get('/placement', async (req: Request, res: Response) => {
         id: '2',
         title: 'Best Deals on Home & Garden',
         description: 'Transform your space with our curated selection',
-        imageUrl: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=400&h=200&fit=crop',
+        imageUrl: placeholderAdImage('Home & Garden'),
         targetUrl: 'https://example.com/category/home-garden',
         adType: 'SPONSORED_PRODUCT',
         priority: 8
@@ -37,7 +42,7 @@ router.get('/placement', async (req: Request, res: Response) => {
         id: '3',
         title: 'Fashion Forward',
         description: 'Discover the latest trends in fashion',
-        imageUrl: 'https://images.unsplash.com/photo-1514996937319-344454492b37?w=400&h=200&fit=crop',
+        imageUrl: placeholderAdImage('Style Picks'),
         targetUrl: 'https://example.com/category/fashion',
         adType: 'BANNER',
         priority: 5

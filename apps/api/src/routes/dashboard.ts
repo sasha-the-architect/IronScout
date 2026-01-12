@@ -571,8 +571,7 @@ router.get('/savings', async (req: Request, res: Response) => {
 // ============================================================================
 // PRICE HISTORY ENDPOINT
 // Returns price history for a caliber
-// Free: Blocked (returns upgrade CTA)
-// Premium: 30/90/365 day charts
+  // V1: 30/90/365 day charts for all users
 // ============================================================================
 
 const priceHistorySchema = z.object({
@@ -594,12 +593,11 @@ router.get('/price-history/:caliber', async (req: Request, res: Response) => {
 
     // Check if user has access to price history
     if (!hasPriceHistoryAccess(userTier)) {
-      return res.status(403).json({
-        error: 'Price history is a Premium feature',
-        message: 'Upgrade to Premium to view price history charts',
-        upgradeUrl: '/pricing',
-        tier: userTier
-      })
+        return res.status(403).json({
+          error: 'Price history unavailable',
+          message: 'Price history is not available for this request.',
+          tier: userTier
+        })
     }
 
     // Enforce tier-based history limit
@@ -659,8 +657,7 @@ router.get('/price-history/:caliber', async (req: Request, res: Response) => {
         effectiveDays,
         maxDaysAllowed: maxDays,
         ...(userTier === 'FREE' && {
-          upgradeMessage: 'Upgrade to Premium for full price history charts',
-          upgradeUrl: '/pricing'
+          upgradeMessage: 'Price history availability varies by product.'
         })
       }
     })

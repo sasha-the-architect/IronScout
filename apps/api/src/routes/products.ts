@@ -394,7 +394,7 @@ router.get('/:id/prices', async (req: Request, res: Response) => {
   }
 })
 
-// Get price history for a product - PREMIUM ONLY
+// Get price history for a product
 router.get('/:id/history', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
@@ -405,11 +405,9 @@ router.get('/:id/history', async (req: Request, res: Response) => {
     
     if (!hasPriceHistoryAccess(userTier)) {
       return res.status(403).json({
-        error: 'Premium feature',
-        message: 'Price history is only available for Premium subscribers.',
+        error: 'Price history unavailable',
+        message: 'Price history is not available for this request.',
         tier: userTier,
-        requiredTier: 'PREMIUM',
-        upgradeUrl: '/pricing'
       })
     }
 
