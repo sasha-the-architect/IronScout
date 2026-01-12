@@ -18,7 +18,6 @@ interface SearchResultCardProps {
   /** Additional badges to display */
   badges?: CardBadge[]
   onTrackChange?: (productId: string, isTracked: boolean) => void
-  onWhyThisPrice?: (productId: string) => void
 }
 
 /**
@@ -36,7 +35,6 @@ export function SearchResultCard({
   isBestPrice = false,
   badges = [],
   onTrackChange,
-  onWhyThisPrice,
 }: SearchResultCardProps) {
   const { data: session } = useSession()
   const accessToken = (session as any)?.accessToken
@@ -87,11 +85,6 @@ export function SearchResultCard({
     }
   }, [accessToken, isTracked, product.id, onTrackChange])
 
-  // Handle "Why this price?" click
-  const handleWhyThisPrice = useCallback((id: string) => {
-    onWhyThisPrice?.(product.id)
-  }, [product.id, onWhyThisPrice])
-
   return (
     <ResultCard
       id={product.id}
@@ -103,6 +96,7 @@ export function SearchResultCard({
       retailerName={lowestPrice.retailer.name}
       retailerUrl={lowestPrice.url}
       caliber={product.caliber || 'Unknown'}
+      bulletType={product.premium?.bulletType}
       grain={product.grainWeight}
       caseMaterial={product.caseMaterial}
       isTracked={isTracked}
@@ -110,7 +104,6 @@ export function SearchResultCard({
       badges={badges}
       placement="search"
       onTrackToggle={handleTrackToggle}
-      onWhyThisPrice={handleWhyThisPrice}
     />
   )
 }

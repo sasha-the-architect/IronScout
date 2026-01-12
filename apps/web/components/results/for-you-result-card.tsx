@@ -17,7 +17,6 @@ interface ForYouResultCardProps {
   /** Additional badges to display */
   badges?: CardBadge[]
   onTrackChange?: (productId: string, isTracked: boolean) => void
-  onWhyThisPrice?: (productId: string) => void
 }
 
 /**
@@ -31,7 +30,6 @@ export function ForYouResultCard({
   isBestPrice = false,
   badges = [],
   onTrackChange,
-  onWhyThisPrice,
 }: ForYouResultCardProps) {
   const { data: session } = useSession()
   const accessToken = (session as any)?.accessToken
@@ -62,11 +60,6 @@ export function ForYouResultCard({
     }
   }, [accessToken, item.isWatched, item.id, item.product.id, onTrackChange])
 
-  // Handle "Why this price?" click
-  const handleWhyThisPrice = useCallback((id: string) => {
-    onWhyThisPrice?.(item.product.id)
-  }, [item.product.id, onWhyThisPrice])
-
   return (
     <ResultCard
       id={item.id}
@@ -85,7 +78,6 @@ export function ForYouResultCard({
       badges={badges}
       placement="for_you"
       onTrackToggle={handleTrackToggle}
-      onWhyThisPrice={handleWhyThisPrice}
     />
   )
 }

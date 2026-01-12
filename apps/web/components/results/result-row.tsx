@@ -96,16 +96,16 @@ export function ResultRow({
     trackTrackToggle(id, nextState)
 
     if (nextState) {
-      toast.success('Item saved', {
-        description: 'Notifications enabled by default.',
+      toast.success('Added to watchlist', {
+        description: 'We\'ll notify you when the price drops.',
         action: {
-          label: 'Edit Alerts',
+          label: 'View Watchlist',
           onClick: () => window.location.href = '/dashboard/saved',
         },
         duration: 4000,
       })
     } else {
-      toast.success('Item removed', {
+      toast.success('Removed from watchlist', {
         duration: 2000,
       })
     }
@@ -138,12 +138,15 @@ export function ResultRow({
         {truncate(retailerName, 20)}
       </td>
 
-      {/* $/rd - Primary price metric, emphasized */}
+      {/* $/rd - Primary price metric with dot indicator */}
       <td className="py-3 px-4">
-        <span className="font-mono font-bold text-lg text-foreground">
-          {formatPrice(pricePerRound)}
-        </span>
-        <span className="text-xs text-muted-foreground ml-0.5">/rd</span>
+        <div className="flex items-baseline gap-1">
+          <span className="font-mono font-bold text-lg text-foreground">
+            {formatPrice(pricePerRound)}
+          </span>
+          <span className="text-primary text-lg">•</span>
+          <span className="text-xs text-muted-foreground">/rd</span>
+        </div>
       </td>
 
       {/* Total - De-emphasized secondary info */}
@@ -182,14 +185,14 @@ export function ResultRow({
                     ? 'text-primary'
                     : 'text-muted-foreground/50 hover:text-muted-foreground'
                 )}
-                aria-label={trackingOptimistic ? 'Unsave item' : 'Save item'}
+                aria-label={trackingOptimistic ? 'Remove from watchlist' : 'Add to watchlist'}
               >
                 <Bookmark className={cn('h-4 w-4', trackingOptimistic && 'fill-current')} />
               </button>
             </TooltipTrigger>
             <TooltipContent side="left">
               <p className="text-xs">
-                {trackingOptimistic ? 'Saved' : 'Save'}
+                {trackingOptimistic ? 'Watching' : 'Watch'}
               </p>
             </TooltipContent>
           </Tooltip>
@@ -375,7 +378,7 @@ export function ResultTableHeader({
         >
           Stock
         </SortableHeader>
-        <th className="py-3 px-4 text-center">Save</th>
+        <th className="py-3 px-4 text-center">Watch</th>
         <th className="py-3 px-4">Action</th>
       </tr>
     </thead>

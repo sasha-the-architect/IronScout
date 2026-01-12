@@ -4,8 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Bell, ChevronDown, ArrowUpRight } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Bookmark, ArrowUpRight } from 'lucide-react'
 import { trackAffiliateClick, trackTrackToggle } from '@/lib/analytics'
 import { toast } from 'sonner'
 import {
@@ -26,10 +25,10 @@ export interface CardBadge {
 }
 
 /**
- * ResultCard Props - Clean Scannable View Spec
+ * ResultCard Props - Mockup-aligned design
  *
  * Primary KPI: Affiliate Clicks
- * Hierarchy: Title → Badges → Price → Retailer → CTA → Secondary Action
+ * Hierarchy: Title → Attributes → Retailer → Price → CTA
  */
 export interface ResultCardProps {
   id: string
@@ -49,9 +48,20 @@ export interface ResultCardProps {
   retailerName: string
   retailerUrl: string
 
+  /** Caliber (e.g., "9mm Luger", ".223 Rem") */
   caliber: string
+  /** Bullet type (e.g., "FMJ", "JHP", "FTX") */
+  bulletType?: string
+  /** Grain weight */
   grain?: string | number
+  /** Casing material (e.g., "Brass", "Steel") */
   caseMaterial?: string
+
+  /** When the price was last updated - for "X ago" display */
+  updatedAt?: Date | string
+
+  /** Whether shipping is included in the price */
+  includesShipping?: boolean
 
   isTracked: boolean
 
@@ -66,7 +76,6 @@ export interface ResultCardProps {
 
   onTrackToggle: (id: string) => void
   onPrimaryClick?: (id: string) => void
-  onWhyThisPrice?: (id: string) => void
 }
 
 /**
@@ -77,46 +86,52 @@ function formatPricePerRound(price: number): string {
 }
 
 /**
- * Format total price with round count
+ * Format relative time (e.g., "10m ago", "2h ago")
  */
-function formatTotalPrice(total: number, roundCount?: number): string {
-  if (roundCount && roundCount > 0) {
-    return `$${total.toFixed(2)} total (${roundCount.toLocaleString()} rds)`
-  }
-  return `$${total.toFixed(2)} total`
+function formatTimeAgo(date: Date | string | undefined): string | null {
+  if (!date) return null
+
+  const now = new Date()
+  const then = new Date(date)
+  const diffMs = now.getTime() - then.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 7) return `${diffDays}d ago`
+
+  return null // Don't show if older than a week
 }
 
 /**
- * Get badge styles based on type
+ * Get casing badge style - Brass gets warm accent, Steel gets neutral
  */
-function getBadgeStyles(type: BadgeType): string {
-  switch (type) {
-    case 'lowest_price':
-      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-    case 'in_stock':
-      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
-    case 'price_drop':
-      return 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-    case 'new_listing':
-      return 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'
-    default:
-      return 'bg-muted text-muted-foreground'
+function getCasingStyle(casing: string): string {
+  const lower = casing.toLowerCase()
+  if (lower === 'brass') {
+    return 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30'
   }
+  if (lower === 'steel') {
+    return 'bg-muted text-muted-foreground border-border'
+  }
+  return 'bg-muted text-muted-foreground border-border'
 }
 
 /**
- * ResultCard Component - Clean Scannable View
+ * ResultCard Component - Mockup-aligned design
  *
- * Hierarchy per spec:
- * 1. Product title (prominent at top)
- * 2. Badges (Current Lowest Price, In Stock, etc.)
- * 3. Price block ($/rd primary, total secondary)
- * 4. Retailer line
- * 5. Primary CTA: VIEW AT RETAILER
- * 6. Secondary: Why this price?
- *
- * Crowned card: +2% scale, green border
- * Alert bell: upper-right, filled when tracking
+ * Layout per mockup:
+ * 1. Title (prominent)
+ * 2. Attribute badges row (caliber | type | grain | casing)
+ * 3. Retailer + timestamp
+ * 4. Price block with shipping indicator
+ * 5. Stock status + Watch button row
+ * 6. Primary CTA
  */
 export function ResultCard({
   id,
@@ -129,15 +144,17 @@ export function ResultCard({
   retailerName,
   retailerUrl,
   caliber,
+  bulletType,
   grain,
   caseMaterial,
+  updatedAt,
+  includesShipping = true,
   isTracked,
   isBestPrice = false,
   badges = [],
   placement = 'search',
   onTrackToggle,
   onPrimaryClick,
-  onWhyThisPrice,
 }: ResultCardProps) {
   const [trackingOptimistic, setTrackingOptimistic] = useState(isTracked)
 
@@ -147,30 +164,7 @@ export function ResultCard({
   }, [isTracked])
 
   const isValidUrl = retailerUrl && retailerUrl.startsWith('http')
-
-  // Build badges array - add automatic badges based on props
-  const displayBadges: CardBadge[] = [...badges]
-
-  // Add "Current Lowest Price" badge for crowned cards if not already present
-  if (isBestPrice && !displayBadges.some(b => b.type === 'lowest_price')) {
-    displayBadges.unshift({ type: 'lowest_price', label: 'Current Lowest Price' })
-  }
-
-  // Stock badge configuration
-  const getStockBadge = () => {
-    if (inStock === undefined) return null
-    if (inStock) {
-      return {
-        label: 'In Stock',
-        className: 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30'
-      }
-    }
-    return {
-      label: 'Out of Stock',
-      className: 'border-red-400 text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/30'
-    }
-  }
-  const stockBadge = getStockBadge()
+  const timeAgo = formatTimeAgo(updatedAt)
 
   const handlePrimaryClick = useCallback(() => {
     trackAffiliateClick(id, retailerName, pricePerRound, placement)
@@ -188,16 +182,16 @@ export function ResultCard({
     trackTrackToggle(id, nextState)
 
     if (nextState) {
-      toast.success('Item saved', {
-        description: 'Notifications enabled by default.',
+      toast.success('Added to watchlist', {
+        description: 'We\'ll notify you when the price drops.',
         action: {
-          label: 'Edit Alerts',
+          label: 'View Watchlist',
           onClick: () => window.location.href = '/dashboard/saved',
         },
         duration: 4000,
       })
     } else {
-      toast.success('Item removed', {
+      toast.success('Removed from watchlist', {
         duration: 2000,
       })
     }
@@ -205,141 +199,151 @@ export function ResultCard({
     onTrackToggle(id)
   }, [id, trackingOptimistic, onTrackToggle])
 
-  const handleWhyThisPrice = useCallback(() => {
-    if (onWhyThisPrice) {
-      onWhyThisPrice(id)
-    }
-  }, [id, onWhyThisPrice])
-
-  // Calculate total if not provided
-  const displayTotal = totalPrice ?? pricePerRound * (roundCount || 1000)
-
   return (
     <Card
       className={cn(
         'overflow-hidden transition-all duration-200 relative h-full flex flex-col',
         isBestPrice
-          ? 'border-2 border-emerald-500 dark:border-emerald-400 shadow-lg scale-[1.02] z-10 bg-card'
-          : 'border border-border bg-card hover:border-border/80'
+          ? 'border-2 border-primary shadow-lg shadow-primary/10 scale-[1.01] z-10 bg-card'
+          : 'border border-border bg-card hover:border-primary/30'
       )}
     >
       <CardContent className="p-4 flex flex-col flex-1">
-        {/* Alert Bell - upper right corner */}
+        {/* Watch Button - upper right corner */}
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 onClick={handleTrackToggle}
                 className={cn(
-                  'absolute top-3 right-3 p-1.5 rounded-full transition-colors',
+                  'absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors',
                   trackingOptimistic
                     ? 'text-primary bg-primary/10 hover:bg-primary/20'
-                    : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 )}
-                aria-label={trackingOptimistic ? 'Remove from saved items' : 'Save item'}
+                aria-label={trackingOptimistic ? 'Remove from watchlist' : 'Add to watchlist'}
               >
-                <Bell
+                <Bookmark
                   className={cn(
-                    'h-4 w-4',
+                    'h-3.5 w-3.5',
                     trackingOptimistic && 'fill-current'
                   )}
                 />
+                <span>{trackingOptimistic ? 'Watching' : 'Watch'}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent side="left">
               <p className="text-xs">
-                {trackingOptimistic ? 'Saved · Click to remove' : 'Save item'}
+                {trackingOptimistic ? 'Click to remove from watchlist' : 'Get alerts when price drops'}
               </p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
 
-        {/* 1. Product Title - prominent at top */}
-        <h3 className="font-semibold text-foreground leading-tight pr-8 mb-3">
+        {/* 1. Product Title */}
+        <h3 className="font-semibold text-foreground leading-tight pr-20 mb-2">
           {productTitle}
         </h3>
 
-        {/* 2. Pricing Block - fixed height for alignment */}
+        {/* 2. Attribute Badges Row */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-2">
+          {/* Caliber - primary identifier */}
+          {caliber && (
+            <span className="px-2 py-0.5 text-xs font-medium rounded border bg-muted/50 text-foreground border-border">
+              {caliber}
+            </span>
+          )}
+
+          {/* Bullet Type */}
+          {bulletType && (
+            <span className="px-2 py-0.5 text-xs font-medium rounded border bg-transparent text-muted-foreground border-border">
+              {bulletType}
+            </span>
+          )}
+
+          {/* Grain Weight */}
+          {grain && (
+            <span className="px-2 py-0.5 text-xs font-medium rounded border bg-transparent text-muted-foreground border-border">
+              {grain}gr
+            </span>
+          )}
+
+          {/* Casing Material - color-coded */}
+          {caseMaterial && (
+            <span className={cn(
+              'px-2 py-0.5 text-xs font-medium rounded border',
+              getCasingStyle(caseMaterial)
+            )}>
+              {caseMaterial}
+            </span>
+          )}
+        </div>
+
+        {/* 3. Retailer + Timestamp */}
+        <p className="text-sm text-muted-foreground mb-3">
+          <span className="font-medium text-foreground">{retailerName}</span>
+          {timeAgo && (
+            <span className="text-muted-foreground/70"> · {timeAgo}</span>
+          )}
+        </p>
+
+        {/* 4. Price Block */}
         <div className="mb-3">
-          {/* Primary: $/rd - emphasized */}
+          {/* Primary: $/rd with delivery indicator */}
           <div className="flex items-baseline gap-1">
-            <span className="font-bold font-mono tracking-tight text-3xl text-foreground">
+            <span className={cn(
+              'font-bold font-mono tracking-tight text-2xl',
+              isBestPrice ? 'text-primary' : 'text-foreground'
+            )}>
               {formatPricePerRound(pricePerRound)}
             </span>
-            <span className="text-sm font-normal text-muted-foreground">/rd</span>
+            <span className="text-primary text-lg">•</span>
+            <span className="text-sm text-muted-foreground">
+              /rd {includesShipping ? 'delivered' : ''}
+            </span>
           </div>
 
-          {/* Secondary: Total - de-emphasized */}
-          <p className="text-xs text-muted-foreground/70 mt-1">
-            {formatTotalPrice(displayTotal, roundCount)}
-          </p>
-
-          {/* Stock Badge - clear status */}
-          {stockBadge && (
-            <Badge
-              variant="outline"
-              className={cn('text-xs font-medium mt-2', stockBadge.className)}
-            >
-              {stockBadge.label}
-            </Badge>
+          {/* Shipping indicator */}
+          {includesShipping && (
+            <p className="text-xs text-muted-foreground/70 mt-0.5">
+              Includes shipping
+            </p>
           )}
         </div>
 
-        {/* 3. Badges - below pricing for alignment */}
-        <div className="min-h-[24px] mb-3">
-          {displayBadges.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {displayBadges.map((badge, index) => (
-                <span
-                  key={`${badge.type}-${index}`}
-                  className={cn(
-                    'px-2 py-0.5 rounded text-xs font-medium',
-                    getBadgeStyles(badge.type)
-                  )}
-                >
-                  {badge.label}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* 4. Retailer Line */}
-        <p className="text-sm text-muted-foreground mb-3">
-          Sold by <span className="font-medium text-foreground">{retailerName}</span>
-        </p>
+        {/* 5. Stock Status */}
+        {inStock !== undefined && (
+          <div className="mb-3">
+            <span className={cn(
+              'text-xs font-medium',
+              inStock
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-red-500 dark:text-red-400'
+            )}>
+              {inStock ? 'In Stock' : 'Out of Stock'}
+            </span>
+          </div>
+        )}
 
         {/* Spacer to push CTA to bottom */}
         <div className="flex-1" />
 
-        {/* 5. Primary CTA - always at bottom */}
-        <div className="space-y-2 mt-auto">
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={handlePrimaryClick}
-                  disabled={!isValidUrl}
-                  className="w-full h-11 font-semibold uppercase tracking-wide bg-primary hover:bg-primary/90 text-primary-foreground"
-                >
-                  <span className="truncate">View at {retailerName}</span>
-                  <ArrowUpRight className="ml-2 h-4 w-4 shrink-0" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs">View at {retailerName}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          {/* 6. Secondary Action: Why this price? */}
-          <button
-            onClick={handleWhyThisPrice}
-            className="flex items-center justify-center w-full text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+        {/* 6. Primary CTA */}
+        <div className="mt-auto">
+          <Button
+            onClick={handlePrimaryClick}
+            disabled={!isValidUrl}
+            variant={isBestPrice ? 'default' : 'outline'}
+            className={cn(
+              'w-full h-10 font-medium',
+              isBestPrice
+                ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                : 'hover:bg-muted hover:text-foreground'
+            )}
           >
-            Why this price?
-            <ChevronDown className="ml-1 h-4 w-4" />
-          </button>
+            <span className="truncate">View at {retailerName}</span>
+            <ArrowUpRight className="ml-2 h-4 w-4 shrink-0" />
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -347,7 +351,7 @@ export function ResultCard({
 }
 
 /**
- * ResultCardSkeleton - Loading placeholder matching new layout
+ * ResultCardSkeleton - Loading placeholder
  */
 export function ResultCardSkeleton() {
   return (
@@ -356,29 +360,28 @@ export function ResultCardSkeleton() {
         {/* Title skeleton */}
         <div className="h-5 w-3/4 bg-muted rounded animate-pulse" />
 
-        {/* Badge skeleton */}
+        {/* Attribute badges skeleton */}
         <div className="flex gap-1.5">
-          <div className="h-5 w-20 bg-muted rounded animate-pulse" />
-        </div>
-
-        {/* Price skeleton */}
-        <div className="space-y-1">
-          <div className="h-3 w-16 bg-muted/50 rounded animate-pulse" />
-          <div className="h-8 w-24 bg-muted rounded animate-pulse" />
-          <div className="h-4 w-32 bg-muted/50 rounded animate-pulse" />
+          <div className="h-5 w-16 bg-muted rounded animate-pulse" />
+          <div className="h-5 w-10 bg-muted rounded animate-pulse" />
+          <div className="h-5 w-12 bg-muted rounded animate-pulse" />
+          <div className="h-5 w-14 bg-muted rounded animate-pulse" />
         </div>
 
         {/* Retailer skeleton */}
+        <div className="h-4 w-28 bg-muted/50 rounded animate-pulse" />
+
+        {/* Price skeleton */}
         <div className="space-y-1">
-          <div className="h-3 w-12 bg-muted/50 rounded animate-pulse" />
-          <div className="h-5 w-28 bg-muted rounded animate-pulse" />
+          <div className="h-7 w-32 bg-muted rounded animate-pulse" />
+          <div className="h-3 w-24 bg-muted/50 rounded animate-pulse" />
         </div>
 
-        {/* CTA skeleton */}
-        <div className="h-11 w-full bg-muted rounded animate-pulse" />
+        {/* Stock skeleton */}
+        <div className="h-4 w-16 bg-muted/50 rounded animate-pulse" />
 
-        {/* Secondary action skeleton */}
-        <div className="h-4 w-24 mx-auto bg-muted/50 rounded animate-pulse" />
+        {/* CTA skeleton */}
+        <div className="h-10 w-full bg-muted rounded animate-pulse mt-auto" />
       </CardContent>
     </Card>
   )
