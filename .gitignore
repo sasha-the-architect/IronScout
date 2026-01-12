@@ -12,6 +12,7 @@ out/
 
 # Production
 build/
+!/scripts/build/
 dist/
 
 # Environment variables
