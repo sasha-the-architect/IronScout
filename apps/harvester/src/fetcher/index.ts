@@ -616,7 +616,7 @@ export const fetcherWorker = new Worker<FetchJobData>(
           sourceType: type,
           contentHash,
         }, {
-          jobId: `extract:${executionId}`, // Idempotent: one extract per execution
+          jobId: `extract_${executionId}`, // Idempotent: one extract per execution
         })
 
         await prisma.execution_logs.create({

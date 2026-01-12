@@ -164,6 +164,11 @@ function createMockJob(data: Record<string, unknown> = {}): Job {
   } as unknown as Job
 }
 
+function expectValidJobId(jobId: string) {
+  expect(jobId).toBeTruthy()
+  expect(jobId).not.toContain(':')
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -174,6 +179,24 @@ describe('BullMQ Job Deduplication', () => {
   })
 
   describe('JobId-based deduplication', () => {
+    it('should avoid BullMQ-invalid characters in jobId formats', () => {
+      const jobIds = [
+        `RESOLVE_SOURCE_PRODUCT_sp-abc123`,
+        `fetch_exec-001`,
+        `extract_exec-001`,
+        `write_exec-001`,
+        `normalize--exec-001`,
+        `normalize--exec-001--chunk-01`,
+        `crawl-source-123-2024-01-01T00-00-00-000Z`,
+        `feed-feed-123-2024-01-01T00-00-00-000Z`,
+        `delayed-item-123-PRICE_DROP-2024-01-01T00-00-00-000Z`,
+      ]
+
+      for (const jobId of jobIds) {
+        expectValidJobId(jobId)
+      }
+    })
+
     it('should use sourceProductId as jobId for resolver queue', () => {
       // The resolver uses RESOLVE_SOURCE_PRODUCT_<sourceProductId> as jobId
       const sourceProductId = 'sp-abc123'

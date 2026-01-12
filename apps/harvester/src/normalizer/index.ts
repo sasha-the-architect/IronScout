@@ -179,7 +179,7 @@ export const normalizerWorker = new Worker<NormalizeJobData>(
         normalizedItems,
         contentHash, // Pass hash to be stored after successful write
       }, {
-        jobId: `write:${executionId}`, // Idempotent: one write per execution
+        jobId: `write_${executionId}`, // Idempotent: one write per execution
       })
 
       await prisma.execution_logs.create({

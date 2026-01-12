@@ -51,7 +51,7 @@ export const schedulerWorker = new Worker<CrawlJobData>(
         url: source.url,
         type: source.type,
       }, {
-        jobId: `fetch:${executionId}`, // Idempotent: one fetch per execution
+        jobId: `fetch_${executionId}`, // Idempotent: one fetch per execution
       })
 
       await prisma.execution_logs.create({

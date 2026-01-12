@@ -272,7 +272,7 @@ export interface ProductResolveJobData {
 /**
  * Product Resolver queue
  * Per Spec v1.2:
- * - JobId format: RESOLVE_SOURCE_PRODUCT:<sourceProductId>
+ * - JobId format: RESOLVE_SOURCE_PRODUCT_<sourceProductId>
  * - Retry: system errors only, max 3 attempts
  * - Debounce: 10-30s per sourceProductId (handled by jobId deduplication)
  */
@@ -294,7 +294,7 @@ export const productResolveQueue = new Queue<ProductResolveJobData>(
 /**
  * Enqueue a product resolution job with database-level deduplication
  *
- * Per Spec v1.2 §0.3: JobId = RESOLVE_SOURCE_PRODUCT:<sourceProductId>
+ * Per Spec v1.2 §0.3: JobId = RESOLVE_SOURCE_PRODUCT_<sourceProductId>
  *
  * Uses product_resolve_requests table as source of truth for dedup:
  * - Inserts new request if none exists
@@ -524,3 +524,4 @@ export const queues = {
   // Embedding Generation queue
   embeddingGenerate: embeddingGenerateQueue,
 }
+

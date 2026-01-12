@@ -4,7 +4,7 @@
  * Processes RESOLVE_SOURCE_PRODUCT jobs from the product-resolve queue.
  *
  * Per Spec v1.2 §0.3:
- * - JobId format: RESOLVE_SOURCE_PRODUCT:<sourceProductId>
+ * - JobId format: RESOLVE_SOURCE_PRODUCT_<sourceProductId>
  * - Retry: system errors only, max 3 attempts
  * - Debounce: 10-30s per sourceProductId (handled by jobId deduplication)
  *
@@ -725,7 +725,7 @@ async function sweepStuckProcessing(): Promise<void> {
       })
 
       // Re-enqueue to BullMQ
-      const jobId = `RESOLVE_SOURCE_PRODUCT:${request.sourceProductId}`
+      const jobId = `RESOLVE_SOURCE_PRODUCT_${request.sourceProductId}`
       await productResolveQueue.add(
         'RESOLVE_SOURCE_PRODUCT',
         {
