@@ -1,0 +1,46 @@
+# Development Docker Compose
+#
+# Usage:
+#   pnpm db:up      # Start PostgreSQL
+#   pnpm db:down    # Stop PostgreSQL
+#   pnpm db:reset   # Reset database (destroys all data)
+#
+# This is for LOCAL DEVELOPMENT only. Do not use in production.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ironscout-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ironscout
+      POSTGRES_PASSWORD: ironscout_dev
+      POSTGRES_DB: ironscout_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ironscout -d ironscout_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis for BullMQ (harvester queues)
+  redis:
+    image: redis:7-alpine
+    container_name: ironscout-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

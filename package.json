@@ -17,7 +17,20 @@
     "type-check": "pnpm run --recursive type-check",
     "doc:watch": "pnpm exec tsx agents/doc-watcher/doc-watcher.ts",
     "doc:watch:head": "pnpm exec tsx agents/doc-watcher/watch-head.ts",
-    "generate:icons": "node scripts/generate-icons.mjs"
+    "generate:icons": "node scripts/generate-icons.mjs",
+    "db:check": "pnpm --filter @ironscout/db check",
+    "db:check:fast": "pnpm --filter @ironscout/db check:fast",
+    "db:check:strict": "pnpm --filter @ironscout/db check:strict",
+    "db:check:drift": "pnpm --filter @ironscout/db check:drift",
+    "db:generate": "pnpm --filter @ironscout/db db:generate",
+    "db:migrate": "pnpm --filter @ironscout/db db:migrate",
+    "db:migrate:dev": "pnpm --filter @ironscout/db db:migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @ironscout/db db:migrate:deploy",
+    "db:migrate:status": "pnpm --filter @ironscout/db db:migrate:status",
+    "db:studio": "pnpm --filter @ironscout/db db:studio",
+    "db:up": "docker compose -f docker/docker-compose.dev.yml up -d postgres",
+    "db:down": "docker compose -f docker/docker-compose.dev.yml down",
+    "db:reset": "pnpm db:down && docker compose -f docker/docker-compose.dev.yml up -d postgres && sleep 2 && pnpm --filter @ironscout/db prisma migrate reset --force"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

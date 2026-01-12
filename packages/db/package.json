@@ -10,7 +10,9 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:status": "prisma migrate status",
     "db:studio": "prisma studio",
     "db:seed": "tsx seed.ts",
     "db:seed-source": "tsx seed-source.ts",
@@ -20,7 +22,15 @@
     "db:seed-comprehensive": "tsx seed-comprehensive-products-simple.ts",
     "db:clear": "tsx clear-seed-data.ts",
     "db:indexes": "tsx apply-indexes-simple.ts",
-    "db:indexes:status": "psql $DATABASE_URL -c \"SELECT schemaname, tablename, indexname, idx_scan, pg_size_pretty(pg_relation_size(indexrelid)) as size FROM pg_stat_user_indexes WHERE schemaname = 'public' ORDER BY tablename, indexname;\""
+    "db:indexes:status": "psql $DATABASE_URL -c \"SELECT schemaname, tablename, indexname, idx_scan, pg_size_pretty(pg_relation_size(indexrelid)) as size FROM pg_stat_user_indexes WHERE schemaname = 'public' ORDER BY tablename, indexname;\"",
+    "check": "tsx scripts/prestart-check.ts",
+    "check:fast": "tsx scripts/prestart-check.ts",
+    "check:strict": "tsx scripts/prestart-check.ts --strict",
+    "check:drift": "tsx scripts/check-schema-drift.ts",
+    "check:client": "tsx scripts/check-client-fresh.ts",
+    "check:client:strict": "tsx scripts/check-client-fresh.ts strict",
+    "validate:schema": "tsx scripts/runtime-schema-check.ts",
+    "test:schema": "vitest run __tests__/schema-integrity.test.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.2.0",
@@ -29,9 +39,12 @@
     "pg": "^8.16.3"
   },
   "devDependencies": {
+    "@testcontainers/postgresql": "^10.18.0",
     "@types/pg": "^8.16.0",
     "dotenv": "^17.2.3",
     "prisma": "^7.2.0",
-    "tsx": "^4.21.0"
+    "testcontainers": "^10.18.0",
+    "tsx": "^4.21.0",
+    "vitest": "^4.3.8"
   }
 }

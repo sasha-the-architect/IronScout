@@ -1,0 +1,193 @@
+# Prisma Schema Integrity CI
+#
+# This workflow prevents P2022 (column does not exist) errors from reaching production.
+# It runs on every PR that touches Prisma-related files.
+#
+# Checks:
+# 1. schema.prisma changes must have corresponding migration
+# 2. Generated Prisma client must be committed and up-to-date
+# 3. Migrations can be applied to a fresh database
+# 4. Critical queries execute without schema errors
+
+name: Schema Integrity
+
+on:
+  pull_request:
+    paths:
+      - 'packages/db/schema.prisma'
+      - 'packages/db/migrations/**'
+      - 'packages/db/generated/**'
+      - 'packages/db/prisma.config.ts'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/db/schema.prisma'
+      - 'packages/db/migrations/**'
+
+# Cancel in-progress runs for the same PR
+concurrency:
+  group: schema-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  schema-drift-check:
+    name: Schema Drift Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check schema drift (offline)
+        run: pnpm db:check:drift
+
+      - name: Check Prisma client is fresh
+        run: |
+          # Run prisma generate
+          pnpm db:generate
+          # Check if there are any uncommitted changes to the generated client
+          if ! git diff --exit-code packages/db/generated/; then
+            echo "::error::Generated Prisma client is stale. Run 'pnpm db:generate' and commit the changes."
+            git diff --stat packages/db/generated/
+            exit 1
+          fi
+
+  migration-test:
+    name: Migration Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: schema-drift-check
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations to fresh database
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+        run: pnpm db:migrate:deploy
+
+      - name: Verify schema matches migrations
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+        run: |
+          # This should find no diff if migrations are correctly generating the schema
+          npx --yes prisma migrate diff \
+            --from-schema-datasource packages/db/schema.prisma \
+            --to-schema-datamodel packages/db/schema.prisma \
+            --exit-code
+
+      - name: Run schema integrity tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+          SKIP_TESTCONTAINERS: 'true'
+        run: pnpm --filter @ironscout/db test:schema
+
+  # Verify migration is backward-compatible during rolling deploys
+  backward-compatibility-check:
+    name: Backward Compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check for breaking migration patterns
+        run: |
+          # Find new migration files in this PR
+          NEW_MIGRATIONS=$(git diff --name-only origin/main...HEAD -- 'packages/db/migrations/*.sql' || true)
+
+          if [ -z "$NEW_MIGRATIONS" ]; then
+            echo "No new migrations in this PR"
+            exit 0
+          fi
+
+          echo "New migrations found:"
+          echo "$NEW_MIGRATIONS"
+
+          # Check for dangerous patterns
+          for migration in $NEW_MIGRATIONS; do
+            if [ -f "$migration" ]; then
+              echo "Checking $migration..."
+
+              # DROP COLUMN without safety period
+              if grep -qi "DROP COLUMN" "$migration"; then
+                echo "::warning file=$migration::Contains DROP COLUMN - ensure old code no longer references this column"
+              fi
+
+              # RENAME COLUMN (breaks old and new code simultaneously)
+              if grep -qi "RENAME COLUMN" "$migration"; then
+                echo "::error file=$migration::Contains RENAME COLUMN - this breaks rolling deploys. Use add→migrate→drop pattern instead."
+                exit 1
+              fi
+
+              # ALTER COLUMN SET NOT NULL without DEFAULT
+              if grep -qi "SET NOT NULL" "$migration" && ! grep -qi "DEFAULT" "$migration"; then
+                echo "::warning file=$migration::Contains SET NOT NULL without DEFAULT - ensure existing rows are handled"
+              fi
+            fi
+          done
+
+          echo "Migration backward compatibility check passed"
