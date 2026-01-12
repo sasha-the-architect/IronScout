@@ -12,12 +12,15 @@
  * - Structured metadata support
  * - Child loggers with inherited context
  * - Environment-based configuration
- * - Request ID correlation via AsyncLocalStorage (Node.js only)
+ * - Request ID + Trace ID correlation via AsyncLocalStorage (Node.js only)
+ * - Automatic PII/secrets redaction
+ * - Sampling for high-volume events
  *
  * Environment variables (Node.js only):
  * - LOG_LEVEL: Minimum log level (debug, info, warn, error, fatal). Default: info
  * - LOG_FORMAT: Output format (json, pretty). Default: json in production, pretty in development
  * - LOG_ASYNC: Enable async buffered logging (true/1). Default: false
+ * - LOG_REDACT: Enable automatic redaction (true/1). Default: true in production
  * - NODE_ENV: Used to determine defaults
  *
  * Browser behavior:
@@ -33,6 +36,9 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal'
  */
 export interface RequestContext {
   requestId?: string
+  traceId?: string
+  spanId?: string
+  userId?: string
   [key: string]: unknown
 }
 
@@ -99,6 +105,9 @@ interface LogEntry {
   service: string
   component?: string
   message: string
+  requestId?: string
+  traceId?: string
+  spanId?: string
   error?: {
     name: string
     message: string
@@ -115,12 +124,235 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   fatal: 4,
 }
 
-// Dynamic log level support - allows runtime changes without restart
+// =============================================================================
+// Redaction - Automatic PII/secrets filtering
+// =============================================================================
+
+/**
+ * Sensitive field patterns - ALWAYS redacted
+ */
+const SENSITIVE_PATTERNS = [
+  /authorization/i,
+  /^cookie$/i,
+  /^set-cookie$/i,
+  /password/i,
+  /secret/i,
+  /token/i,
+  /api[-_]?key/i,
+  /access[-_]?token/i,
+  /refresh[-_]?token/i,
+  /bearer/i,
+  /jwt/i,
+  /session[-_]?id/i,
+  /credit[-_]?card/i,
+  /card[-_]?number/i,
+  /cvv/i,
+  /cvc/i,
+  /^pan$/i,
+  /account[-_]?number/i,
+  /routing[-_]?number/i,
+  /ssn/i,
+  /social[-_]?security/i,
+  /^dob$/i,
+  /date[-_]?of[-_]?birth/i,
+  /private[-_]?key/i,
+]
+
+/**
+ * Safe fields that pass through without redaction (allowlist)
+ */
+const SAFE_FIELDS = new Set([
+  // Standard log fields
+  'timestamp', 'ts', 'level', 'service', 'component', 'message', 'msg',
+  'event', 'event_name', 'env', 'environment', 'version',
+  // Request correlation
+  'requestId', 'request_id', 'traceId', 'trace_id', 'spanId', 'span_id',
+  'correlationId', 'correlation_id',
+  // HTTP fields
+  'method', 'path', 'route', 'url', 'statusCode', 'status_code',
+  'latencyMs', 'latency_ms', 'durationMs', 'duration_ms',
+  'contentLength', 'content_length', 'protocol', 'host', 'hostname', 'port',
+  'userAgent', 'user_agent', 'ip', 'remoteAddress', 'remote_address',
+  // Identifiers (non-sensitive)
+  'userId', 'user_id', 'productId', 'product_id', 'orderId', 'order_id',
+  'jobId', 'job_id', 'sourceProductId', 'sourceKind',
+  // Error fields
+  'error', 'errorType', 'error_type', 'errorCode', 'error_code',
+  'errorMessage', 'error_message', 'errorName', 'error_name',
+  'error_category', 'error_status_code', 'error_is_operational', 'error_is_retryable',
+  'stack', 'name', 'code',
+  // Business fields
+  'caliber', 'brand', 'category', 'purpose', 'tier',
+  'count', 'total', 'page', 'limit', 'offset',
+  'query', 'sortBy', 'sort_by', 'filter', 'filters',
+  // Metrics
+  'attemptsMade', 'willRetry', 'isFinalAttempt',
+  'processed', 'skipped', 'errors', 'success',
+  // Nested objects (will be recursively checked)
+  'http', 'error_details', 'meta', 'context', 'data',
+])
+
+const REDACTED = '[REDACTED]'
+
+function isSensitiveField(fieldName: string): boolean {
+  return SENSITIVE_PATTERNS.some((pattern) => pattern.test(fieldName))
+}
+
+function isSafeField(fieldName: string): boolean {
+  return SAFE_FIELDS.has(fieldName)
+}
+
+/**
+ * Redact sensitive fields from log entry
+ */
+function redactEntry<T>(obj: T, depth = 0, seen = new WeakSet<object>()): T {
+  if (depth > 10) return '[MAX_DEPTH]' as unknown as T
+  if (obj === null || obj === undefined) return obj
+  if (typeof obj !== 'object') return obj
+
+  if (seen.has(obj as object)) return '[CIRCULAR]' as unknown as T
+  seen.add(obj as object)
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => redactEntry(item, depth + 1, seen)) as unknown as T
+  }
+
+  const result: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (isSensitiveField(key)) {
+      result[key] = REDACTED
+    } else if (isSafeField(key)) {
+      result[key] = typeof value === 'object' && value !== null
+        ? redactEntry(value, depth + 1, seen)
+        : value
+    } else if (typeof value === 'boolean' || value === null || value === undefined) {
+      result[key] = value
+    } else if (typeof value === 'object') {
+      result[key] = redactEntry(value, depth + 1, seen)
+    } else {
+      // Unknown primitive field - redact by default (fail-safe)
+      result[key] = REDACTED
+    }
+  }
+  return result as unknown as T
+}
+
+// =============================================================================
+// Sampling - Rate limit high-volume events
+// =============================================================================
+
+interface SampleConfig {
+  rate: number // 0.0 to 1.0
+  counter: number
+}
+
+const sampleConfigs = new Map<string, SampleConfig>()
+let defaultSampleRate = 1.0 // Log everything by default
+
+/**
+ * Configure sampling rate for an event type
+ * @param eventName - Event name or pattern (e.g., 'http.request.end')
+ * @param rate - Sample rate from 0.0 (log nothing) to 1.0 (log everything)
+ */
+export function setSampleRate(eventName: string, rate: number): void {
+  sampleConfigs.set(eventName, { rate: Math.max(0, Math.min(1, rate)), counter: 0 })
+}
+
+/**
+ * Set default sample rate for events without specific config
+ */
+export function setDefaultSampleRate(rate: number): void {
+  defaultSampleRate = Math.max(0, Math.min(1, rate))
+}
+
+/**
+ * Check if an event should be logged based on sampling
+ */
+function shouldSample(eventName?: string): boolean {
+  if (!eventName) return true
+
+  const config = sampleConfigs.get(eventName)
+  if (!config) {
+    // Use deterministic sampling for consistency
+    return Math.random() < defaultSampleRate
+  }
+
+  // Deterministic counter-based sampling
+  config.counter++
+  const interval = Math.ceil(1 / config.rate)
+  return config.counter % interval === 0
+}
+
+// =============================================================================
+// Log Volume Metrics
+// =============================================================================
+
+interface LogMetrics {
+  total: number
+  byLevel: Record<LogLevel, number>
+  byService: Record<string, number>
+  sampled: number
+  redacted: number
+  lastReset: number
+}
+
+const metrics: LogMetrics = {
+  total: 0,
+  byLevel: { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 },
+  byService: {},
+  sampled: 0,
+  redacted: 0,
+  lastReset: Date.now(),
+}
+
+/**
+ * Get current log metrics
+ */
+export function getLogMetrics(): LogMetrics & { uptimeMs: number } {
+  return {
+    ...metrics,
+    uptimeMs: Date.now() - metrics.lastReset,
+  }
+}
+
+/**
+ * Reset log metrics
+ */
+export function resetLogMetrics(): void {
+  metrics.total = 0
+  metrics.byLevel = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 }
+  metrics.byService = {}
+  metrics.sampled = 0
+  metrics.redacted = 0
+  metrics.lastReset = Date.now()
+}
+
+// =============================================================================
+// Configuration
+// =============================================================================
+
 let dynamicLogLevel: LogLevel | null = null
+let redactionEnabled: boolean | null = null
+
 function isAsyncEnabled(): boolean {
   if (!isNode || isBrowser) return false
   const flag = getEnv('LOG_ASYNC')
   return flag === 'true' || flag === '1'
+}
+
+function isRedactionEnabled(): boolean {
+  if (redactionEnabled !== null) return redactionEnabled
+  const flag = getEnv('LOG_REDACT')
+  if (flag === 'false' || flag === '0') return false
+  // Default: enabled in production
+  return getEnv('NODE_ENV') === 'production'
+}
+
+/**
+ * Enable or disable redaction at runtime
+ */
+export function setRedactionEnabled(enabled: boolean): void {
+  redactionEnabled = enabled
 }
 
 type PendingLog = { line: string; level: LogLevel }
@@ -208,7 +440,12 @@ function formatError(error: unknown): LogEntry['error'] | undefined {
 }
 
 function formatJson(entry: LogEntry): string {
-  return JSON.stringify(entry)
+  // Apply redaction if enabled
+  const finalEntry = isRedactionEnabled() ? redactEntry(entry) : entry
+  if (isRedactionEnabled()) {
+    metrics.redacted++
+  }
+  return JSON.stringify(finalEntry)
 }
 
 // ANSI colors for Node.js terminal
@@ -316,6 +553,11 @@ export async function flushLogs(): Promise<void> {
 }
 
 function output(entry: LogEntry): void {
+  // Update metrics
+  metrics.total++
+  metrics.byLevel[entry.level]++
+  metrics.byService[entry.service] = (metrics.byService[entry.service] || 0) + 1
+
   const format = getLogFormat()
 
   if (!isBrowser && isAsyncEnabled()) {
@@ -421,6 +663,13 @@ export class Logger implements ILogger {
   ): void {
     if (!shouldLog(level)) return
 
+    // Check sampling based on event_name
+    const eventName = (meta?.event_name || meta?.event) as string | undefined
+    if (!shouldSample(eventName)) {
+      metrics.sampled++
+      return
+    }
+
     const errorData = error ? formatError(error) : undefined
 
     // Get request context from AsyncLocalStorage (if available)
@@ -431,7 +680,7 @@ export class Logger implements ILogger {
       level,
       service: this.service,
       message,
-      // Include request context fields (requestId, etc.) before other meta
+      // Include request context fields (requestId, traceId, etc.) before other meta
       ...requestContext,
       ...this.defaultContext,
       ...meta,
@@ -506,4 +755,25 @@ export class Logger implements ILogger {
  */
 export function createLogger(service: string): ILogger {
   return new Logger(service)
+}
+
+/**
+ * Generate a trace ID (simple UUID v4)
+ */
+export function generateTraceId(): string {
+  // Simple UUID v4 generation
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
+/**
+ * Generate a span ID (shorter identifier for individual operations)
+ */
+export function generateSpanId(): string {
+  return 'xxxxxxxxxxxxxxxx'.replace(/x/g, () => {
+    return ((Math.random() * 16) | 0).toString(16)
+  })
 }

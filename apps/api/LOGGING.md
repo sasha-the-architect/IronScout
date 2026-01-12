@@ -14,6 +14,8 @@ Production-grade structured logging for the IronScout API.
   "component": "server",
   "message": "Request completed",
   "requestId": "req-abc123",
+  "traceId": "a1b2c3d4-e5f6-4789-abcd-ef0123456789",
+  "spanId": "1234567890abcdef",
   "env": "production",
   "version": "1.0.0",
   "event_name": "http.request.end",
@@ -44,6 +46,7 @@ Production-grade structured logging for the IronScout API.
 | `LOG_LEVEL` | `info` | Minimum log level (debug, info, warn, error, fatal) |
 | `LOG_FORMAT` | `json` (prod) / `pretty` (dev) | Output format |
 | `LOG_ASYNC` | `false` | Enable buffered async logging |
+| `LOG_REDACT` | `true` (prod) / `false` (dev) | Enable automatic PII/secrets redaction |
 | `NODE_ENV` | `development` | Affects format defaults |
 
 ---
@@ -110,6 +113,25 @@ cat api.log | jq -s 'map(select(.error_code)) | group_by(.error_code) | map({cod
 ```bash
 # All logs for a specific request
 cat api.log | jq 'select(.requestId == "req-abc123")'
+
+# Trace across services using traceId
+cat *.log | jq 'select(.traceId == "a1b2c3d4-e5f6-4789-abcd-ef0123456789")'
+```
+
+### Distributed Tracing
+
+Requests include three correlation IDs:
+- `requestId`: Unique to this specific request
+- `traceId`: Shared across all services in a request chain (propagated via `X-Trace-ID` header)
+- `spanId`: Unique identifier for this operation within the trace
+
+To trace a request across services:
+```bash
+# Get the traceId from the first log
+TRACE_ID=$(cat api.log | jq -r 'select(.event_name == "http.request.end") | .traceId' | head -1)
+
+# Find all logs with this trace
+cat *.log | jq --arg id "$TRACE_ID" 'select(.traceId == $id)' | jq -s 'sort_by(.timestamp)'
 ```
 
 ### Rate Limiting Analysis
@@ -201,7 +223,37 @@ pnpm test apps/api/src/lib/__tests__/redact.test.ts
 
 1. Increase `LOG_LEVEL` to `warn` or `error`
 2. Health checks and static assets are already excluded
-3. Consider sampling for high-frequency events
+3. Use sampling for high-frequency events:
+   ```typescript
+   import { setSampleRate, setDefaultSampleRate } from '@ironscout/logger'
+
+   // Sample 10% of http.request.end events
+   setSampleRate('http.request.end', 0.1)
+
+   // Sample 50% of all events by default
+   setDefaultSampleRate(0.5)
+   ```
+
+### Log Metrics
+
+Monitor log volume to detect runaway logging:
+```typescript
+import { getLogMetrics, resetLogMetrics } from '@ironscout/logger'
+
+const metrics = getLogMetrics()
+// {
+//   total: 1000,
+//   byLevel: { debug: 100, info: 800, warn: 50, error: 50, fatal: 0 },
+//   byService: { api: 600, harvester: 400 },
+//   sampled: 200,  // events dropped by sampling
+//   redacted: 800, // entries with redaction applied
+//   uptimeMs: 60000,
+//   lastReset: 1705312200000
+// }
+
+// Reset counters
+resetLogMetrics()
+```
 
 ### Log Fields Missing
 
@@ -256,26 +308,31 @@ const log = createChildLogger('myFeature', { customContext: 'value' })
 
 ```
 Request Flow:
-┌─────────────────────┐
-│ requestContextMiddleware │  ← Sets requestId
-└──────────┬──────────┘
+┌─────────────────────────────┐
+│ requestContextMiddleware    │  ← Sets requestId, traceId, spanId
+└──────────┬──────────────────┘
            │
-┌──────────▼──────────┐
-│ requestLoggerMiddleware │  ← Starts timer, logs on finish
-└──────────┬──────────┘
+┌──────────▼──────────────────┐
+│ requestLoggerMiddleware     │  ← Starts timer, logs on finish
+└──────────┬──────────────────┘
            │
-┌──────────▼──────────┐
-│   Route Handlers    │  ← Use loggers.* for domain logs
-└──────────┬──────────┘
+┌──────────▼──────────────────┐
+│   Route Handlers            │  ← Use loggers.* for domain logs
+└──────────┬──────────────────┘
            │
-┌──────────▼──────────┐
-│ errorLoggerMiddleware │  ← Classifies and logs errors
-└──────────┬──────────┘
+┌──────────▼──────────────────┐
+│ errorLoggerMiddleware       │  ← Classifies and logs errors
+└──────────┬──────────────────┘
            │
-┌──────────▼──────────┐
-│ Final Error Handler │  ← Sends response to client
-└─────────────────────┘
+┌──────────▼──────────────────┐
+│ Final Error Handler         │  ← Sends response to client
+└─────────────────────────────┘
 ```
+
+Headers propagated:
+- `X-Request-ID` - Request-specific ID
+- `X-Trace-ID` - Distributed trace ID (propagated from upstream or generated)
+- `X-Span-ID` - Span ID for this operation
 
 ---
 

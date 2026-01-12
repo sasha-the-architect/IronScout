@@ -381,12 +381,25 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
 
     if (result.skipped) {
       // Per spec Q8.2.3: Use SUCCEEDED + skippedReason, not separate SKIPPED status
-      log.debug('Run skipped - finalizing with SUCCEEDED status', {
-        feedId: feed.id,
-        runId: run.id,
-        skippedReason: result.skippedReason,
-        decision: 'SKIP_UNCHANGED',
-      })
+      // FILE_NOT_FOUND gets WARN level for visibility; others get DEBUG
+      if (result.skippedReason === 'FILE_NOT_FOUND') {
+        log.warn('RUN_SKIPPED_FILE_NOT_FOUND', {
+          event_name: 'RUN_SKIPPED_FILE_NOT_FOUND',
+          feedId: feed.id,
+          runId: run.id,
+          feedName: feed.sources.name,
+          network: feed.network,
+          skippedReason: result.skippedReason,
+          decision: 'File not found - expected condition, will retry next schedule',
+        })
+      } else {
+        log.debug('Run skipped - finalizing with SUCCEEDED status', {
+          feedId: feed.id,
+          runId: run.id,
+          skippedReason: result.skippedReason,
+          decision: 'SKIP_UNCHANGED',
+        })
+      }
       await finalizeRun(context, 'SUCCEEDED', { skippedReason: result.skippedReason }, log)
     } else {
       // Phase 2: Circuit Breaker → Promote

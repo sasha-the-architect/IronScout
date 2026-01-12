@@ -62,7 +62,7 @@ async function processEmbeddingJob(job: Job<EmbeddingGenerateJobData>): Promise<
   const startTime = Date.now()
 
   log.debug('EMBEDDING_JOB_START', {
-    event: 'EMBEDDING_JOB_START',
+    event_name: 'EMBEDDING_JOB_START',
     jobId: job.id,
     productId,
     trigger,
@@ -73,7 +73,7 @@ async function processEmbeddingJob(job: Job<EmbeddingGenerateJobData>): Promise<
   // Check if OpenAI is configured
   if (!openai) {
     log.warn('EMBEDDING_SKIPPED_NO_API_KEY', {
-      event: 'EMBEDDING_SKIPPED_NO_API_KEY',
+      event_name: 'EMBEDDING_SKIPPED_NO_API_KEY',
       jobId: job.id,
       productId,
     })
@@ -99,7 +99,7 @@ async function processEmbeddingJob(job: Job<EmbeddingGenerateJobData>): Promise<
 
   if (!product) {
     log.warn('EMBEDDING_SKIPPED_PRODUCT_NOT_FOUND', {
-      event: 'EMBEDDING_SKIPPED_PRODUCT_NOT_FOUND',
+      event_name: 'EMBEDDING_SKIPPED_PRODUCT_NOT_FOUND',
       jobId: job.id,
       productId,
     })
@@ -125,7 +125,7 @@ async function processEmbeddingJob(job: Job<EmbeddingGenerateJobData>): Promise<
   const durationMs = Date.now() - startTime
 
   log.info('EMBEDDING_JOB_COMPLETED', {
-    event: 'EMBEDDING_JOB_COMPLETED',
+    event_name: 'EMBEDDING_JOB_COMPLETED',
     jobId: job.id,
     productId,
     trigger,
@@ -145,13 +145,13 @@ export async function startEmbeddingWorker(options?: {
 
   if (!OPENAI_API_KEY) {
     log.warn('EMBEDDING_WORKER_NO_API_KEY', {
-      event: 'EMBEDDING_WORKER_NO_API_KEY',
+      event_name: 'EMBEDDING_WORKER_NO_API_KEY',
       message: 'OPENAI_API_KEY not set - embedding worker will skip all jobs',
     })
   }
 
   log.info('EMBEDDING_WORKER_START', {
-    event: 'EMBEDDING_WORKER_START',
+    event_name: 'EMBEDDING_WORKER_START',
     concurrency,
     queueName: QUEUE_NAMES.EMBEDDING_GENERATE,
     openaiConfigured: !!OPENAI_API_KEY,
@@ -179,7 +179,7 @@ export async function startEmbeddingWorker(options?: {
     log.error(
       'EMBEDDING_JOB_FAILED',
       {
-        event: 'EMBEDDING_JOB_FAILED',
+        event_name: 'EMBEDDING_JOB_FAILED',
         jobId: job?.id,
         productId: job?.data?.productId,
         trigger: job?.data?.trigger,
@@ -194,7 +194,7 @@ export async function startEmbeddingWorker(options?: {
     log.error(
       'EMBEDDING_WORKER_ERROR',
       {
-        event: 'EMBEDDING_WORKER_ERROR',
+        event_name: 'EMBEDDING_WORKER_ERROR',
         errorMessage: error.message,
       },
       error
@@ -210,7 +210,7 @@ export async function startEmbeddingWorker(options?: {
 export async function stopEmbeddingWorker(): Promise<void> {
   if (embeddingWorker) {
     log.info('EMBEDDING_WORKER_STOPPING', {
-      event: 'EMBEDDING_WORKER_STOPPING',
+      event_name: 'EMBEDDING_WORKER_STOPPING',
       processedCount,
       errorCount,
       skippedCount,

@@ -12,12 +12,15 @@
  * - Structured metadata support
  * - Child loggers with inherited context
  * - Environment-based configuration
- * - Request ID correlation via AsyncLocalStorage (Node.js only)
+ * - Request ID + Trace ID correlation via AsyncLocalStorage (Node.js only)
+ * - Automatic PII/secrets redaction
+ * - Sampling for high-volume events
  *
  * Environment variables (Node.js only):
  * - LOG_LEVEL: Minimum log level (debug, info, warn, error, fatal). Default: info
  * - LOG_FORMAT: Output format (json, pretty). Default: json in production, pretty in development
  * - LOG_ASYNC: Enable async buffered logging (true/1). Default: false
+ * - LOG_REDACT: Enable automatic redaction (true/1). Default: true in production
  * - NODE_ENV: Used to determine defaults
  *
  * Browser behavior:
@@ -31,6 +34,9 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
  */
 export interface RequestContext {
     requestId?: string;
+    traceId?: string;
+    spanId?: string;
+    userId?: string;
     [key: string]: unknown;
 }
 /**
@@ -47,6 +53,38 @@ export declare function getRequestContext(): RequestContext | undefined;
 export interface LogContext {
     [key: string]: unknown;
 }
+/**
+ * Configure sampling rate for an event type
+ * @param eventName - Event name or pattern (e.g., 'http.request.end')
+ * @param rate - Sample rate from 0.0 (log nothing) to 1.0 (log everything)
+ */
+export declare function setSampleRate(eventName: string, rate: number): void;
+/**
+ * Set default sample rate for events without specific config
+ */
+export declare function setDefaultSampleRate(rate: number): void;
+interface LogMetrics {
+    total: number;
+    byLevel: Record<LogLevel, number>;
+    byService: Record<string, number>;
+    sampled: number;
+    redacted: number;
+    lastReset: number;
+}
+/**
+ * Get current log metrics
+ */
+export declare function getLogMetrics(): LogMetrics & {
+    uptimeMs: number;
+};
+/**
+ * Reset log metrics
+ */
+export declare function resetLogMetrics(): void;
+/**
+ * Enable or disable redaction at runtime
+ */
+export declare function setRedactionEnabled(enabled: boolean): void;
 /**
  * Set the log level dynamically at runtime
  * This takes precedence over LOG_LEVEL env var
@@ -102,4 +140,13 @@ export declare class Logger implements ILogger {
  * ```
  */
 export declare function createLogger(service: string): ILogger;
+/**
+ * Generate a trace ID (simple UUID v4)
+ */
+export declare function generateTraceId(): string;
+/**
+ * Generate a span ID (shorter identifier for individual operations)
+ */
+export declare function generateSpanId(): string;
+export {};
 //# sourceMappingURL=index.d.ts.map

@@ -12,12 +12,15 @@
  * - Structured metadata support
  * - Child loggers with inherited context
  * - Environment-based configuration
- * - Request ID correlation via AsyncLocalStorage (Node.js only)
+ * - Request ID + Trace ID correlation via AsyncLocalStorage (Node.js only)
+ * - Automatic PII/secrets redaction
+ * - Sampling for high-volume events
  *
  * Environment variables (Node.js only):
  * - LOG_LEVEL: Minimum log level (debug, info, warn, error, fatal). Default: info
  * - LOG_FORMAT: Output format (json, pretty). Default: json in production, pretty in development
  * - LOG_ASYNC: Enable async buffered logging (true/1). Default: false
+ * - LOG_REDACT: Enable automatic redaction (true/1). Default: true in production
  * - NODE_ENV: Used to determine defaults
  *
  * Browser behavior:
@@ -79,13 +82,202 @@ const LOG_LEVELS = {
     error: 3,
     fatal: 4,
 };
-// Dynamic log level support - allows runtime changes without restart
+// =============================================================================
+// Redaction - Automatic PII/secrets filtering
+// =============================================================================
+/**
+ * Sensitive field patterns - ALWAYS redacted
+ */
+const SENSITIVE_PATTERNS = [
+    /authorization/i,
+    /^cookie$/i,
+    /^set-cookie$/i,
+    /password/i,
+    /secret/i,
+    /token/i,
+    /api[-_]?key/i,
+    /access[-_]?token/i,
+    /refresh[-_]?token/i,
+    /bearer/i,
+    /jwt/i,
+    /session[-_]?id/i,
+    /credit[-_]?card/i,
+    /card[-_]?number/i,
+    /cvv/i,
+    /cvc/i,
+    /^pan$/i,
+    /account[-_]?number/i,
+    /routing[-_]?number/i,
+    /ssn/i,
+    /social[-_]?security/i,
+    /^dob$/i,
+    /date[-_]?of[-_]?birth/i,
+    /private[-_]?key/i,
+];
+/**
+ * Safe fields that pass through without redaction (allowlist)
+ */
+const SAFE_FIELDS = new Set([
+    // Standard log fields
+    'timestamp', 'ts', 'level', 'service', 'component', 'message', 'msg',
+    'event', 'event_name', 'env', 'environment', 'version',
+    // Request correlation
+    'requestId', 'request_id', 'traceId', 'trace_id', 'spanId', 'span_id',
+    'correlationId', 'correlation_id',
+    // HTTP fields
+    'method', 'path', 'route', 'url', 'statusCode', 'status_code',
+    'latencyMs', 'latency_ms', 'durationMs', 'duration_ms',
+    'contentLength', 'content_length', 'protocol', 'host', 'hostname', 'port',
+    'userAgent', 'user_agent', 'ip', 'remoteAddress', 'remote_address',
+    // Identifiers (non-sensitive)
+    'userId', 'user_id', 'productId', 'product_id', 'orderId', 'order_id',
+    'jobId', 'job_id', 'sourceProductId', 'sourceKind',
+    // Error fields
+    'error', 'errorType', 'error_type', 'errorCode', 'error_code',
+    'errorMessage', 'error_message', 'errorName', 'error_name',
+    'error_category', 'error_status_code', 'error_is_operational', 'error_is_retryable',
+    'stack', 'name', 'code',
+    // Business fields
+    'caliber', 'brand', 'category', 'purpose', 'tier',
+    'count', 'total', 'page', 'limit', 'offset',
+    'query', 'sortBy', 'sort_by', 'filter', 'filters',
+    // Metrics
+    'attemptsMade', 'willRetry', 'isFinalAttempt',
+    'processed', 'skipped', 'errors', 'success',
+    // Nested objects (will be recursively checked)
+    'http', 'error_details', 'meta', 'context', 'data',
+]);
+const REDACTED = '[REDACTED]';
+function isSensitiveField(fieldName) {
+    return SENSITIVE_PATTERNS.some((pattern) => pattern.test(fieldName));
+}
+function isSafeField(fieldName) {
+    return SAFE_FIELDS.has(fieldName);
+}
+/**
+ * Redact sensitive fields from log entry
+ */
+function redactEntry(obj, depth = 0, seen = new WeakSet()) {
+    if (depth > 10)
+        return '[MAX_DEPTH]';
+    if (obj === null || obj === undefined)
+        return obj;
+    if (typeof obj !== 'object')
+        return obj;
+    if (seen.has(obj))
+        return '[CIRCULAR]';
+    seen.add(obj);
+    if (Array.isArray(obj)) {
+        return obj.map((item) => redactEntry(item, depth + 1, seen));
+    }
+    const result = {};
+    for (const [key, value] of Object.entries(obj)) {
+        if (isSensitiveField(key)) {
+            result[key] = REDACTED;
+        }
+        else if (isSafeField(key)) {
+            result[key] = typeof value === 'object' && value !== null
+                ? redactEntry(value, depth + 1, seen)
+                : value;
+        }
+        else if (typeof value === 'boolean' || value === null || value === undefined) {
+            result[key] = value;
+        }
+        else if (typeof value === 'object') {
+            result[key] = redactEntry(value, depth + 1, seen);
+        }
+        else {
+            // Unknown primitive field - redact by default (fail-safe)
+            result[key] = REDACTED;
+        }
+    }
+    return result;
+}
+const sampleConfigs = new Map();
+let defaultSampleRate = 1.0; // Log everything by default
+/**
+ * Configure sampling rate for an event type
+ * @param eventName - Event name or pattern (e.g., 'http.request.end')
+ * @param rate - Sample rate from 0.0 (log nothing) to 1.0 (log everything)
+ */
+export function setSampleRate(eventName, rate) {
+    sampleConfigs.set(eventName, { rate: Math.max(0, Math.min(1, rate)), counter: 0 });
+}
+/**
+ * Set default sample rate for events without specific config
+ */
+export function setDefaultSampleRate(rate) {
+    defaultSampleRate = Math.max(0, Math.min(1, rate));
+}
+/**
+ * Check if an event should be logged based on sampling
+ */
+function shouldSample(eventName) {
+    if (!eventName)
+        return true;
+    const config = sampleConfigs.get(eventName);
+    if (!config) {
+        // Use deterministic sampling for consistency
+        return Math.random() < defaultSampleRate;
+    }
+    // Deterministic counter-based sampling
+    config.counter++;
+    const interval = Math.ceil(1 / config.rate);
+    return config.counter % interval === 0;
+}
+const metrics = {
+    total: 0,
+    byLevel: { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 },
+    byService: {},
+    sampled: 0,
+    redacted: 0,
+    lastReset: Date.now(),
+};
+/**
+ * Get current log metrics
+ */
+export function getLogMetrics() {
+    return {
+        ...metrics,
+        uptimeMs: Date.now() - metrics.lastReset,
+    };
+}
+/**
+ * Reset log metrics
+ */
+export function resetLogMetrics() {
+    metrics.total = 0;
+    metrics.byLevel = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+    metrics.byService = {};
+    metrics.sampled = 0;
+    metrics.redacted = 0;
+    metrics.lastReset = Date.now();
+}
+// =============================================================================
+// Configuration
+// =============================================================================
 let dynamicLogLevel = null;
+let redactionEnabled = null;
 function isAsyncEnabled() {
     if (!isNode || isBrowser)
         return false;
     const flag = getEnv('LOG_ASYNC');
     return flag === 'true' || flag === '1';
+}
+function isRedactionEnabled() {
+    if (redactionEnabled !== null)
+        return redactionEnabled;
+    const flag = getEnv('LOG_REDACT');
+    if (flag === 'false' || flag === '0')
+        return false;
+    // Default: enabled in production
+    return getEnv('NODE_ENV') === 'production';
+}
+/**
+ * Enable or disable redaction at runtime
+ */
+export function setRedactionEnabled(enabled) {
+    redactionEnabled = enabled;
 }
 const asyncQueue = [];
 let asyncFlushPromise = null;
@@ -163,7 +355,12 @@ function formatError(error) {
     };
 }
 function formatJson(entry) {
-    return JSON.stringify(entry);
+    // Apply redaction if enabled
+    const finalEntry = isRedactionEnabled() ? redactEntry(entry) : entry;
+    if (isRedactionEnabled()) {
+        metrics.redacted++;
+    }
+    return JSON.stringify(finalEntry);
 }
 // ANSI colors for Node.js terminal
 const ANSI_COLORS = {
@@ -253,6 +450,10 @@ export async function flushLogs() {
     }
 }
 function output(entry) {
+    // Update metrics
+    metrics.total++;
+    metrics.byLevel[entry.level]++;
+    metrics.byService[entry.service] = (metrics.byService[entry.service] || 0) + 1;
     const format = getLogFormat();
     if (!isBrowser && isAsyncEnabled()) {
         const line = format === 'json'
@@ -334,6 +535,12 @@ export class Logger {
     log(level, message, meta, error) {
         if (!shouldLog(level))
             return;
+        // Check sampling based on event_name
+        const eventName = (meta?.event_name || meta?.event);
+        if (!shouldSample(eventName)) {
+            metrics.sampled++;
+            return;
+        }
         const errorData = error ? formatError(error) : undefined;
         // Get request context from AsyncLocalStorage (if available)
         const requestContext = getRequestContext();
@@ -342,7 +549,7 @@ export class Logger {
             level,
             service: this.service,
             message,
-            // Include request context fields (requestId, etc.) before other meta
+            // Include request context fields (requestId, traceId, etc.) before other meta
             ...requestContext,
             ...this.defaultContext,
             ...meta,
@@ -407,5 +614,24 @@ export class Logger {
  */
 export function createLogger(service) {
     return new Logger(service);
+}
+/**
+ * Generate a trace ID (simple UUID v4)
+ */
+export function generateTraceId() {
+    // Simple UUID v4 generation
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+}
+/**
+ * Generate a span ID (shorter identifier for individual operations)
+ */
+export function generateSpanId() {
+    return 'xxxxxxxxxxxxxxxx'.replace(/x/g, () => {
+        return ((Math.random() * 16) | 0).toString(16);
+    });
 }
 //# sourceMappingURL=index.js.map

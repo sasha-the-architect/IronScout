@@ -173,9 +173,11 @@ export async function resolveSourceProduct(
   })
 
   if (!sourceProduct) {
-    rlog.error('SOURCE_NOT_FOUND', {
+    // WARN not ERROR: Expected when source product was deleted after job enqueue
+    // or due to race conditions during ingestion. Worker handles gracefully.
+    rlog.warn('SOURCE_NOT_FOUND', {
+      event_name: 'SOURCE_NOT_FOUND',
       phase: 'load',
-      errorType: 'expected',
       durationMs: Date.now() - startTime,
     })
     return createErrorResult('SOURCE_NOT_FOUND', `source_product ${sourceProductId} not found`, null)

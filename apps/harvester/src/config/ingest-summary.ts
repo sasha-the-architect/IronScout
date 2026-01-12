@@ -157,7 +157,7 @@ export function emitIngestRunSummary(summary: IngestRunSummary): void {
 
   log[logLevel]('INGEST_RUN_SUMMARY', {
     // Core identifiers
-    event: 'INGEST_RUN_SUMMARY',
+    event_name: 'INGEST_RUN_SUMMARY',
     pipeline: summary.pipeline,
     runId: summary.runId,
     sourceId: summary.sourceId,

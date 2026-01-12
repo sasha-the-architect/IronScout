@@ -60,12 +60,12 @@ export async function startProductResolverWorker(options?: {
   // Initialize brand alias cache before starting worker
   await brandAliasCache.initialize(prisma)
   log.info('BRAND_ALIAS_CACHE_INITIALIZED', {
-    event: 'BRAND_ALIAS_CACHE_INITIALIZED',
+    event_name: 'BRAND_ALIAS_CACHE_INITIALIZED',
     metrics: brandAliasCache.getMetrics(),
   })
 
   log.info('RESOLVER_WORKER_START', {
-    event: 'RESOLVER_WORKER_START',
+    event_name: 'RESOLVER_WORKER_START',
     concurrency,
     maxStalledCount,
     queueName: QUEUE_NAMES.PRODUCT_RESOLVE,
@@ -89,7 +89,7 @@ export async function startProductResolverWorker(options?: {
     processedCount++
     lastProcessedAt = new Date()
     log.debug('RESOLVER_JOB_COMPLETED', {
-      event: 'RESOLVER_JOB_COMPLETED',
+      event_name: 'RESOLVER_JOB_COMPLETED',
       jobId: job.id,
       sourceProductId: job.data.sourceProductId,
       trigger: job.data.trigger,
@@ -100,7 +100,7 @@ export async function startProductResolverWorker(options?: {
   productResolverWorker.on('failed', (job: Job<ProductResolveJobData> | undefined, error: Error) => {
     errorCount++
     log.error('RESOLVER_JOB_FAILED', {
-      event: 'RESOLVER_JOB_FAILED',
+      event_name: 'RESOLVER_JOB_FAILED',
       jobId: job?.id,
       sourceProductId: job?.data?.sourceProductId,
       trigger: job?.data?.trigger,
@@ -113,7 +113,7 @@ export async function startProductResolverWorker(options?: {
 
   productResolverWorker.on('error', (error: Error) => {
     log.error('RESOLVER_WORKER_ERROR', {
-      event: 'RESOLVER_WORKER_ERROR',
+      event_name: 'RESOLVER_WORKER_ERROR',
       errorMessage: error.message,
       errorName: error.name,
     }, error)
@@ -121,7 +121,7 @@ export async function startProductResolverWorker(options?: {
 
   productResolverWorker.on('stalled', (jobId: string) => {
     log.error('RESOLVER_JOB_STALLED', {
-      event: 'RESOLVER_JOB_STALLED',
+      event_name: 'RESOLVER_JOB_STALLED',
       jobId,
       reason: 'Job processing took too long or worker crashed',
     })
@@ -136,7 +136,7 @@ export async function startProductResolverWorker(options?: {
 export async function stopProductResolverWorker(): Promise<void> {
   if (productResolverWorker) {
     log.info('RESOLVER_WORKER_STOPPING', {
-      event: 'RESOLVER_WORKER_STOPPING',
+      event_name: 'RESOLVER_WORKER_STOPPING',
       processedCount,
       errorCount,
       lastProcessedAt: lastProcessedAt?.toISOString(),
@@ -151,7 +151,7 @@ export async function stopProductResolverWorker(): Promise<void> {
     await closeResolverLogger()
 
     log.info('RESOLVER_WORKER_STOPPED', {
-      event: 'RESOLVER_WORKER_STOPPED',
+      event_name: 'RESOLVER_WORKER_STOPPED',
       finalProcessedCount: processedCount,
       finalErrorCount: errorCount,
     })
@@ -173,7 +173,7 @@ async function processResolveJob(
   const startTime = Date.now()
 
   log.info('RESOLVER_JOB_START', {
-    event: 'RESOLVER_JOB_START',
+    event_name: 'RESOLVER_JOB_START',
     jobId: job.id,
     sourceProductId,
     trigger,
@@ -186,7 +186,7 @@ async function processResolveJob(
   // Version check - warn if job was enqueued with different version
   if (resolverVersion !== RESOLVER_VERSION) {
     log.warn('RESOLVER_VERSION_MISMATCH', {
-      event: 'RESOLVER_VERSION_MISMATCH',
+      event_name: 'RESOLVER_VERSION_MISMATCH',
       sourceProductId,
       jobVersion: resolverVersion,
       currentVersion: RESOLVER_VERSION,
@@ -207,7 +207,7 @@ async function processResolveJob(
   })
 
   log.debug('RESOLVER_REQUEST_PROCESSING', {
-    event: 'RESOLVER_REQUEST_PROCESSING',
+    event_name: 'RESOLVER_REQUEST_PROCESSING',
     sourceProductId,
     rowsUpdated: requestUpdate.count,
   })
@@ -215,7 +215,7 @@ async function processResolveJob(
   try {
     // Execute resolver algorithm
     log.debug('RESOLVER_ALGORITHM_START', {
-      event: 'RESOLVER_ALGORITHM_START',
+      event_name: 'RESOLVER_ALGORITHM_START',
       sourceProductId,
       trigger,
     })
@@ -229,7 +229,7 @@ async function processResolveJob(
     recordRequest(sourceKind)
 
     log.debug('RESOLVER_ALGORITHM_COMPLETE', {
-      event: 'RESOLVER_ALGORITHM_COMPLETE',
+      event_name: 'RESOLVER_ALGORITHM_COMPLETE',
       sourceProductId,
       matchType: result.matchType,
       status: result.status,
@@ -251,7 +251,7 @@ async function processResolveJob(
 
     if (skipPersistence) {
       log.debug('RESOLVER_PERSISTENCE_SKIPPED', {
-        event: 'RESOLVER_PERSISTENCE_SKIPPED',
+        event_name: 'RESOLVER_PERSISTENCE_SKIPPED',
         sourceProductId,
         reason: isSourceNotFound
           ? 'Source product not found - cannot persist'
@@ -266,7 +266,7 @@ async function processResolveJob(
       const persistDuration = Date.now() - persistStart
 
       log.debug('RESOLVER_RESULT_PERSISTED', {
-        event: 'RESOLVER_RESULT_PERSISTED',
+        event_name: 'RESOLVER_RESULT_PERSISTED',
         sourceProductId,
         productId: result.productId,
         matchType: result.matchType,
@@ -280,7 +280,7 @@ async function processResolveJob(
           data: { normalizedHash: result.evidence.inputHash },
         })
         log.debug('RESOLVER_HASH_UPDATED', {
-          event: 'RESOLVER_HASH_UPDATED',
+          event_name: 'RESOLVER_HASH_UPDATED',
           sourceProductId,
           inputHash: result.evidence.inputHash.slice(0, 16) + '...',
         })
@@ -310,7 +310,7 @@ async function processResolveJob(
     })
 
     log.info('RESOLVER_JOB_COMPLETE', {
-      event: 'RESOLVER_JOB_COMPLETE',
+      event_name: 'RESOLVER_JOB_COMPLETE',
       jobId: job.id,
       sourceProductId,
       trigger,
@@ -358,7 +358,7 @@ async function processResolveJob(
           })
           if (enqueued) {
             log.debug('EMBEDDING_JOB_ENQUEUED', {
-              event: 'EMBEDDING_JOB_ENQUEUED',
+              event_name: 'EMBEDDING_JOB_ENQUEUED',
               productId: result.productId,
               sourceProductId,
               trigger: 'RESOLVE',
@@ -368,7 +368,7 @@ async function processResolveJob(
       } catch (embeddingErr) {
         // Log but don't fail the resolver job for embedding errors
         log.warn('EMBEDDING_ENQUEUE_FAILED', {
-          event: 'EMBEDDING_ENQUEUE_FAILED',
+          event_name: 'EMBEDDING_ENQUEUE_FAILED',
           productId: result.productId,
           sourceProductId,
           error: embeddingErr instanceof Error ? embeddingErr.message : String(embeddingErr),
@@ -407,7 +407,7 @@ async function processResolveJob(
     // If not final attempt, leave as PROCESSING so sweeper can recover if needed
 
     log.error('RESOLVER_JOB_ERROR', {
-      event: 'RESOLVER_JOB_ERROR',
+      event_name: 'RESOLVER_JOB_ERROR',
       jobId: job.id,
       sourceProductId,
       trigger,
@@ -451,7 +451,7 @@ async function persistResolverResult(
 
   if (wasTruncated) {
     log.warn('RESOLVER_EVIDENCE_TRUNCATED', {
-      event: 'RESOLVER_EVIDENCE_TRUNCATED',
+      event_name: 'RESOLVER_EVIDENCE_TRUNCATED',
       sourceProductId,
       originalSize,
       finalSize,
@@ -461,7 +461,7 @@ async function persistResolverResult(
   }
 
   log.debug('RESOLVER_PERSIST_START', {
-    event: 'RESOLVER_PERSIST_START',
+    event_name: 'RESOLVER_PERSIST_START',
     sourceProductId,
     productId: result.productId,
     matchType: result.matchType,
@@ -606,13 +606,13 @@ let sweeperRunning = false
 export function startProcessingSweeper(): void {
   if (sweeperInterval) {
     log.warn('SWEEPER_ALREADY_RUNNING', {
-      event: 'SWEEPER_ALREADY_RUNNING',
+      event_name: 'SWEEPER_ALREADY_RUNNING',
     })
     return
   }
 
   log.info('SWEEPER_START', {
-    event: 'SWEEPER_START',
+    event_name: 'SWEEPER_START',
     intervalMs: SWEEPER_INTERVAL_MS,
     timeoutMs: PROCESSING_TIMEOUT_MS,
     maxAttempts: MAX_ATTEMPTS,
@@ -621,7 +621,7 @@ export function startProcessingSweeper(): void {
   sweeperInterval = setInterval(async () => {
     if (sweeperRunning) {
       log.debug('SWEEPER_SKIP_IN_PROGRESS', {
-        event: 'SWEEPER_SKIP_IN_PROGRESS',
+        event_name: 'SWEEPER_SKIP_IN_PROGRESS',
       })
       return
     }
@@ -631,7 +631,7 @@ export function startProcessingSweeper(): void {
       await sweepStuckProcessing()
     } catch (err) {
       log.error('SWEEPER_ERROR', {
-        event: 'SWEEPER_ERROR',
+        event_name: 'SWEEPER_ERROR',
         error: err instanceof Error ? err.message : String(err),
       }, err)
     } finally {
@@ -648,7 +648,7 @@ export function stopProcessingSweeper(): void {
     clearInterval(sweeperInterval)
     sweeperInterval = null
     log.info('SWEEPER_STOP', {
-      event: 'SWEEPER_STOP',
+      event_name: 'SWEEPER_STOP',
     })
   }
 }
@@ -684,7 +684,7 @@ async function sweepStuckProcessing(): Promise<void> {
   }
 
   log.info('SWEEPER_FOUND_STUCK', {
-    event: 'SWEEPER_FOUND_STUCK',
+    event_name: 'SWEEPER_FOUND_STUCK',
     count: stuckRequests.length,
     timeoutThreshold: timeoutThreshold.toISOString(),
   })
@@ -708,7 +708,7 @@ async function sweepStuckProcessing(): Promise<void> {
       failedCount++
 
       log.error('SWEEPER_REQUEST_FAILED', {
-        event: 'SWEEPER_REQUEST_FAILED',
+        event_name: 'SWEEPER_REQUEST_FAILED',
         requestId: request.id,
         sourceProductId: request.sourceProductId,
         attempts: newAttempts,
@@ -741,7 +741,7 @@ async function sweepStuckProcessing(): Promise<void> {
       retriedCount++
 
       log.info('SWEEPER_REQUEST_RETRY', {
-        event: 'SWEEPER_REQUEST_RETRY',
+        event_name: 'SWEEPER_REQUEST_RETRY',
         requestId: request.id,
         sourceProductId: request.sourceProductId,
         attempts: newAttempts,
@@ -751,7 +751,7 @@ async function sweepStuckProcessing(): Promise<void> {
   }
 
   log.info('SWEEPER_COMPLETE', {
-    event: 'SWEEPER_COMPLETE',
+    event_name: 'SWEEPER_COMPLETE',
     totalStuck: stuckRequests.length,
     retried: retriedCount,
     failed: failedCount,

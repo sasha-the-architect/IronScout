@@ -184,7 +184,23 @@ async function downloadViaSftp(
             clearTimeout(timeout)
             resolved = true
             conn.end()
-            reject(new Error(`File not found: ${feed.path}`))
+            // FILE_NOT_FOUND is an expected condition (file not yet published, being regenerated)
+            // Return as skip instead of error to avoid failure cascade
+            feedLog.warn('SFTP_FILE_NOT_FOUND', {
+              event_name: 'SFTP_FILE_NOT_FOUND',
+              phase: 'stat',
+              path: feed.path,
+              errorMessage: statErr.message,
+              action: 'skip_run',
+            })
+            resolve({
+              content: Buffer.alloc(0),
+              mtime: null,
+              size: BigInt(0),
+              contentHash: '',
+              skipped: true,
+              skippedReason: 'FILE_NOT_FOUND',
+            })
             return
           }
 
@@ -580,9 +596,39 @@ async function downloadViaFtp(
       skipped: false,
     }
   } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    const errorMessageLower = errorMessage.toLowerCase()
+
+    // Detect file-not-found errors (FTP 550, "no such file", etc.)
+    // Return as skip instead of error to avoid failure cascade
+    const isFileNotFound =
+      errorMessageLower.includes('550') ||
+      errorMessageLower.includes('no such file') ||
+      errorMessageLower.includes('not found') ||
+      errorMessageLower.includes('does not exist')
+
+    if (isFileNotFound) {
+      feedLog.warn('FTP_FILE_NOT_FOUND', {
+        event_name: 'FTP_FILE_NOT_FOUND',
+        phase: 'stat',
+        path: feed.path,
+        errorMessage,
+        action: 'skip_run',
+      })
+      return {
+        content: Buffer.alloc(0),
+        mtime: null,
+        size: BigInt(0),
+        contentHash: '',
+        skipped: true,
+        skippedReason: 'FILE_NOT_FOUND',
+      }
+    }
+
     feedLog.error('FTP_ERROR', {
+      event_name: 'FTP_ERROR',
       phase: 'error',
-      errorMessage: err instanceof Error ? err.message : String(err),
+      errorMessage,
       errorName: err instanceof Error ? err.name : 'Unknown',
       host: feed.host,
       path: feed.path,

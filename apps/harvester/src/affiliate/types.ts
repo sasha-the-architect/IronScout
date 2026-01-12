@@ -51,7 +51,8 @@ export interface DownloadResult {
   size: bigint
   contentHash: string
   skipped: boolean
-  skippedReason?: 'UNCHANGED_HASH' | 'UNCHANGED_MTIME'
+  /** Reason for skipping processing (run completes as SUCCEEDED, not FAILED) */
+  skippedReason?: 'UNCHANGED_HASH' | 'UNCHANGED_MTIME' | 'FILE_NOT_FOUND'
 }
 
 /**

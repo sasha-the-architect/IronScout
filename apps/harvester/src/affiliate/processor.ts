@@ -25,7 +25,7 @@ import { createId } from '@paralleldrive/cuid2'
 import { logger } from '../config/logger'
 import { computeUrlHash, normalizeUrl } from './parser'
 import { ProductMatcher } from './product-matcher'
-import { enqueueProductResolve } from '../config/queues'
+import { enqueueProductResolve, alertQueue, type AlertJobData } from '../config/queues'
 import { RESOLVER_VERSION } from '../resolver'
 import type {
   FeedRunContext,
@@ -60,6 +60,10 @@ interface LastPriceEntry {
   sourceProductId: string
   priceSignatureHash: string
   createdAt: Date
+  // Extended for alert detection (per affiliate-feed-alerts-v1 spec)
+  price: number
+  inStock: boolean
+  currency: string
 }
 
 /** New price record to insert */
@@ -75,6 +79,37 @@ interface NewPriceRecord {
   inStock: boolean
   originalPrice: number | null
   priceType: 'REGULAR' | 'SALE'
+}
+
+/**
+ * Price change detected for alert queueing
+ * Per affiliate-feed-alerts-v1 spec §3.3
+ */
+interface AffiliatePriceChange {
+  productId: string
+  sourceProductId: string
+  oldPrice: number
+  newPrice: number
+}
+
+/**
+ * Stock change detected for alert queueing
+ * Per affiliate-feed-alerts-v1 spec §3.3
+ */
+interface AffiliateStockChange {
+  productId: string
+  sourceProductId: string
+  inStock: true // Only back-in-stock triggers alerts
+}
+
+/**
+ * Result of decidePriceWrites including change lists for alerts
+ * Per affiliate-feed-alerts-v1 spec §3.4
+ */
+interface PriceWriteResult {
+  pricesToWrite: NewPriceRecord[]
+  priceChanges: AffiliatePriceChange[]
+  stockChanges: AffiliateStockChange[]
 }
 
 /** Resolved identity for a product (canonical identity for backward compat) */
@@ -414,8 +449,9 @@ export async function processProducts(
 
       // Step 5: Decide writes in-memory and collect prices to insert
       // Per spec §4.2.1: No per-row DB reads - all decisions use cache
+      // Per affiliate-feed-alerts-v1: Also returns price/stock changes for alerting
       log.debug('Deciding price writes', { runId: run.id, chunkNum, productCount: deduped.length })
-      const pricesToWrite = decidePriceWrites(
+      const { pricesToWrite, priceChanges, stockChanges } = decidePriceWrites(
         deduped,
         upsertedProducts,
         retailerId,
@@ -428,6 +464,8 @@ export async function processProducts(
         runId: run.id,
         chunkNum,
         pricesToWrite: pricesToWrite.length,
+        priceChanges: priceChanges.length,
+        stockChanges: stockChanges.length,
         skipped: deduped.length - pricesToWrite.length,
       })
 
@@ -447,13 +485,41 @@ export async function processProducts(
           durationMs: Date.now() - insertStart,
         })
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // Step 6b: Queue alerts AFTER successful price writes
+        // Per affiliate-feed-alerts-v1 spec §4: Only enqueue after bulkInsertPrices succeeds
+        // ═══════════════════════════════════════════════════════════════════════
+        if (priceChanges.length > 0 || stockChanges.length > 0) {
+          const alertStart = Date.now()
+          const { priceDropsEnqueued, backInStockEnqueued } = await queueAffiliateAlerts(
+            priceChanges,
+            stockChanges,
+            run.id
+          )
+
+          if (priceDropsEnqueued > 0 || backInStockEnqueued > 0) {
+            log.info('AFFILIATE_ALERTS_ENQUEUED', {
+              event_name: 'AFFILIATE_ALERTS_ENQUEUED',
+              runId: run.id,
+              chunkNum,
+              priceDropsEnqueued,
+              backInStockEnqueued,
+              durationMs: Date.now() - alertStart,
+            })
+          }
+        }
+
         // Update cache so later chunks see these writes
         // Per spec §4.2.1: Cache updated after each batch insert
+        // Per affiliate-feed-alerts-v1: Include price, inStock, currency for change detection
         for (const price of pricesToWrite) {
           lastPriceCache.set(price.sourceProductId, {
             sourceProductId: price.sourceProductId,
             priceSignatureHash: price.priceSignatureHash,
             createdAt: t0,
+            price: price.price,
+            inStock: price.inStock,
+            currency: price.currency,
           })
         }
       }
@@ -1246,6 +1312,7 @@ async function batchRecordSeen(
 /**
  * Batch fetch last prices for source products
  * Per spec §4.2.1: Uses DISTINCT ON for efficient single-query fetch
+ * Per affiliate-feed-alerts-v1 spec: Includes price, inStock, currency for alert detection
  */
 async function batchFetchLastPrices(
   sourceProductIds: string[]
@@ -1253,12 +1320,16 @@ async function batchFetchLastPrices(
   if (sourceProductIds.length === 0) return []
 
   // Per spec: Use DISTINCT ON to get latest price per sourceProductId
+  // Per affiliate-feed-alerts-v1: Include price::float8, inStock, currency for change detection
   // Table name: prices (per Prisma @@map)
   const results = await prisma.$queryRaw<LastPriceEntry[]>`
     SELECT DISTINCT ON ("sourceProductId")
       "sourceProductId",
       "priceSignatureHash",
-      "createdAt"
+      "createdAt",
+      "price"::float8 AS price,
+      "inStock",
+      "currency"
     FROM prices
     WHERE "sourceProductId" = ANY(${sourceProductIds}::text[])
     ORDER BY "sourceProductId", "createdAt" DESC
@@ -1270,6 +1341,7 @@ async function batchFetchLastPrices(
 /**
  * Decide which prices to write based on cache
  * Per spec §4.2.1: All decisions use run-local cache, no per-row DB reads
+ * Per affiliate-feed-alerts-v1 spec: Returns structured change lists for alert queueing
  */
 function decidePriceWrites(
   products: ProductWithIdentity[],
@@ -1279,8 +1351,10 @@ function decidePriceWrites(
   t0: Date,
   lastPriceCache: Map<string, LastPriceEntry>,
   sourceProductIdToProductId: Map<string, string | null>
-): NewPriceRecord[] {
+): PriceWriteResult {
   const pricesToWrite: NewPriceRecord[] = []
+  const priceChanges: AffiliatePriceChange[] = []
+  const stockChanges: AffiliateStockChange[] = []
 
   // Build lookup from identityKey to sourceProductId
   const idLookup = new Map<string, string>()
@@ -1295,14 +1369,23 @@ function decidePriceWrites(
     const priceSignatureHash = computePriceSignature(product)
     const lastPrice = lastPriceCache.get(sourceProductId)
 
+    // Normalize current values
+    const normalizedCurrency = product.currency || 'USD'
+    const normalizedNewInStock = product.inStock === true
+
     // Determine if we should write
     const isNew = !lastPrice
     const signatureChanged = lastPrice && lastPrice.priceSignatureHash !== priceSignatureHash
     const heartbeatDue =
       lastPrice && t0.getTime() - lastPrice.createdAt.getTime() >= HEARTBEAT_MS
 
-    if (!isNew && !signatureChanged && !heartbeatDue) {
-      // Skip write - signature unchanged and heartbeat not due
+    // Per affiliate-feed-alerts-v1 spec: Stock-only changes must be written even if signature unchanged
+    // Normalize old inStock: treat null/undefined as unknown (not comparable)
+    const normalizedOldInStock = lastPrice?.inStock === true
+    const stockChanged = lastPrice && normalizedOldInStock !== normalizedNewInStock
+
+    if (!isNew && !signatureChanged && !heartbeatDue && !stockChanged) {
+      // Skip write - no changes detected
       continue
     }
 
@@ -1316,7 +1399,7 @@ function decidePriceWrites(
       affiliateFeedRunId: runId,
       priceSignatureHash,
       price: product.price,
-      currency: product.currency || 'USD',
+      currency: normalizedCurrency,
       url: product.url,
       inStock: product.inStock,
       originalPrice: product.originalPrice ?? null,
@@ -1325,9 +1408,52 @@ function decidePriceWrites(
           ? 'SALE'
           : 'REGULAR',
     })
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ALERT CHANGE DETECTION
+    // Per affiliate-feed-alerts-v1 spec §6
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Skip alert detection if no productId (per spec §5: can't alert for unresolved products)
+    if (!productId) {
+      continue
+    }
+
+    // Skip alert detection for new products (no prior state to compare)
+    if (isNew) {
+      continue
+    }
+
+    // Price drop detection (per spec §6.1):
+    // - Same currency AND price decreased
+    // - Skip if prior currency is null (unknown state)
+    const oldCurrency = lastPrice.currency
+    if (
+      oldCurrency &&
+      oldCurrency === normalizedCurrency &&
+      lastPrice.price > product.price
+    ) {
+      priceChanges.push({
+        productId,
+        sourceProductId,
+        oldPrice: lastPrice.price,
+        newPrice: product.price,
+      })
+    }
+
+    // Back-in-stock detection (per spec §6.2):
+    // - Was explicitly false, now true
+    // - Skip if prior inStock is null (unknown state per spec Known Limitations)
+    if (lastPrice.inStock === false && normalizedNewInStock) {
+      stockChanges.push({
+        productId,
+        sourceProductId,
+        inStock: true,
+      })
+    }
   }
 
-  return pricesToWrite
+  return { pricesToWrite, priceChanges, stockChanges }
 }
 
 /**
@@ -1404,4 +1530,71 @@ async function bulkInsertPrices(
   `
 
   return insertedCount
+}
+
+/**
+ * Queue affiliate alerts for price drops and back-in-stock events
+ * Per affiliate-feed-alerts-v1 spec §4
+ *
+ * @param priceChanges - Price drop changes to alert
+ * @param stockChanges - Back-in-stock changes to alert
+ * @param runId - Affiliate feed run ID for traceability
+ * @returns Counts of enqueued alerts
+ */
+async function queueAffiliateAlerts(
+  priceChanges: AffiliatePriceChange[],
+  stockChanges: AffiliateStockChange[],
+  runId: string
+): Promise<{ priceDropsEnqueued: number; backInStockEnqueued: number }> {
+  let priceDropsEnqueued = 0
+  let backInStockEnqueued = 0
+
+  // Queue price drop alerts
+  for (const change of priceChanges) {
+    try {
+      const jobData: AlertJobData = {
+        executionId: runId,
+        productId: change.productId,
+        oldPrice: change.oldPrice,
+        newPrice: change.newPrice,
+      }
+      // Per spec: Do not set jobId (alerter enforces cooldowns and claim logic)
+      await alertQueue.add('PRICE_DROP', jobData)
+      priceDropsEnqueued++
+    } catch (err) {
+      log.error('AFFILIATE_ALERTS_QUEUE_FAILED', {
+        event_name: 'AFFILIATE_ALERTS_QUEUE_FAILED',
+        runId,
+        alertType: 'PRICE_DROP',
+        productId: change.productId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+      // Continue - alerts are best-effort per spec
+    }
+  }
+
+  // Queue back-in-stock alerts
+  for (const change of stockChanges) {
+    try {
+      const jobData: AlertJobData = {
+        executionId: runId,
+        productId: change.productId,
+        inStock: change.inStock,
+      }
+      // Per spec: Do not set jobId (alerter enforces cooldowns and claim logic)
+      await alertQueue.add('BACK_IN_STOCK', jobData)
+      backInStockEnqueued++
+    } catch (err) {
+      log.error('AFFILIATE_ALERTS_QUEUE_FAILED', {
+        event_name: 'AFFILIATE_ALERTS_QUEUE_FAILED',
+        runId,
+        alertType: 'BACK_IN_STOCK',
+        productId: change.productId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+      // Continue - alerts are best-effort per spec
+    }
+  }
+
+  return { priceDropsEnqueued, backInStockEnqueued }
 }
