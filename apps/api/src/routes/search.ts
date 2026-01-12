@@ -4,7 +4,7 @@ import { aiSearch, getSearchSuggestions, parseSearchIntent, backfillProductEmbed
 import { enqueueEmbeddingBatch, getEmbeddingQueueStats } from '../services/ai-search/embedding-queue'
 import { prisma, isAiSearchEnabled, isVectorSearchEnabled } from '@ironscout/db'
 import { requireAdmin, rateLimit, getUserTier } from '../middleware/auth'
-import { getMaxSearchResults, hasPriceHistoryAccess } from '../config/tiers'
+import { hasPriceHistoryAccess } from '../config/tiers'
 import { loggers } from '../config/logger'
 
 const log = loggers.search
@@ -84,83 +84,22 @@ router.post('/semantic', async (req: Request, res: Response) => {
 
     const { query, page, limit, sortBy, filters } = semanticSearchSchema.parse(req.body)
 
-    // Get user tier
+    // V1: All users get full capabilities (no tier restrictions)
     const userTier = await getUserTier(req)
-    const maxResults = getMaxSearchResults(userTier)
-    const isPremium = userTier === 'PREMIUM'
-    
-    // Strip Premium filters for FREE users
-    let effectiveFilters = filters
-    if (!isPremium && filters) {
-      const { 
-        bulletType, pressureRating, isSubsonic, 
-        shortBarrelOptimized, suppressorSafe, lowFlash, lowRecoil,
-        matchGrade, controlledExpansion, minVelocity, maxVelocity,
-        ...basicFilters 
-      } = filters
-      effectiveFilters = basicFilters
-      
-      // Log if Premium filters were stripped
-      const strippedCount = Object.keys(filters).length - Object.keys(basicFilters).length
-      if (strippedCount > 0) {
-        log.debug('Stripped premium filters for FREE user', { strippedCount })
-      }
-    }
-    
-    // Apply tier-based limit
-    const tierLimitedLimit = Math.min(limit, maxResults)
-    
-    // Prevent FREE users from using price_context sort
-    const effectiveSortBy = (!isPremium && sortBy === 'price_context') ? 'relevance' : sortBy
 
     // Check if vector search is enabled
     const vectorEnabled = await isVectorSearchEnabled()
 
     const result = await aiSearch(query, {
       page,
-      limit: tierLimitedLimit,
-      sortBy: effectiveSortBy,
-      useVectorSearch: vectorEnabled, // Controlled via admin settings
-      explicitFilters: effectiveFilters,
-      userTier, // Pass user tier to enable Premium features
+      limit, // V1: No limit restrictions
+      sortBy,
+      useVectorSearch: vectorEnabled,
+      explicitFilters: filters,
+      userTier,
     })
-    
-    // Check if results are limited
-    const hasMoreResults = result.pagination.total > maxResults && userTier === 'FREE'
-    
-    // Build meta response
-    const metaResponse: any = {
-      tier: userTier,
-      maxResults,
-      resultsLimited: hasMoreResults,
-    }
-    
-    if (hasMoreResults) {
-      metaResponse.upgradeMessage = `Showing ${maxResults} of ${result.pagination.total} results. Upgrade to Premium to see all results.`
-    }
-    
-    // Add Premium feature hints for FREE users
-    if (!isPremium) {
-      metaResponse.premiumFeatures = {
-        priceContextSort: 'Upgrade to Premium to sort by price context',
-        advancedFilters: 'Upgrade to Premium for bullet type, pressure rating, and performance filters',
-        performanceBadges: 'Upgrade to Premium to see performance badges and detailed explanations'
-      }
-    }
-    
-    // Adjust pagination info for tier limits
-    const adjustedResult = {
-      ...result,
-      pagination: {
-        ...result.pagination,
-        total: userTier === 'FREE' ? Math.min(result.pagination.total, maxResults) : result.pagination.total,
-        totalPages: Math.ceil(Math.min(result.pagination.total, maxResults) / tierLimitedLimit),
-        actualTotal: result.pagination.total
-      },
-      _meta: metaResponse
-    }
-    
-    res.json(adjustedResult)
+
+    res.json(result)
   } catch (error) {
     log.error('Semantic search error', {}, error)
 

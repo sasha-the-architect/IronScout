@@ -1,33 +1,24 @@
-import { redirect } from 'next/navigation'
-import { BillingOverview } from '@/components/billing/billing-overview'
-import { SubscriptionDetails } from '@/components/billing/subscription-details'
-import { PaymentHistory } from '@/components/billing/payment-history'
-import { premiumEnabled } from '@/lib/features'
+import Link from 'next/link'
 
+/**
+ * V1: Billing page is not available.
+ * Shows a static message instead of subscription management.
+ */
 export default function BillingPage() {
-  // FEATURE FLAG: Redirect to dashboard when premium is disabled
-  if (!premiumEnabled()) {
-    redirect('/dashboard')
-  }
-
   return (
     <div className="p-6 lg:p-8">
-      {/* Page Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold">Billing</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your subscription and view payment history
+      <div className="max-w-md">
+        <h1 className="text-2xl font-bold mb-4">Billing</h1>
+        <p className="text-muted-foreground mb-6">
+          Billing and subscription management is not currently available.
+          All features are free during our launch period.
         </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <BillingOverview />
-          <PaymentHistory />
-        </div>
-        <div className="space-y-6">
-          <SubscriptionDetails />
-        </div>
+        <Link
+          href="/dashboard"
+          className="text-primary hover:underline"
+        >
+          Return to dashboard
+        </Link>
       </div>
     </div>
   )

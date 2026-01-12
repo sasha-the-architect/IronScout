@@ -4,73 +4,48 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { premiumEnabled, isEffectivelyPremium } from '@/lib/features'
 import {
   LayoutDashboard,
   Search,
   Bookmark,
   Settings,
-  CreditCard,
   Menu,
   X,
   LogOut,
-  Crown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { signOut } from 'next-auth/react'
 
 interface SidebarNavProps {
-  isPremium?: boolean
   userName?: string
 }
 
-// Navigation items per dashboard-product-spec.md
-// Note: Search is NOT in nav list - it's a primary CTA button above the nav
-const allNavItems = [
+// V1 Navigation items - no premium gating
+const navItems = [
   {
     title: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
     exact: true,
-    requiresPremium: false,
   },
   {
     title: 'Watchlist',
     href: '/dashboard/saved',
     icon: Bookmark,
-    requiresPremium: false,
-  },
-  {
-    title: 'Billing',
-    href: '/dashboard/billing',
-    icon: CreditCard,
-    requiresPremium: true, // Only show when premium is enabled
   },
   {
     title: 'Settings',
     href: '/dashboard/settings',
     icon: Settings,
-    requiresPremium: false,
   },
 ]
 
-export function SidebarNav({ isPremium = false, userName }: SidebarNavProps) {
+export function SidebarNav({ userName }: SidebarNavProps) {
   const pathname = usePathname()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
-  // Filter nav items based on premium feature flag
-  const navItems = useMemo(() => {
-    const premiumFeatureEnabled = premiumEnabled()
-    return allNavItems.filter(item => !item.requiresPremium || premiumFeatureEnabled)
-  }, [])
-
-  // Determine effective premium status (respects feature flag)
-  const showPremiumBadge = useMemo(() => {
-    return premiumEnabled() && isEffectivelyPremium(isPremium ? 'PREMIUM' : 'FREE')
-  }, [isPremium])
-
-  const isActive = (item: typeof allNavItems[0]) => {
+  const isActive = (item: typeof navItems[0]) => {
     if (item.exact) {
       return pathname === item.href
     }
@@ -98,19 +73,6 @@ export function SidebarNav({ isPremium = false, userName }: SidebarNavProps) {
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{userName || 'User'}</p>
-            {/* Only show tier badges when premium feature is enabled */}
-            {premiumEnabled() && (
-              <div className="flex items-center gap-1">
-                {showPremiumBadge ? (
-                  <>
-                    <Crown className="h-3 w-3 text-amber-500" />
-                    <span className="text-xs text-amber-600">Premium</span>
-                  </>
-                ) : (
-                  <span className="text-xs text-muted-foreground">Free</span>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>

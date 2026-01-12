@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { prisma } from '@ironscout/db'
-import { TIER_CONFIG } from '../config/tiers'
+import type { UserTier } from '../config/tiers'
 import { getRedisClient } from '../config/redis'
 import { loggers } from '../config/logger'
 
@@ -22,8 +22,6 @@ if (!JWT_SECRET) {
  * In production, you might want to add an 'isAdmin' or 'role' column to the User table
  */
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').filter(Boolean)
-
-export type UserTier = keyof typeof TIER_CONFIG
 
 /**
  * JWT payload type for NextAuth tokens

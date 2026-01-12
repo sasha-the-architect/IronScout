@@ -1,9 +1,18 @@
-import { Router, Request, Response } from 'express'
+import { Router, Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
 import Stripe from 'stripe'
 import { prisma } from '@ironscout/db'
 import { loggers } from '../config/logger'
-import { premiumEnabled, premiumApiEnabled, stripeEnabled, requirePremiumApi } from '../lib/features'
+
+/**
+ * V1: Premium billing endpoints are disabled.
+ * This middleware returns 404 for all billing routes.
+ */
+function billingDisabled() {
+  return (_req: Request, res: Response, _next: NextFunction) => {
+    return res.status(404).json({ error: 'Not found' })
+  }
+}
 
 const logger = loggers.payments
 const router: any = Router()
@@ -92,6 +101,21 @@ async function logConsumerSubscriptionChange(
 const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-12-15.clover' })
   : null
+
+/**
+ * Extract subscription ID from Stripe invoice subscription field.
+ * Stripe returns string | Subscription | null depending on expand settings and API version.
+ * Accepts unknown to handle type variations across Stripe API versions.
+ */
+function extractSubscriptionId(subscription: unknown): string | null {
+  if (!subscription) return null
+  if (typeof subscription === 'string') return subscription
+  if (typeof subscription === 'object' && subscription !== null && 'id' in subscription) {
+    const id = (subscription as { id: unknown }).id
+    return typeof id === 'string' ? id : null
+  }
+  return null
+}
 
 // =============================================================================
 // Retailer Visibility Management
@@ -429,7 +453,7 @@ router.get('/debug/webhook-stats', async (req: Request, res: Response) => {
 // Consumer Checkout (existing)
 // =============================================================================
 
-router.post('/create-checkout', requirePremiumApi(), async (req: Request, res: Response) => {
+router.post('/create-checkout', billingDisabled(), async (req: Request, res: Response) => {
   const startTime = Date.now()
 
   try {
@@ -507,7 +531,7 @@ router.post('/create-checkout', requirePremiumApi(), async (req: Request, res: R
 // Merchant Checkout
 // =============================================================================
 
-router.post('/merchant/create-checkout', requirePremiumApi(), async (req: Request, res: Response) => {
+router.post('/merchant/create-checkout', billingDisabled(), async (req: Request, res: Response) => {
   const startTime = Date.now()
 
   try {
@@ -644,7 +668,7 @@ router.post('/merchant/create-checkout', requirePremiumApi(), async (req: Reques
 // Merchant Customer Portal
 // =============================================================================
 
-router.post('/merchant/create-portal-session', requirePremiumApi(), async (req: Request, res: Response) => {
+router.post('/merchant/create-portal-session', billingDisabled(), async (req: Request, res: Response) => {
   const startTime = Date.now()
 
   try {
@@ -742,18 +766,18 @@ router.post('/webhook', async (req: Request, res: Response) => {
       eventId: event.id
     })
 
-    // FEATURE FLAG: When premium is disabled, verify signature but skip side effects
-    // This ensures security (signature verification) while preventing entitlement changes
-    if (!premiumEnabled()) {
-      log('INFO', 'Premium disabled - webhook received but side effects skipped', {
-        action: 'webhook_premium_disabled',
-        eventType: event.type,
-        eventId: event.id
-      })
-      webhookStats.processed++
-      return res.json({ received: true, premiumDisabled: true })
-    }
+    // V1: Premium billing is disabled. Verify signature but skip all side effects.
+    // This ensures Stripe doesn't retry indefinitely while preventing entitlement changes.
+    log('INFO', 'V1 mode - webhook received but side effects skipped', {
+      action: 'webhook_v1_skip',
+      eventType: event.type,
+      eventId: event.id
+    })
+    webhookStats.processed++
+    return res.json({ received: true, v1Mode: true })
 
+    // NOTE: The switch statement below is preserved but unreachable in v1.
+    // It documents the original webhook handling for future premium implementation.
     switch (event.type) {
       // =======================================================================
       // Checkout completed - new subscription created
@@ -775,15 +799,14 @@ router.post('/webhook', async (req: Request, res: Response) => {
       // Invoice paid - subscription renewed or payment succeeded
       // =======================================================================
       case 'invoice.paid': {
+        if (!stripe) break // V1: billing disabled when no Stripe key
+
         const invoice = event.data.object as Stripe.Invoice
-        // Extract subscription ID from invoice (may be string, object, or null depending on Stripe API version)
-        const rawSubscription = (invoice as unknown as { subscription?: string | { id: string } | null }).subscription
-        const subscriptionId = typeof rawSubscription === 'string'
-          ? rawSubscription
-          : rawSubscription?.id || null
+        // Extract subscription ID - Stripe types vary by API version so we use loose typing
+        const subscriptionId = extractSubscriptionId((invoice as unknown as Record<string, unknown>).subscription)
 
         if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+          const subscription = await stripe!.subscriptions.retrieve(subscriptionId!)
           const metadata = subscription.metadata || {}
 
           // Route to merchant handler if metadata.type === 'merchant'
@@ -800,15 +823,14 @@ router.post('/webhook', async (req: Request, res: Response) => {
       // Invoice payment failed
       // =======================================================================
       case 'invoice.payment_failed': {
+        if (!stripe) break // V1: billing disabled when no Stripe key
+
         const invoice = event.data.object as Stripe.Invoice
-        // Extract subscription ID from invoice (may be string, object, or null depending on Stripe API version)
-        const rawSubscription = (invoice as unknown as { subscription?: string | { id: string } | null }).subscription
-        const subscriptionId = typeof rawSubscription === 'string'
-          ? rawSubscription
-          : rawSubscription?.id || null
+        // Extract subscription ID - Stripe types vary by API version so we use loose typing
+        const subscriptionId = extractSubscriptionId((invoice as unknown as Record<string, unknown>).subscription)
 
         if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+          const subscription = await stripe!.subscriptions.retrieve(subscriptionId!)
           const metadata = subscription.metadata || {}
 
           // Route to merchant handler if metadata.type === 'merchant'
@@ -1844,7 +1866,7 @@ async function handleConsumerSubscriptionDeleted(subscription: Stripe.Subscripti
 // Plans endpoint
 // =============================================================================
 
-router.get('/plans', requirePremiumApi(), async (req: Request, res: Response) => {
+router.get('/plans', billingDisabled(), async (req: Request, res: Response) => {
   try {
     const plans = [
       {
@@ -1901,7 +1923,7 @@ router.get('/plans', requirePremiumApi(), async (req: Request, res: Response) =>
 })
 
 // Merchant plans endpoint
-router.get('/merchant/plans', requirePremiumApi(), async (req: Request, res: Response) => {
+router.get('/merchant/plans', billingDisabled(), async (req: Request, res: Response) => {
   try {
     const merchantPlans = [
       {

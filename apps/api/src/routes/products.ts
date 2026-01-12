@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
-import { getMaxSearchResults, hasPriceHistoryAccess, getPriceHistoryDays, shapePriceHistory } from '../config/tiers'
+import { hasPriceHistoryAccess, getPriceHistoryDays, shapePriceHistory } from '../config/tiers'
 import { getUserTier } from '../middleware/auth'
 import { loggers } from '../config/logger'
 import { batchGetPricesViaProductLinks, getPricesViaProductLinks } from '../services/ai-search/price-resolver'
@@ -38,15 +38,9 @@ router.get('/search', async (req: Request, res: Response) => {
       sortBy, page, limit
     } = params
 
-    // Get user tier for result limiting
-    const userTier = await getUserTier(req)
-    const maxResults = getMaxSearchResults(userTier)
-
+    // V1: No tier-based result limits
     const pageNum = parseInt(page)
-    const requestedLimit = parseInt(limit)
-    
-    // Apply tier-based limit
-    const limitNum = Math.min(requestedLimit, maxResults)
+    const limitNum = parseInt(limit)
     const skip = (pageNum - 1) * limitNum
 
     // Build where clause for search
@@ -237,26 +231,15 @@ router.get('/search', async (req: Request, res: Response) => {
     facets.brands = countValues('brand')
     facets.categories = countValues('category')
 
-    // Calculate if there are more results available (for upgrade prompt)
-    const hasMoreResults = total > maxResults && userTier === 'FREE'
-
+    // V1: No result limits
     res.json({
       products: formattedProducts,
       facets,
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total: userTier === 'FREE' ? Math.min(total, maxResults) : total,
-        totalPages: Math.ceil(Math.min(total, maxResults) / limitNum),
-        actualTotal: total // Always show the real total count
-      },
-      _meta: {
-        tier: userTier,
-        maxResults,
-        resultsLimited: hasMoreResults,
-        upgradeMessage: hasMoreResults 
-          ? `Showing ${maxResults} of ${total} results. Upgrade to Premium to see all results.`
-          : undefined
+        total,
+        totalPages: Math.ceil(total / limitNum),
       }
     })
   } catch (error) {
@@ -514,6 +497,7 @@ router.get('/:id/history', async (req: Request, res: Response) => {
     // Shape history based on tier (FREE gets summary only, PREMIUM gets full history)
     const shapedHistory = shapePriceHistory(history, userTier)
 
+    // V1: No tier restrictions on price history
     res.json({
       product,
       ...shapedHistory,
@@ -525,17 +509,6 @@ router.get('/:id/history', async (req: Request, res: Response) => {
         lowestPrice: history.length > 0 ? Math.min(...history.map((h: any) => h.minPrice)) : null,
         highestPrice: history.length > 0 ? Math.max(...history.map((h: any) => h.maxPrice)) : null,
         currentPrice: history.length > 0 ? history[history.length - 1].avgPrice : null
-      },
-      _meta: {
-        tier: userTier,
-        historyLimited: isLimited,
-        ...(userTier === 'FREE' && {
-          upgradeMessage: 'Upgrade to Premium for full price history charts',
-          upgradeUrl: '/pricing'
-        }),
-        ...(isLimited && userTier === 'PREMIUM' && {
-          upgradeMessage: `Requested ${requestedDays} days but max is ${maxDays}`,
-        })
       }
     })
   } catch (error) {

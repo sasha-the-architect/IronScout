@@ -13,8 +13,6 @@ export default async function ProductsLayout({
     return <>{children}</>
   }
 
-  const userTier = (session.user as any)?.tier || 'FREE'
-  const isPremium = userTier === 'PREMIUM'
   const userName = session.user?.name || session.user?.email || 'User'
 
   return (
@@ -31,7 +29,7 @@ export default async function ProductsLayout({
       `}</style>
 
       <div className="fixed inset-0 bg-background">
-        <SidebarNav isPremium={isPremium} userName={userName} />
+        <SidebarNav userName={userName} />
 
         {/* Main content area - offset for sidebar on desktop */}
         <div className="lg:pl-64 h-full overflow-auto">

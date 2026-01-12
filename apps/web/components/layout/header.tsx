@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { Menu, X, User, Bookmark, Settings, LayoutDashboard, ChevronDown, Search, CreditCard, LogOut } from 'lucide-react'
+import { Menu, X, User, Bookmark, Settings, LayoutDashboard, ChevronDown, Search, LogOut } from 'lucide-react'
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -31,9 +31,6 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
-            <Link href="/pricing" className="text-sm font-medium hover:text-primary transition-colors">
-              Pricing
-            </Link>
             <Link href="/retailers" className="text-sm font-medium hover:text-primary transition-colors">
               For Retailers
             </Link>
@@ -84,14 +81,6 @@ export function Header() {
                           Saved Items
                         </Link>
                         <Link
-                          href="/dashboard/billing"
-                          className="flex items-center px-4 py-2 text-sm hover:bg-accent"
-                          onClick={() => setIsUserMenuOpen(false)}
-                        >
-                          <CreditCard className="h-4 w-4 mr-3" />
-                          Billing
-                        </Link>
-                        <Link
                           href="/dashboard/settings"
                           className="flex items-center px-4 py-2 text-sm hover:bg-accent"
                           onClick={() => setIsUserMenuOpen(false)}
@@ -138,13 +127,6 @@ export function Header() {
           <div className="md:hidden border-t py-4">
             <nav className="flex flex-col space-y-4">
               <Link
-                href="/pricing"
-                className="text-sm font-medium hover:text-primary transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Pricing
-              </Link>
-              <Link
                 href="/retailers"
                 className="text-sm font-medium hover:text-primary transition-colors"
                 onClick={() => setIsMenuOpen(false)}
@@ -180,14 +162,6 @@ export function Header() {
                   >
                     <Bookmark className="h-4 w-4 mr-2" />
                     Saved Items
-                  </Link>
-                  <Link
-                    href="/dashboard/billing"
-                    className="flex items-center text-sm font-medium hover:text-primary transition-colors"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Billing
                   </Link>
                   <Link
                     href="/dashboard/settings"
