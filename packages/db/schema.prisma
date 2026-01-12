@@ -62,18 +62,7 @@ model admin_audit_logs {
   @@index([merchantId])
 }
 
-model advertisements {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  imageUrl    String?
-  targetUrl   String
-  adType      AdType   @default(DISPLAY)
-  isActive    Boolean  @default(true)
-  priority    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
+// DELETED: advertisements model (orphaned v1 placeholder, removed 2026-01-12)
 
 model affiliate_feed_run_errors {
   id                  String              @id @default(cuid())
@@ -176,11 +165,11 @@ model affiliate_feeds {
   createdBy              String?
   affiliate_feed_runs    affiliate_feed_runs[]
   sources                sources               @relation(fields: [sourceId], references: [id])
+  // REMOVED: @@index([sourceId]) - redundant, covered by unique([sourceId, variant])
 
   @@unique([sourceId, variant])
   @@index([nextRunAt])
   @@index([status])
-  @@index([sourceId])
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -208,7 +197,7 @@ model alerts {
 
   @@unique([userId, productId, ruleType], map: "alerts_userid_productid_ruletype_key")
   @@index([productId])
-  @@index([userId])
+  // REMOVED: @@index([userId]) - redundant, covered by unique([userId, productId, ruleType])
   @@index([suppressedAt])
   @@index([watchlistItemId])
 }
@@ -237,7 +226,7 @@ model click_events {
   @@index([createdAt])
   @@index([retailerId])
   @@index([sessionId])
-  @@index([clickId])
+  // REMOVED: @@index([clickId]) - redundant, field has @unique constraint
   @@index([sourceId])
   @@index([sourceProductId])
 }
@@ -271,7 +260,7 @@ model merchant_contacts {
   merchants          merchants             @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@unique([merchantId, email])
-  @@index([merchantId])
+  // REMOVED: @@index([merchantId]) - redundant, covered by unique([merchantId, email])
   @@index([email])
 }
 
@@ -378,10 +367,10 @@ model merchant_invites {
   createdAt      DateTime         @default(now())
   merchants      merchants        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   merchant_users merchant_users   @relation(fields: [invitedById], references: [id])
+  // REMOVED: @@index([merchantId]) - redundant, covered by unique([merchantId, email])
+  // REMOVED: @@index([inviteToken]) - redundant, field has @unique constraint
 
   @@unique([merchantId, email])
-  @@index([merchantId])
-  @@index([inviteToken])
 }
 
 model merchant_notification_prefs {
@@ -423,7 +412,7 @@ model retailer_skus {
   parsedBrand      String?
   parseConfidence  Decimal?        @db.Decimal(3, 2)
   retailerSkuHash  String?
-  contentHash      String?         // Hash of mutable fields for change detection
+  contentHash      String? // Hash of mutable fields for change detection
   isActive         Boolean         @default(true)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
@@ -433,10 +422,10 @@ model retailer_skus {
   coercionsApplied Json?
   retailers        retailers       @relation(fields: [retailerId], references: [id], onDelete: Cascade)
   retailer_feeds   retailer_feeds? @relation(fields: [feedId], references: [id])
-  prices           prices[]        // PR #2: Unified price history for retailer SKUs
+  prices           prices[] // PR #2: Unified price history for retailer SKUs
 
   @@unique([retailerId, retailerSkuHash])
-  @@index([retailerId])
+  // REMOVED: @@index([retailerId]) - redundant, covered by unique([retailerId, retailerSkuHash])
   @@index([feedId])
   @@index([isActive])
 }
@@ -460,7 +449,7 @@ model merchant_users {
   merchant_user_retailers merchant_user_retailers[]
 
   @@unique([merchantId, email])
-  @@index([merchantId])
+  // REMOVED: @@index([merchantId]) - redundant, covered by unique([merchantId, email])
   @@index([email])
 }
 
@@ -532,7 +521,7 @@ model merchant_retailers {
   merchant_user_retailers merchant_user_retailers[]
 
   @@unique([merchantId, retailerId])
-  @@index([merchantId])
+  // REMOVED: @@index([merchantId]) - redundant, covered by unique([merchantId, retailerId])
   @@index([retailerId])
   @@index([status])
   @@index([listingStatus])
@@ -554,7 +543,7 @@ model merchant_user_retailers {
   merchant_retailers merchant_retailers @relation(fields: [merchantRetailerId], references: [id], onDelete: Cascade)
 
   @@unique([merchantUserId, merchantRetailerId])
-  @@index([merchantUserId])
+  // REMOVED: @@index([merchantUserId]) - redundant, covered by unique([merchantUserId, merchantRetailerId])
   @@index([merchantRetailerId])
 }
 
@@ -617,14 +606,7 @@ model feed_corrections {
   @@index([quarantinedRecordId])
 }
 
-model market_reports {
-  id          String   @id @default(cuid())
-  productId   String?
-  category    String
-  reportType  String
-  data        Json
-  generatedAt DateTime @default(now())
-}
+// DELETED: market_reports model (orphaned v1 placeholder, removed 2026-01-12)
 
 model pixel_events {
   id            String    @id @default(cuid())
@@ -658,7 +640,7 @@ model prices {
   retailerId          String
   merchantId          String?
   sourceId            String?
-  retailerSkuId       String?    // PR #2: Link to retailer_skus for unified price history
+  retailerSkuId       String? // PR #2: Link to retailer_skus for unified price history
   price               Decimal    @db.Decimal(10, 2)
   currency            String     @default("USD")
   url                 String
@@ -701,7 +683,7 @@ model prices {
   @@index([merchantId])
   @@index([sourceId])
   @@index([retailerSkuId])
-  @@index([ingestionRunType])
+  // REMOVED: @@index([ingestionRunType]) - unused, no query filtering on this column
   @@index([ingestionRunId])
   @@index([observedAt])
 }
@@ -838,20 +820,20 @@ model products {
 /// Unified quarantine table for all feed types (retailer and affiliate)
 /// Records that fail trust-critical validation are stored here for review
 model quarantined_records {
-  id               String              @id @default(cuid())
-  feedType         QuarantineFeedType  @default(RETAILER)
-  feedId           String              // ID of retailer_feeds or affiliate_feeds (no FK for flexibility)
+  id               String             @id @default(cuid())
+  feedType         QuarantineFeedType @default(RETAILER)
+  feedId           String // ID of retailer_feeds or affiliate_feeds (no FK for flexibility)
   runId            String?
-  retailerId       String?             // For retailer feeds: denormalized retailerId
-  sourceId         String?             // For affiliate feeds: sourceId for grouping
+  retailerId       String? // For retailer feeds: denormalized retailerId
+  sourceId         String? // For affiliate feeds: sourceId for grouping
   productType      String?
-  matchKey         String              // Identity key for deduplication
-  rawData          Json                // Original parsed product data
-  parsedFields     Json?               // Partially normalized fields
-  blockingErrors   Json                // Array of error codes/messages
-  status           QuarantineStatus    @default(QUARANTINED)
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  matchKey         String // Identity key for deduplication
+  rawData          Json // Original parsed product data
+  parsedFields     Json? // Partially normalized fields
+  blockingErrors   Json // Array of error codes/messages
+  status           QuarantineStatus   @default(QUARANTINED)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
   feed_corrections feed_corrections[]
 
   @@unique([feedId, matchKey])
@@ -909,9 +891,9 @@ model source_product_seen {
   createdAt           DateTime            @default(now())
   affiliate_feed_runs affiliate_feed_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
   source_products     source_products     @relation(fields: [sourceProductId], references: [id], onDelete: Cascade)
+  // REMOVED: @@index([runId]) - redundant, covered by unique([runId, sourceProductId])
 
   @@unique([runId, sourceProductId])
-  @@index([runId])
 }
 
 /// One row per product per source. Contains product attributes.
@@ -926,7 +908,7 @@ model source_products {
   url           String
   imageUrl      String?
   brand         String?
-  brandNorm     String?  // Normalized brand for alias matching and impact estimation
+  brandNorm     String? // Normalized brand for alias matching and impact estimation
   description   String?
   category      String?
   caliber       String?
@@ -1040,7 +1022,7 @@ model product_links {
   products        products?       @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([productId])
-  @@index([status])
+  // REMOVED: @@index([status]) - redundant, covered by @@index([status, matchType])
   @@index([matchType])
   @@index([status, matchType]) // For filtered queries by resolution state
   @@index([resolverVersion])
@@ -1165,7 +1147,7 @@ model product_resolve_requests {
 
   @@index([sourceProductId])
   @@index([sourceId])
-  @@index([status])
+  // REMOVED: @@index([status]) - redundant, covered by @@index([status, updatedAt])
   @@index([createdAt])
   @@index([status, updatedAt]) // For worker polling queries
 }
@@ -1329,11 +1311,7 @@ model watchlist_items {
   @@index([intentType], map: "watchlist_items_intent_type_idx")
 }
 
-enum AdType {
-  DISPLAY
-  SPONSORED_PRODUCT
-  BANNER
-}
+// DELETED: AdType enum (unused after advertisements model removed)
 
 enum AffiliateFeedRunStatus {
   RUNNING

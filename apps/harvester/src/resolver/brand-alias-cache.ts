@@ -78,6 +78,7 @@ class BrandAliasCache {
   // Rate limiting for subscriber error logs (prevent spam during outages)
   private subscriberErrorCount = 0
   private lastSubscriberErrorLog = 0
+  private subscriberErrorWindowStart = 0
 
   /**
    * Initialize the cache with a Prisma client.
@@ -102,12 +103,30 @@ class BrandAliasCache {
       })
 
       this.subscriber.on('error', (error) => {
-        this.subscriberErrorCount++
         const now = Date.now()
+        const windowMs = 5 * 60 * 1000
+        const errorThreshold = 3
+
+        if (!this.subscriberErrorWindowStart || now - this.subscriberErrorWindowStart > windowMs) {
+          this.subscriberErrorWindowStart = now
+          this.subscriberErrorCount = 0
+        }
+
+        this.subscriberErrorCount++
+
         // Rate limit: log first error, then once per minute during prolonged issues
         if (this.subscriberErrorCount === 1 || now - this.lastSubscriberErrorLog > 60000) {
           this.lastSubscriberErrorLog = now
-          log.error('Redis subscriber error', { errorCount: this.subscriberErrorCount }, error)
+          const logMeta = {
+            errorCount: this.subscriberErrorCount,
+            windowMs,
+            threshold: errorThreshold,
+          }
+          if (this.subscriberErrorCount <= errorThreshold) {
+            log.warn('Redis subscriber error', logMeta, error)
+          } else {
+            log.error('Redis subscriber error', logMeta, error)
+          }
         }
       })
 

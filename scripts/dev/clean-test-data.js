@@ -87,9 +87,7 @@ async function cleanTestData() {
     const prices = await prisma.prices.deleteMany({});
     console.log(`  Deleted ${prices.count} prices`);
 
-    console.log('Cleaning pricing snapshots...');
-    const snapshots = await prisma.pricing_snapshots.deleteMany({});
-    console.log(`  Deleted ${snapshots.count} pricing_snapshots`);
+    // NOTE: pricing_snapshots removed (benchmark subsystem deleted for v1)
 
     console.log('Cleaning price corrections...');
     const priceCorrections = await prisma.price_corrections.deleteMany({});
