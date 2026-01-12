@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import {
   MoreHorizontal,
   Play,
@@ -49,11 +50,11 @@ export function FeedActions({ feed }: FeedActionsProps) {
     try {
       const result = await action();
       if (!result.success) {
-        alert(result.error || 'Action failed');
+        toast.error(result.error || 'Action failed');
       }
       router.refresh();
     } catch {
-      alert('An unexpected error occurred');
+      toast.error('An unexpected error occurred');
     } finally {
       setIsLoading(false);
       setIsOpen(false);

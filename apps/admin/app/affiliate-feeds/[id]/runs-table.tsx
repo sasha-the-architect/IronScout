@@ -2,6 +2,7 @@
 
 import { useState, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   CheckCircle,
   XCircle,
@@ -89,22 +90,22 @@ export function RunsTable({ runs, feedId }: RunsTableProps) {
 
   const handleIgnore = async (runId: string) => {
     if (!ignoreReason.trim()) {
-      alert('Please provide a reason for ignoring this run');
+      toast.error('Please provide a reason for ignoring this run');
       return;
     }
     setIsIgnoring(runId);
     try {
       const result = await ignoreRun(runId, ignoreReason);
       if (!result.success) {
-        alert(result.error || 'Failed to ignore run');
+        toast.error(result.error || 'Failed to ignore run');
       } else {
-        alert(result.message);
+        toast.success(result.message);
         setIgnoreDialogRunId(null);
         setIgnoreReason('');
       }
       router.refresh();
     } catch {
-      alert('An unexpected error occurred');
+      toast.error('An unexpected error occurred');
     } finally {
       setIsIgnoring(null);
     }
@@ -118,13 +119,13 @@ export function RunsTable({ runs, feedId }: RunsTableProps) {
     try {
       const result = await unignoreRun(runId);
       if (!result.success) {
-        alert(result.error || 'Failed to unignore run');
+        toast.error(result.error || 'Failed to unignore run');
       } else {
-        alert(result.message);
+        toast.success(result.message);
       }
       router.refresh();
     } catch {
-      alert('An unexpected error occurred');
+      toast.error('An unexpected error occurred');
     } finally {
       setIsIgnoring(null);
     }
@@ -135,7 +136,7 @@ export function RunsTable({ runs, feedId }: RunsTableProps) {
     try {
       const result = await generateRunReport(runId);
       if (!result.success || !result.report) {
-        alert(result.error || 'Failed to generate report');
+        toast.error(result.error || 'Failed to generate report');
         return;
       }
 
@@ -152,7 +153,7 @@ export function RunsTable({ runs, feedId }: RunsTableProps) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      alert('An unexpected error occurred');
+      toast.error('An unexpected error occurred');
     } finally {
       setIsDownloading(null);
     }
@@ -166,13 +167,13 @@ export function RunsTable({ runs, feedId }: RunsTableProps) {
     try {
       const result = await approveActivation(runId);
       if (!result.success) {
-        alert(result.error || 'Failed to approve');
+        toast.error(result.error || 'Failed to approve');
       } else {
-        alert(result.message);
+        toast.success(result.message);
       }
       router.refresh();
     } catch {
-      alert('An unexpected error occurred');
+      toast.error('An unexpected error occurred');
     } finally {
       setIsApproving(null);
     }

@@ -5,6 +5,7 @@ import { getAdminSession } from '@/lib/auth';
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { Navigation } from '@/components/navigation';
+import { Toaster } from 'sonner';
 
 // Force dynamic rendering - required for cookie access
 export const dynamic = 'force-dynamic';
@@ -76,6 +77,7 @@ export default async function RootLayout({
             {children}
           </main>
         </div>
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

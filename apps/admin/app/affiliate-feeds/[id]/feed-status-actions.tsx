@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   Play,
   Pause,
@@ -35,13 +36,13 @@ export function FeedStatusActions({ feed }: FeedStatusActionsProps) {
     try {
       const result = await action();
       if (!result.success) {
-        alert(result.error || 'Action failed');
+        toast.error(result.error || 'Action failed');
       } else if (result.message) {
-        alert(result.message);
+        toast.success(result.message);
       }
       router.refresh();
     } catch {
-      alert('An unexpected error occurred');
+      toast.error('An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }
