@@ -8,7 +8,6 @@ import {
   TrendingUp,
   Minus,
   HelpCircle,
-  Lock,
   ChevronDown,
   ChevronUp,
   BarChart3
@@ -85,7 +84,7 @@ interface PriceVerdictProps {
  */
 export function PriceVerdict({
   priceContext,
-  isPremium = false,
+  isPremium: _isPremium = false,
   size = 'sm',
   showWhy = true,
   className
@@ -120,13 +119,9 @@ export function PriceVerdict({
 
   const sizes = sizeClasses[size]
 
-  // Premium users get the "Why?" expansion
-  const hasPremiumDepth = isPremium &&
+  const hasPremiumDepth =
     priceContext.relativePricePct !== undefined &&
     priceContext.meta
-
-  // Free users see locked teaser
-  const showLockedTeaser = !isPremium && showWhy && priceContext.contextBand !== 'INSUFFICIENT_DATA'
 
   return (
     <div className={cn('inline-block', className)}>
@@ -141,7 +136,7 @@ export function PriceVerdict({
           <span>{config.label}</span>
 
           {/* Why? affordance */}
-          {(hasPremiumDepth || showLockedTeaser) && showWhy && (
+          {hasPremiumDepth && showWhy && (
             <CollapsibleTrigger asChild>
               <button
                 className={cn(
@@ -167,13 +162,7 @@ export function PriceVerdict({
             'bg-background/80 backdrop-blur-sm',
             sizes.container
           )}>
-            {hasPremiumDepth ? (
-              // Premium: Full depth
-              <PremiumDepth priceContext={priceContext} />
-            ) : (
-              // Free: Locked teaser
-              <LockedTeaser />
-            )}
+            {hasPremiumDepth && <PremiumDepth priceContext={priceContext} />}
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -239,18 +228,6 @@ function PremiumDepth({ priceContext }: { priceContext: PriceContext }) {
           Based on {meta.sampleCount.toLocaleString()} prices over {meta.windowDays} days
         </div>
       )}
-    </div>
-  )
-}
-
-/**
- * Locked teaser for free users
- */
-function LockedTeaser() {
-  return (
-    <div className="flex items-center gap-2 text-muted-foreground">
-      <Lock className="h-3.5 w-3.5 shrink-0" />
-      <span>Unlock price timing and historical context</span>
     </div>
   )
 }

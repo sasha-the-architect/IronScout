@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, CardContent } from '@/components/ui/card'
-import { DollarSign, Lock } from 'lucide-react'
+import { DollarSign } from 'lucide-react'
 import type { SavingsCardProps } from '@/types/dashboard'
 
 /**
@@ -14,7 +14,7 @@ import type { SavingsCardProps } from '@/types/dashboard'
  * Note: "Verified savings" feature removed per ADR-006/ADR-007
  * (no outcome guarantees, premium = information density only)
  */
-export function SavingsCard({ savings, isPremium = false }: SavingsCardProps) {
+export function SavingsCard({ savings, isPremium: _isPremium = false }: SavingsCardProps) {
   return (
     <Card className="bg-card border-border">
       <CardContent className="p-5">
@@ -61,13 +61,6 @@ export function SavingsCard({ savings, isPremium = false }: SavingsCardProps) {
               </div>
             )}
 
-            {/* Free tier: Upgrade hint */}
-            {!isPremium && (
-              <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Lock className="h-3 w-3" />
-                <span>Premium processes alerts faster and adds price history</span>
-              </div>
-            )}
           </div>
         </div>
       </CardContent>

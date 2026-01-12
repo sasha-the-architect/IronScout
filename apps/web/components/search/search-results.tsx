@@ -2,9 +2,8 @@ import { auth } from '@/lib/auth'
 import { aiSearch, getAds, AISearchResponse, ExplicitFilters } from '@/lib/api'
 import { SearchResultsGrid } from '@/components/results'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Search, Crown, Bell, TrendingDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, Bell, TrendingDown } from 'lucide-react'
 import { SearchHeader } from './search-header'
-import Link from 'next/link'
 import { createLogger } from '@/lib/logger'
 
 const logger = createLogger('search-results')
@@ -47,8 +46,7 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
   // Get session for user tier and token
   const session = await auth()
   const accessToken = (session as any)?.accessToken
-  const userTier = (session?.user as any)?.tier || 'FREE'
-  const isPremium = userTier === 'PREMIUM'
+  const isPremium = true
   
   // Build explicit filters from URL params
   const explicitFilters: ExplicitFilters = {}
@@ -64,19 +62,16 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
   if (searchParams.inStock === 'true') explicitFilters.inStock = true
   if (searchParams.brand) explicitFilters.brand = searchParams.brand
   
-  // Premium filters (only apply if user is Premium)
-  if (isPremium) {
-    if (searchParams.bulletType) explicitFilters.bulletType = searchParams.bulletType as any
-    if (searchParams.pressureRating) explicitFilters.pressureRating = searchParams.pressureRating as any
-    if (searchParams.isSubsonic === 'true') explicitFilters.isSubsonic = true
-    if (searchParams.shortBarrelOptimized === 'true') explicitFilters.shortBarrelOptimized = true
-    if (searchParams.suppressorSafe === 'true') explicitFilters.suppressorSafe = true
-    if (searchParams.lowFlash === 'true') explicitFilters.lowFlash = true
-    if (searchParams.lowRecoil === 'true') explicitFilters.lowRecoil = true
-    if (searchParams.matchGrade === 'true') explicitFilters.matchGrade = true
-    if (searchParams.minVelocity) explicitFilters.minVelocity = parseInt(searchParams.minVelocity)
-    if (searchParams.maxVelocity) explicitFilters.maxVelocity = parseInt(searchParams.maxVelocity)
-  }
+  if (searchParams.bulletType) explicitFilters.bulletType = searchParams.bulletType as any
+  if (searchParams.pressureRating) explicitFilters.pressureRating = searchParams.pressureRating as any
+  if (searchParams.isSubsonic === 'true') explicitFilters.isSubsonic = true
+  if (searchParams.shortBarrelOptimized === 'true') explicitFilters.shortBarrelOptimized = true
+  if (searchParams.suppressorSafe === 'true') explicitFilters.suppressorSafe = true
+  if (searchParams.lowFlash === 'true') explicitFilters.lowFlash = true
+  if (searchParams.lowRecoil === 'true') explicitFilters.lowRecoil = true
+  if (searchParams.matchGrade === 'true') explicitFilters.matchGrade = true
+  if (searchParams.minVelocity) explicitFilters.minVelocity = parseInt(searchParams.minVelocity)
+  if (searchParams.maxVelocity) explicitFilters.maxVelocity = parseInt(searchParams.maxVelocity)
   
   // Check if any explicit filters are active
   const hasFilters = Object.keys(explicitFilters).length > 0
@@ -165,25 +160,10 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
         <div className="space-y-4">
           {/* Results Limited Banner */}
           {_meta?.resultsLimited && (
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
-                  <Crown className="h-5 w-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-amber-900 dark:text-amber-100">
-                    Showing {_meta.maxResults} of {(pagination as any).actualTotal} results
-                  </p>
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
-                    Upgrade to Premium to see all results
-                  </p>
-                </div>
-              </div>
-              <Button asChild size="sm" className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white">
-                <Link href="/pricing">
-                  Upgrade
-                </Link>
-              </Button>
+            <div className="bg-muted/40 border border-border rounded-xl p-4">
+              <p className="font-medium text-foreground">
+                Showing {_meta.maxResults} of {(pagination as any).actualTotal} results
+              </p>
             </div>
           )}
 

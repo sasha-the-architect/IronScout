@@ -121,24 +121,6 @@ export function SavedItemsManager() {
         </CardContent>
       </Card>
 
-      {/* Upgrade CTA for free tier */}
-      {meta && !meta.canAddMore && (
-        <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Watchlist limit reached</p>
-                <p className="text-sm text-muted-foreground">
-                  Upgrade to Premium for unlimited watchlist items
-                </p>
-              </div>
-              <Button asChild>
-                <a href="/pricing">Upgrade</a>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

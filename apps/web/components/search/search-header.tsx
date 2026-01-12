@@ -1,6 +1,6 @@
 'use client'
 
-import { Sparkles, SlidersHorizontal, Crown, Info } from 'lucide-react'
+import { Sparkles, SlidersHorizontal, Info } from 'lucide-react'
 import { ExplicitFilters } from '@/lib/api'
 import { SearchControls } from './search-controls'
 import {
@@ -51,6 +51,7 @@ export function SearchHeader({
   isPremium = false,
   premiumFiltersActive = 0
 }: SearchHeaderProps) {
+  const hasPremiumIntent = !!intent?.premiumIntent
   
   const hasIntent = intent && (
     intent.calibers?.length || 
@@ -91,38 +92,34 @@ export function SearchHeader({
       activeFilters.push({ label: 'Brand', value: explicitFilters.brand, color: 'indigo' })
     }
     
-    // Premium filters
+    // Performance filters
     if (explicitFilters.bulletType) {
-      activeFilters.push({ label: 'Bullet', value: explicitFilters.bulletType, color: 'amber', isPremium: true })
+      activeFilters.push({ label: 'Bullet', value: explicitFilters.bulletType, color: 'amber' })
     }
     if (explicitFilters.pressureRating) {
-      activeFilters.push({ label: 'Pressure', value: explicitFilters.pressureRating.replace('PLUS_P_PLUS', '+P+').replace('PLUS_P', '+P'), color: 'amber', isPremium: true })
+      activeFilters.push({ label: 'Pressure', value: explicitFilters.pressureRating.replace('PLUS_P_PLUS', '+P+').replace('PLUS_P', '+P'), color: 'amber' })
     }
     if (explicitFilters.isSubsonic) {
-      activeFilters.push({ label: 'Type', value: 'Subsonic', color: 'amber', isPremium: true })
+      activeFilters.push({ label: 'Type', value: 'Subsonic', color: 'amber' })
     }
     if (explicitFilters.shortBarrelOptimized) {
-      activeFilters.push({ label: 'Opt.', value: 'Short Barrel', color: 'amber', isPremium: true })
+      activeFilters.push({ label: 'Opt.', value: 'Short Barrel', color: 'amber' })
     }
     if (explicitFilters.suppressorSafe) {
-      activeFilters.push({ label: 'Type', value: 'Suppressor Safe', color: 'amber', isPremium: true })
+      activeFilters.push({ label: 'Type', value: 'Suppressor Safe', color: 'amber' })
     }
     if (explicitFilters.lowFlash) {
-      activeFilters.push({ label: 'Type', value: 'Low Flash', color: 'amber', isPremium: true })
+      activeFilters.push({ label: 'Type', value: 'Low Flash', color: 'amber' })
     }
     if (explicitFilters.lowRecoil) {
-      activeFilters.push({ label: 'Type', value: 'Low Recoil', color: 'amber', isPremium: true })
+      activeFilters.push({ label: 'Type', value: 'Low Recoil', color: 'amber' })
     }
     if (explicitFilters.matchGrade) {
-      activeFilters.push({ label: 'Grade', value: 'Match Grade', color: 'amber', isPremium: true })
+      activeFilters.push({ label: 'Grade', value: 'Match Grade', color: 'amber' })
     }
   }
 
-  const getColorClasses = (color: string, isPremiumFilter?: boolean) => {
-    if (isPremiumFilter) {
-      return 'bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/50 dark:to-orange-900/50 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-    }
-    
+  const getColorClasses = (color: string) => {
     const colorMap: Record<string, string> = {
       blue: 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
       purple: 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300',
@@ -168,9 +165,9 @@ export function SearchHeader({
                       intent.grainWeights?.length ? `${intent.grainWeights.join('/')}gr` : null,
                       ...(intent.caseMaterials || []),
                       intent.qualityLevel,
-                      isPremium && intent.premiumIntent?.environment,
-                      isPremium && intent.premiumIntent?.barrelLength ? `${intent.premiumIntent.barrelLength} barrel` : null,
-                      isPremium && intent.premiumIntent?.suppressorUse ? 'suppressor' : null,
+                      hasPremiumIntent && intent.premiumIntent?.environment,
+                      hasPremiumIntent && intent.premiumIntent?.barrelLength ? `${intent.premiumIntent.barrelLength} barrel` : null,
+                      hasPremiumIntent && intent.premiumIntent?.suppressorUse ? 'suppressor' : null,
                     ].filter(Boolean).join(', ')}
                     <span className="opacity-60"> · {Math.round(intent.confidence * 100)}% confident</span>
                   </p>
@@ -198,9 +195,8 @@ export function SearchHeader({
           {activeFilters.map((filter, i) => (
             <span 
               key={i} 
-              className={`px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getColorClasses(filter.color, filter.isPremium)}`}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getColorClasses(filter.color)}`}
             >
-              {filter.isPremium && <Crown className="h-3 w-3" />}
               {filter.label}: {filter.value}
             </span>
           ))}

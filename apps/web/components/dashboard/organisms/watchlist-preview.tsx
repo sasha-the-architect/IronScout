@@ -5,9 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PriceDelta } from '../atoms/price-delta'
 import { Sparkline, generateSparklineFromTrend } from '../atoms/sparkline'
-import { Bookmark, ChevronRight, Lock, TrendingDown, Bell, TrendingUp, Search, Sparkles } from 'lucide-react'
+import { Bookmark, ChevronRight, TrendingDown, Bell, TrendingUp, Search, Sparkles } from 'lucide-react'
 import { useWatchlist } from '@/hooks/use-watchlist'
-import { UPGRADE_COPY } from '@/types/dashboard'
 import type { WatchlistItem } from '@/types/dashboard'
 import Link from 'next/link'
 
@@ -33,7 +32,7 @@ interface SavedItemsPreviewProps {
  * Free: Current price only
  * Premium: "Lowest in X days" + inline sparkline
  */
-export function SavedItemsPreview({ isPremium = false, maxItems = 5 }: SavedItemsPreviewProps) {
+export function SavedItemsPreview({ isPremium: _isPremium = false, maxItems = 5 }: SavedItemsPreviewProps) {
   const { data, loading, error } = useWatchlist()
 
   // Limit to maxItems
@@ -118,23 +117,8 @@ export function SavedItemsPreview({ isPremium = false, maxItems = 5 }: SavedItem
             ) : (
               <div className="space-y-1">
                 {previewItems.map((item) => (
-                  <WatchlistRow key={item.id} item={item} isPremium={isPremium} />
+                  <WatchlistRow key={item.id} item={item} isPremium />
                 ))}
-              </div>
-            )}
-
-            {/* Free tier limit message */}
-            {!isPremium && data._meta && data._meta.itemLimit !== -1 && data._meta.itemCount >= data._meta.itemLimit && (
-              <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-border">
-                <div className="flex items-start gap-2">
-                  <Lock className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div className="text-xs text-muted-foreground">
-                    <p>
-                      {data._meta.itemCount} of {data._meta.itemLimit} items
-                    </p>
-                    <p className="mt-1 text-primary">{UPGRADE_COPY.WATCHLIST_LIMIT}</p>
-                  </div>
-                </div>
               </div>
             )}
           </>
@@ -153,7 +137,7 @@ interface WatchlistRowProps {
   isPremium?: boolean
 }
 
-function WatchlistRow({ item, isPremium = false }: WatchlistRowProps) {
+function WatchlistRow({ item, isPremium: _isPremium = false }: WatchlistRowProps) {
   const { product, targetPrice, lowestPriceSeen, isLowestSeen, savingsVsTarget } = item
 
   // Calculate price delta if we have target price
@@ -164,9 +148,7 @@ function WatchlistRow({ item, isPremium = false }: WatchlistRowProps) {
 
   // Generate sparkline data (Premium feature)
   // In production, this would come from price history API
-  const sparklineData = isPremium
-    ? generateSparklineFromTrend(deltaPercent && deltaPercent < 0 ? 'DOWN' : 'STABLE')
-    : null
+  const sparklineData = generateSparklineFromTrend(deltaPercent && deltaPercent < 0 ? 'DOWN' : 'STABLE')
 
   return (
     <div className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-muted/50 transition-colors">
@@ -179,8 +161,7 @@ function WatchlistRow({ item, isPremium = false }: WatchlistRowProps) {
         </p>
       </div>
 
-      {/* Premium: Sparkline */}
-      {isPremium && sparklineData && (
+      {sparklineData && (
         <div className="hidden sm:block">
           <Sparkline
             data={sparklineData}
@@ -198,8 +179,7 @@ function WatchlistRow({ item, isPremium = false }: WatchlistRowProps) {
             <p className="text-sm font-semibold text-foreground">
               ${product.currentPrice.toFixed(2)}
             </p>
-            {/* Premium: Show if lowest */}
-            {isPremium && isLowestSeen && (
+            {isLowestSeen && (
               <p className="text-xs text-status-buy flex items-center justify-end gap-1">
                 <TrendingDown className="h-3 w-3" />
                 Lowest

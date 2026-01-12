@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Search, Sparkles, X, Loader2, SlidersHorizontal, ChevronDown, RotateCcw, Crown, TrendingUp, Bell, Bookmark } from 'lucide-react'
+import { Search, Sparkles, X, Loader2, SlidersHorizontal, ChevronDown, RotateCcw, TrendingUp, Bell, Bookmark } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getSearchSuggestions } from '@/lib/api'
 import { PremiumFilters } from '@/components/premium'
@@ -70,7 +70,7 @@ interface UnifiedSearchProps {
   isPremium?: boolean
 }
 
-export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedSearchProps) {
+export function UnifiedSearch({ initialQuery = '', isPremium: _isPremium = false }: UnifiedSearchProps) {
   const searchParams = useSearchParams()
   const { isSearching, navigateWithLoading } = useSearchLoading()
 
@@ -401,29 +401,25 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
               ))}
             </div>
 
-            {/* Premium examples */}
-            {isPremium && (
-              <div className="pt-3 border-t border-border">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Crown className="h-3 w-3 text-amber-500" />
-                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Advanced searches:</p>
-                </div>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {premiumExampleQueries.map((example, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setQuery(example)
-                        handleSearch(example)
-                      }}
-                      className="text-xs px-3 py-1.5 rounded-full border border-amber-200 dark:border-amber-800 hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors text-amber-700 dark:text-amber-400"
-                    >
-                      {example}
-                    </button>
-                  ))}
-                </div>
+            <div className="pt-3 border-t border-border">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <p className="text-xs text-muted-foreground font-medium">Advanced searches:</p>
               </div>
-            )}
+              <div className="flex flex-wrap justify-center gap-2">
+                {premiumExampleQueries.map((example, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setQuery(example)
+                      handleSearch(example)
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-full border border-border hover:border-primary/50 hover:bg-muted/50 transition-colors text-muted-foreground"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -583,29 +579,20 @@ export function UnifiedSearch({ initialQuery = '', isPremium = false }: UnifiedS
                 </select>
               </div>
 
-              {/* Premium Filters Toggle */}
-              {isPremium ? (
-                <div className="pt-2">
-                  <button
-                    onClick={() => setPremiumFiltersOpen(!premiumFiltersOpen)}
-                    className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 transition-colors"
-                  >
-                    <Crown className="h-3 w-3" />
-                    <span>Premium filters</span>
-                    <ChevronDown className={`h-3 w-3 transition-transform ${premiumFiltersOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {premiumFiltersOpen && (
-                    <div className="mt-2">
-                      <PremiumFilters isPremium={isPremium} />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="pt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  <Crown className="h-3 w-3 text-amber-500" />
-                  <span>Subsonic, match grade, suppressor-safe filters available with <a href="/pricing" className="text-primary underline-offset-2 hover:underline">Premium</a></span>
-                </div>
-              )}
+              <div className="pt-2">
+                <button
+                  onClick={() => setPremiumFiltersOpen(!premiumFiltersOpen)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <span>Performance filters</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${premiumFiltersOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {premiumFiltersOpen && (
+                  <div className="mt-2">
+                    <PremiumFilters isPremium />
+                  </div>
+                )}
+              </div>
             </div>
           </details>
         </div>

@@ -14,9 +14,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ForYouResultCard } from '@/components/results'
 import { ResultCardSkeleton } from '@/components/results'
-import { Search, ChevronRight, Lock, Sparkles, TrendingDown, Bell } from 'lucide-react'
+import { Search, ChevronRight, Sparkles, TrendingDown, Bell } from 'lucide-react'
 import { useDealsForYou } from '@/hooks/use-deals-for-you'
-import { UPGRADE_COPY } from '@/types/dashboard'
 import Link from 'next/link'
 
 import type { ProductFeedItem } from '@/types/dashboard'
@@ -90,7 +89,7 @@ interface PersonalizedFeedProps {
  * Free: 5 items max, basic info
  * Premium: 20 items, context explanations
  */
-export function PersonalizedFeed({ isPremium = false, onAddToWatchlist }: PersonalizedFeedProps) {
+export function PersonalizedFeed({ isPremium: _isPremium = false, onAddToWatchlist }: PersonalizedFeedProps) {
   const { data, loading, error } = useDealsForYou()
 
   return (
@@ -186,26 +185,6 @@ export function PersonalizedFeed({ isPremium = false, onAddToWatchlist }: Person
               items={data.items}
               onAddToWatchlist={onAddToWatchlist}
             />
-          )}
-
-          {/* Free tier limit message */}
-          {!isPremium && data._meta && data._meta.itemsLimit !== -1 && data.items.length >= data._meta.itemsLimit && (
-            <div className="p-4 rounded-lg bg-muted/50 border border-border">
-              <div className="flex items-start gap-3">
-                <Lock className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div className="text-sm">
-                  <p className="text-muted-foreground">
-                    Showing {data._meta.itemsShown} of {data._meta.itemsLimit} products
-                  </p>
-                  <p className="mt-1">
-                    <Link href="/pricing" className="text-primary hover:underline">
-                      Upgrade to Premium
-                    </Link>{' '}
-                    for more products with price context
-                  </p>
-                </div>
-              </div>
-            </div>
           )}
 
           {/* Personalization indicator */}

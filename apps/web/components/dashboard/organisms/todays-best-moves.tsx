@@ -17,7 +17,6 @@ import { PriceDelta } from '../atoms/price-delta'
 import { ExternalLink, Search, Target, Zap } from 'lucide-react'
 import { useDealsForYou } from '@/hooks/use-deals-for-you'
 import { useMarketPulse } from '@/hooks/use-market-pulse'
-import { UPGRADE_COPY } from '@/types/dashboard'
 import type { ProductFeedItem, PriceContext } from '@/types/dashboard'
 import Link from 'next/link'
 
@@ -36,7 +35,7 @@ interface TopMatchProps {
  *
  * Uses price context (descriptive) instead of verdicts (prescriptive).
  */
-export function TopMatch({ isPremium = false }: TopMatchProps) {
+export function TopMatch({ isPremium: _isPremium = false }: TopMatchProps) {
   const { data: itemsData, loading: itemsLoading } = useDealsForYou()
   const { data: pulseData, loading: pulseLoading } = useMarketPulse()
 
@@ -183,21 +182,13 @@ export function TopMatch({ isPremium = false }: TopMatchProps) {
                 </div>
               )}
 
-              {/* Premium: Show delta */}
-              {isPremium && pulse && (
+              {pulse && (
                 <div className="flex items-center gap-2">
                   <PriceDelta percent={pulse.trendPercent} size="md" />
                   <span className="text-xs text-muted-foreground">vs 7-day avg</span>
                 </div>
               )}
             </div>
-
-            {/* Free tier teaser */}
-            {!isPremium && (
-              <p className="text-xs text-muted-foreground italic">
-                {UPGRADE_COPY.MARKET_PULSE_EXPAND}
-              </p>
-            )}
           </div>
 
           {/* Right side: CTA */}

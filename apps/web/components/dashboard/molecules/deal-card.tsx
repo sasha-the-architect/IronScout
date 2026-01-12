@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { ContextChip } from '../atoms/context-chip'
 import { ExternalLink, Bookmark, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ProductCardProps } from '@/types/dashboard'
-import { UPGRADE_COPY } from '@/types/dashboard'
 
 /**
  * ProductCard - Product card with price context (ADR-006 compliant)
@@ -22,7 +21,7 @@ import { UPGRADE_COPY } from '@/types/dashboard'
  */
 export function ProductCard({
   item,
-  isPremium = false,
+  isPremium: _isPremium = false,
   onViewClick,
   onWatchlistClick,
 }: ProductCardProps) {
@@ -83,8 +82,7 @@ export function ProductCard({
             )}
           </div>
 
-          {/* Price context indicator (Premium) */}
-          {isPremium && item.priceSignal && (
+          {item.priceSignal && (
             <ContextChip
               context={item.priceSignal.contextBand}
               size="sm"
@@ -100,8 +98,7 @@ export function ProductCard({
           </div>
         )}
 
-        {/* Premium: Context explanation expandable */}
-        {isPremium && item.explanation && (
+        {item.explanation && (
           <div>
             <button
               onClick={() => setExpanded(!expanded)}
@@ -120,13 +117,6 @@ export function ProductCard({
               </p>
             )}
           </div>
-        )}
-
-        {/* Free tier: Upgrade teaser */}
-        {!isPremium && (
-          <p className="text-xs text-muted-foreground italic">
-            {UPGRADE_COPY.PRICE_CONTEXT}
-          </p>
         )}
 
         {/* Actions */}

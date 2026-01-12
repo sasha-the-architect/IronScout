@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils'
 import { ContextChip } from '../atoms/context-chip'
 import { Sparkline, generateSparklineFromTrend } from '../atoms/sparkline'
 import { PriceDelta } from '../atoms/price-delta'
-import { Lock } from 'lucide-react'
 import type { PulseRowProps } from '@/types/dashboard'
 
 /**
@@ -17,11 +16,12 @@ import type { PulseRowProps } from '@/types/dashboard'
  * - Price context chip (descriptive, not prescriptive)
  * - Premium: Click for full chart
  */
-export function PulseRow({ pulse, isPremium = false, onClick }: PulseRowProps) {
+export function PulseRow({ pulse, isPremium: _isPremium = false, onClick }: PulseRowProps) {
   const sparklineData = generateSparklineFromTrend(pulse.trend, 7)
+  const canClick = !!onClick
 
   const handleClick = () => {
-    if (isPremium && onClick) {
+    if (onClick) {
       onClick()
     }
   }
@@ -32,13 +32,12 @@ export function PulseRow({ pulse, isPremium = false, onClick }: PulseRowProps) {
       className={cn(
         'flex items-center gap-3 py-3 px-3 rounded-lg transition-colors',
         'border border-transparent',
-        isPremium && onClick && 'cursor-pointer hover:bg-muted/50 hover:border-border',
-        !isPremium && 'opacity-90'
+        canClick && 'cursor-pointer hover:bg-muted/50 hover:border-border'
       )}
-      role={isPremium && onClick ? 'button' : undefined}
-      tabIndex={isPremium && onClick ? 0 : undefined}
+      role={canClick ? 'button' : undefined}
+      tabIndex={canClick ? 0 : undefined}
       onKeyDown={(e) => {
-        if ((e.key === 'Enter' || e.key === ' ') && isPremium && onClick) {
+        if ((e.key === 'Enter' || e.key === ' ') && canClick) {
           e.preventDefault()
           onClick()
         }
@@ -66,20 +65,12 @@ export function PulseRow({ pulse, isPremium = false, onClick }: PulseRowProps) {
 
       {/* Price context chip (ADR-006 compliant) */}
       <div className="flex-shrink-0">
-        <ContextChip context={pulse.priceContext} size="sm" showTooltip={isPremium} />
+        <ContextChip context={pulse.priceContext} size="sm" showTooltip />
       </div>
 
-      {/* Premium indicator */}
-      {isPremium && onClick && (
+      {canClick && (
         <div className="flex-shrink-0 text-muted-foreground">
           <span className="sr-only">Click for full chart</span>
-        </div>
-      )}
-
-      {/* Free tier lock */}
-      {!isPremium && (
-        <div className="flex-shrink-0">
-          <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
         </div>
       )}
     </div>

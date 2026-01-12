@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Crown, Lock, Zap, VolumeX, Eye, Gauge, Target, Crosshair, RotateCcw } from 'lucide-react'
+import { Zap, VolumeX, Eye, Gauge, Target, Crosshair, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -21,7 +21,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import Link from 'next/link'
 import { BulletType, PressureRating, BULLET_TYPE_LABELS, PRESSURE_RATING_LABELS } from '@/lib/api'
 
 // Bullet type options grouped by category
@@ -62,7 +61,7 @@ interface PremiumFiltersProps {
   className?: string
 }
 
-export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
+export function PremiumFilters({ isPremium: _isPremium, className }: PremiumFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -95,8 +94,6 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
 
   // Apply filter changes
   const applyFilter = (key: string, value: string | boolean) => {
-    if (!isPremium) return // Prevent filter application for non-Premium users
-
     const params = new URLSearchParams(searchParams.toString())
     
     if (value === '' || value === false) {
@@ -125,30 +122,18 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
     router.push(`/search?${params.toString()}`)
   }
 
-  // Locked filter wrapper for non-Premium users
-  const FilterWrapper = ({ children, label }: { children: React.ReactNode; label: string }) => {
-    if (isPremium) return <>{children}</>
-    
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="relative">
-              <div className="opacity-50 pointer-events-none">
-                {children}
-              </div>
-              <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-lg">
-                <Lock className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p className="text-sm">Upgrade to Premium to use {label}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    )
-  }
+  const FilterWrapper = ({ children }: { children: React.ReactNode; label: string }) => (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div>{children}</div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="text-sm">Filter option</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
 
   return (
     <div className={className}>
@@ -156,13 +141,13 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-medium text-foreground">Performance Filters</h3>
-          {activeFilterCount > 0 && isPremium && (
+          {activeFilterCount > 0 && (
             <Badge variant="secondary" className="text-xs">
               {activeFilterCount} active
             </Badge>
           )}
         </div>
-        {activeFilterCount > 0 && isPremium && (
+        {activeFilterCount > 0 && (
           <Button
             variant="ghost"
             size="sm"
@@ -175,26 +160,6 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
         )}
       </div>
 
-      {/* Upgrade prompt for FREE users - aspirational, not punitive */}
-      {!isPremium && (
-        <div className="mb-4 p-3 bg-muted/50 border border-border rounded-lg">
-          <p className="text-sm font-medium text-foreground">
-            Filters used by serious buyers
-          </p>
-          <p className="text-xs text-muted-foreground mt-1 mb-3">
-            Match grade, subsonic, suppressor-safe, low flash, short barrel optimized
-          </p>
-          <Button
-            size="sm"
-            variant="outline"
-            asChild
-            className="h-7 text-xs"
-          >
-            <Link href="/pricing">Unlock performance filters</Link>
-          </Button>
-        </div>
-      )}
-
       <div className="space-y-4">
         {/* Bullet Type */}
         <FilterWrapper label="bullet type filter">
@@ -205,7 +170,6 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
             <Select
               value={filters.bulletType || '_all'}
               onValueChange={(value) => applyFilter('bulletType', value === '_all' ? '' : value)}
-              disabled={!isPremium}
             >
               <SelectTrigger className="h-9">
                 <SelectValue placeholder="All types" />
@@ -238,7 +202,6 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
             <Select
               value={filters.pressureRating || '_all'}
               onValueChange={(value) => applyFilter('pressureRating', value === '_all' ? '' : value)}
-              disabled={!isPremium}
             >
               <SelectTrigger className="h-9">
                 <SelectValue placeholder="All pressures" />
@@ -268,7 +231,6 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
               <Switch
                 checked={filters.isSubsonic}
                 onCheckedChange={(checked) => applyFilter('isSubsonic', checked)}
-                disabled={!isPremium}
               />
             </div>
           </FilterWrapper>
@@ -282,7 +244,6 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
               <Switch
                 checked={filters.shortBarrelOptimized}
                 onCheckedChange={(checked) => applyFilter('shortBarrelOptimized', checked)}
-                disabled={!isPremium}
               />
             </div>
           </FilterWrapper>
@@ -296,7 +257,6 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
               <Switch
                 checked={filters.suppressorSafe}
                 onCheckedChange={(checked) => applyFilter('suppressorSafe', checked)}
-                disabled={!isPremium}
               />
             </div>
           </FilterWrapper>
@@ -310,7 +270,6 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
               <Switch
                 checked={filters.lowFlash}
                 onCheckedChange={(checked) => applyFilter('lowFlash', checked)}
-                disabled={!isPremium}
               />
             </div>
           </FilterWrapper>
@@ -324,7 +283,6 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
               <Switch
                 checked={filters.lowRecoil}
                 onCheckedChange={(checked) => applyFilter('lowRecoil', checked)}
-                disabled={!isPremium}
               />
             </div>
           </FilterWrapper>
@@ -338,7 +296,6 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
               <Switch
                 checked={filters.matchGrade}
                 onCheckedChange={(checked) => applyFilter('matchGrade', checked)}
-                disabled={!isPremium}
               />
             </div>
           </FilterWrapper>
@@ -356,7 +313,7 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
                 placeholder="Min"
                 value={filters.minVelocity}
                 onChange={(e) => applyFilter('minVelocity', e.target.value)}
-                disabled={!isPremium}
+                
                 className="w-full h-9 px-3 text-sm border rounded-md"
               />
               <span className="text-muted-foreground">-</span>
@@ -365,7 +322,7 @@ export function PremiumFilters({ isPremium, className }: PremiumFiltersProps) {
                 placeholder="Max"
                 value={filters.maxVelocity}
                 onChange={(e) => applyFilter('maxVelocity', e.target.value)}
-                disabled={!isPremium}
+                
                 className="w-full h-9 px-3 text-sm border rounded-md"
               />
             </div>

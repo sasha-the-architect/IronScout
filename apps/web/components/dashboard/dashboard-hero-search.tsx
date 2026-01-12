@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Sparkles, X, Loader2, Crown } from 'lucide-react'
+import { Search, Sparkles, X, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getSearchSuggestions } from '@/lib/api'
 import { QuickCaliberFilters } from './quick-caliber-filters'
@@ -29,7 +29,7 @@ interface DashboardHeroSearchProps {
 }
 
 export function DashboardHeroSearch({
-  isPremium,
+  isPremium: _isPremium,
   userCalibersFromAlerts = []
 }: DashboardHeroSearchProps) {
   const router = useRouter()
@@ -190,29 +190,25 @@ export function DashboardHeroSearch({
             ))}
           </div>
 
-          {/* Premium example queries */}
-          {isPremium && (
-            <div className="mt-4">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Crown className="h-4 w-4 text-amber-500" aria-hidden="true" />
-                <p className="text-sm text-amber-600 dark:text-amber-400">Premium AI examples:</p>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {premiumExampleQueries.map((example, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      setQuery(example)
-                      handleSearch(example)
-                    }}
-                    className="text-sm px-4 py-2.5 rounded-full border border-amber-200 dark:border-amber-700 hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors text-amber-600 dark:text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 motion-reduce:transition-none"
-                  >
-                    "{example}"
-                  </button>
-                ))}
-              </div>
+          <div className="mt-4">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <p className="text-sm text-muted-foreground">Advanced examples:</p>
             </div>
-          )}
+            <div className="flex flex-wrap justify-center gap-2">
+              {premiumExampleQueries.map((example, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setQuery(example)
+                    handleSearch(example)
+                  }}
+                  className="text-sm px-4 py-2.5 rounded-full border border-border hover:border-primary/50 hover:bg-muted/50 transition-colors text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 motion-reduce:transition-none"
+                >
+                  "{example}"
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Quick Caliber Filters */}

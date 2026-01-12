@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { User, Mail, Bell, Crown, LogOut, Trash2, Shield, AlertTriangle, Clock, XCircle, Loader2 } from 'lucide-react'
+import { User, Mail, Bell, LogOut, Trash2, Shield, AlertTriangle, Clock, XCircle, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { createLogger } from '@/lib/logger'
 
@@ -176,25 +176,6 @@ export function UserSettings() {
             </div>
           </div>
 
-          <div className="pt-4 border-t">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">Account Tier</div>
-                <div className="text-sm text-muted-foreground">
-                  Manage your subscription level
-                </div>
-              </div>
-              <Badge variant="outline" className="text-base px-4 py-1">
-                Free
-              </Badge>
-            </div>
-            <Button variant="outline" className="mt-4 w-full" asChild>
-              <a href="/pricing">
-                <Crown className="h-4 w-4 mr-2" />
-                Upgrade to Premium
-              </a>
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
