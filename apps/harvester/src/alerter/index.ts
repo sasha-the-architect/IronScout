@@ -11,9 +11,10 @@ import { Resend } from 'resend'
 const log = logger.alerter
 const redis = createRedisClient()
 
-// Tier configuration (duplicated from API for harvester independence)
+// V1: All users get real-time alerts (no tier delays)
+// Tier delay skeleton preserved for future premium reintroduction
 const TIER_ALERT_DELAY_MS = {
-  FREE: 60 * 60 * 1000, // 1 hour delay
+  FREE: 0, // V1: Real-time for all
   PREMIUM: 0, // Real-time
 }
 
@@ -500,7 +501,8 @@ export const alerterWorker = new Worker<AlertJobData>(
             continue
           }
 
-          // Get user tier and calculate delay
+          // V1: All users get real-time alerts (delayMs will be 0 for all tiers)
+          // Tier lookup preserved for future premium reintroduction
           const userTier = (alert.users.tier || 'FREE') as keyof typeof TIER_ALERT_DELAY_MS
           const delayMs = TIER_ALERT_DELAY_MS[userTier] || TIER_ALERT_DELAY_MS.FREE
 

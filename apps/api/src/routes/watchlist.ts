@@ -9,10 +9,8 @@
 
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
-import { prisma } from '@ironscout/db'
-import { saveItem, unsaveItem, getSavedItems, countSavedItems } from '../services/saved-items'
-import { getUserTier, getAuthenticatedUserId } from '../middleware/auth'
-import { getMaxWatchlistItems, hasReachedWatchlistLimit, hasFeature } from '../config/tiers'
+import { saveItem, getSavedItems, countSavedItems } from '../services/saved-items'
+import { getAuthenticatedUserId } from '../middleware/auth'
 import { loggers } from '../config/logger'
 
 const log = loggers.watchlist
@@ -34,10 +32,6 @@ router.get('/', async (req: Request, res: Response) => {
     if (!userId) {
       return res.status(401).json({ error: 'Authentication required' })
     }
-
-    const userTier = await getUserTier(req)
-    const maxItems = getMaxWatchlistItems(userTier)
-    const hasCollections = hasFeature(userTier, 'collections')
 
     const items = await getSavedItems(userId)
 
@@ -64,15 +58,13 @@ router.get('/', async (req: Request, res: Response) => {
       savingsVsTarget: null,
     }))
 
+    // V1: Unlimited items for all users
     res.json({
       items: formattedItems,
-      collections: hasCollections ? [] : undefined,
       _meta: {
-        tier: userTier,
         itemCount: items.length,
-        itemLimit: maxItems,
-        canAddMore: maxItems === -1 || items.length < maxItems,
-        hasCollections,
+        itemLimit: -1, // Unlimited
+        canAddMore: true,
       },
       _deprecated: 'This endpoint is deprecated. Use GET /api/saved-items instead.',
     })
@@ -93,21 +85,9 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const data = createWatchlistItemSchema.parse(req.body)
-    const userTier = await getUserTier(req)
 
-    // Check tier limit
+    // V1: No tier limits
     const currentCount = await countSavedItems(userId)
-    if (hasReachedWatchlistLimit(userTier, currentCount)) {
-      const limit = getMaxWatchlistItems(userTier)
-      return res.status(403).json({
-        error: 'Watchlist limit reached',
-        message: `Free accounts are limited to ${limit} watchlist items. Upgrade to Premium for unlimited tracking.`,
-        currentCount,
-        limit,
-        tier: userTier,
-      })
-    }
-
     const item = await saveItem(userId, data.productId)
 
     res.status(201).json({
@@ -124,8 +104,7 @@ router.post('/', async (req: Request, res: Response) => {
       },
       _meta: {
         itemsUsed: currentCount + 1,
-        itemsLimit: getMaxWatchlistItems(userTier),
-        tier: userTier,
+        itemsLimit: -1, // Unlimited
       },
       _deprecated: 'This endpoint is deprecated. Use POST /api/saved-items/:productId instead.',
     })

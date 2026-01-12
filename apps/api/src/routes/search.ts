@@ -3,8 +3,7 @@ import { z } from 'zod'
 import { aiSearch, getSearchSuggestions, parseSearchIntent, backfillProductEmbeddings, updateProductEmbedding, ParseOptions } from '../services/ai-search'
 import { enqueueEmbeddingBatch, getEmbeddingQueueStats } from '../services/ai-search/embedding-queue'
 import { prisma, isAiSearchEnabled, isVectorSearchEnabled } from '@ironscout/db'
-import { requireAdmin, rateLimit, getUserTier } from '../middleware/auth'
-import { hasPriceHistoryAccess } from '../config/tiers'
+import { requireAdmin, rateLimit } from '../middleware/auth'
 import { loggers } from '../config/logger'
 
 const log = loggers.search
@@ -84,19 +83,17 @@ router.post('/semantic', async (req: Request, res: Response) => {
 
     const { query, page, limit, sortBy, filters } = semanticSearchSchema.parse(req.body)
 
-    // V1: All users get full capabilities (no tier restrictions)
-    const userTier = await getUserTier(req)
-
     // Check if vector search is enabled
     const vectorEnabled = await isVectorSearchEnabled()
 
+    // V1: All users get full capabilities
     const result = await aiSearch(query, {
       page,
-      limit, // V1: No limit restrictions
+      limit,
       sortBy,
       useVectorSearch: vectorEnabled,
       explicitFilters: filters,
-      userTier,
+      userTier: 'PREMIUM',
     })
 
     res.json(result)
@@ -117,8 +114,8 @@ router.post('/semantic', async (req: Request, res: Response) => {
 /**
  * Parse a query without searching (for debugging/preview)
  * POST /api/search/parse
- * 
- * Premium users get enhanced intent parsing with environment, barrel length, etc.
+ *
+ * V1: All users get enhanced intent parsing with environment, barrel length, etc.
  */
 const parseSchema = z.object({
   query: z.string().min(1).max(500),
@@ -137,17 +134,15 @@ router.post('/parse', async (req: Request, res: Response) => {
 
     const { query } = parseSchema.parse(req.body)
 
-    // Get user tier for Premium parsing
-    const userTier = await getUserTier(req)
-    const parseOptions: ParseOptions = { userTier }
+    // V1: All users get full parsing capabilities
+    const parseOptions: ParseOptions = { userTier: 'PREMIUM' }
 
     const intent = await parseSearchIntent(query, parseOptions)
-    
-    res.json({ 
+
+    res.json({
       intent,
-      tier: userTier,
-      // Indicate if Premium parsing was used
-      premiumParsing: userTier === 'PREMIUM' && !!intent.premiumIntent
+      // V1: Enhanced parsing always available
+      premiumParsing: !!intent.premiumIntent
     })
   } catch (error) {
     log.error('Parse error', {}, error)
@@ -158,7 +153,7 @@ router.post('/parse', async (req: Request, res: Response) => {
         details: error.issues
       })
     }
-    
+
     res.status(500).json({ error: 'Parse failed' })
   }
 })
@@ -195,8 +190,10 @@ router.get('/suggestions', async (req: Request, res: Response) => {
 /**
  * Natural language to filters (for hybrid UI)
  * Allows users to type naturally, then see/edit extracted filters
- * 
+ *
  * POST /api/search/nl-to-filters
+ *
+ * V1: All users get full filter capabilities
  */
 router.post('/nl-to-filters', async (req: Request, res: Response) => {
   try {
@@ -211,80 +208,78 @@ router.post('/nl-to-filters', async (req: Request, res: Response) => {
 
     const { query } = parseSchema.parse(req.body)
 
-    // Get user tier for Premium parsing
-    const userTier = await getUserTier(req)
-    const parseOptions: ParseOptions = { userTier }
+    // V1: All users get full parsing capabilities
+    const parseOptions: ParseOptions = { userTier: 'PREMIUM' }
 
     const intent = await parseSearchIntent(query, parseOptions)
-    
+
     // Convert intent to filter format matching existing search API
     const filters: Record<string, any> = {}
-    
+
     if (intent.calibers?.length) {
       filters.caliber = intent.calibers[0]
       filters.caliberOptions = intent.calibers
     }
-    
+
     if (intent.purpose) {
       filters.purpose = intent.purpose
     }
-    
+
     if (intent.grainWeights?.length) {
       filters.grainWeight = intent.grainWeights[0]
       filters.grainWeightOptions = intent.grainWeights
     }
-    
+
     if (intent.caseMaterials?.length) {
       filters.caseMaterial = intent.caseMaterials[0]
     }
-    
+
     if (intent.brands?.length) {
       filters.brand = intent.brands[0]
     }
-    
+
     if (intent.minPrice !== undefined) {
       filters.minPrice = intent.minPrice
     }
-    
+
     if (intent.maxPrice !== undefined) {
       filters.maxPrice = intent.maxPrice
     }
-    
+
     if (intent.inStockOnly) {
       filters.inStock = true
     }
-    
-    // Add Premium filters if available and user is Premium
-    const premiumFilters: Record<string, any> = {}
-    if (userTier === 'PREMIUM' && intent.premiumIntent) {
+
+    // V1: All advanced filters available to all users
+    const advancedFilters: Record<string, any> = {}
+    if (intent.premiumIntent) {
       if (intent.premiumIntent.preferredBulletTypes?.length) {
-        premiumFilters.bulletType = intent.premiumIntent.preferredBulletTypes[0]
-        premiumFilters.bulletTypeOptions = intent.premiumIntent.preferredBulletTypes
+        advancedFilters.bulletType = intent.premiumIntent.preferredBulletTypes[0]
+        advancedFilters.bulletTypeOptions = intent.premiumIntent.preferredBulletTypes
       }
-      
+
       if (intent.premiumIntent.suppressorUse) {
-        premiumFilters.suppressorSafe = true
+        advancedFilters.suppressorSafe = true
       }
-      
+
       if (intent.premiumIntent.barrelLength === 'short') {
-        premiumFilters.shortBarrelOptimized = true
+        advancedFilters.shortBarrelOptimized = true
       }
-      
+
       if (intent.premiumIntent.safetyConstraints?.includes('low-flash')) {
-        premiumFilters.lowFlash = true
+        advancedFilters.lowFlash = true
       }
-      
+
       if (intent.premiumIntent.safetyConstraints?.includes('low-recoil')) {
-        premiumFilters.lowRecoil = true
+        advancedFilters.lowRecoil = true
       }
     }
-    
+
     res.json({
       filters,
-      premiumFilters: userTier === 'PREMIUM' ? premiumFilters : undefined,
+      advancedFilters,
       intent,
-      explanation: generateExplanation(intent, userTier === 'PREMIUM'),
-      tier: userTier
+      explanation: generateExplanation(intent)
     })
   } catch (error) {
     log.error('NL to filters error', {}, error)
@@ -294,60 +289,58 @@ router.post('/nl-to-filters', async (req: Request, res: Response) => {
 
 /**
  * Generate human-readable explanation of parsed intent
+ * V1: All users get enhanced explanations
  */
-function generateExplanation(intent: any, isPremium: boolean): string {
+function generateExplanation(intent: any): string {
+  // Use enhanced explanation if available
+  if (intent.premiumIntent?.explanation) {
+    return intent.premiumIntent.explanation
+  }
+
   const parts: string[] = []
-  
+
   if (intent.calibers?.length) {
     parts.push(`caliber: ${intent.calibers.join(' or ')}`)
   }
-  
+
   if (intent.purpose) {
     parts.push(`for ${intent.purpose.toLowerCase()}`)
   }
-  
+
   if (intent.grainWeights?.length) {
     parts.push(`${intent.grainWeights.join('/')}gr bullets`)
   }
-  
+
   if (intent.qualityLevel) {
     parts.push(`${intent.qualityLevel} quality`)
   }
-  
+
   if (intent.caseMaterials?.length) {
     parts.push(`${intent.caseMaterials.join('/')} case`)
   }
-  
+
   if (intent.inStockOnly) {
     parts.push('in stock only')
   }
-  
-  // Add Premium explanation if available
-  if (isPremium && intent.premiumIntent?.explanation) {
-    return intent.premiumIntent.explanation
-  }
-  
+
   if (parts.length === 0) {
     return 'Searching all products'
   }
-  
+
   return `Looking for: ${parts.join(', ')}`
 }
 
 /**
- * Get available Premium filters for UI
+ * Get available advanced filters for UI
  * GET /api/search/premium-filters
- * 
- * Returns the list of Premium filters with their options
+ *
+ * V1: Returns all filter definitions for all users
  */
-router.get('/premium-filters', async (req: Request, res: Response) => {
+router.get('/premium-filters', async (_req: Request, res: Response) => {
   try {
-    const userTier = await getUserTier(req)
-    
-    // Return filter definitions even for FREE users (for UI display)
-    // but indicate they require Premium
+    // V1: All filters available to all users
     res.json({
-      available: userTier === 'PREMIUM',
+      available: true,
       filters: {
         bulletType: {
           label: 'Bullet Type',
@@ -412,10 +405,7 @@ router.get('/premium-filters', async (req: Request, res: Response) => {
           max: 3500,
           unit: 'fps'
         }
-      },
-      upgradeMessage: userTier === 'FREE' 
-        ? 'Upgrade to Premium to access advanced filters and performance-based search'
-        : undefined
+      }
     })
   } catch (error) {
     log.error('Premium filters error', {}, error)

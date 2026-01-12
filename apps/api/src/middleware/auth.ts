@@ -86,44 +86,14 @@ function extractUserIdFromJwt(req: Request): string | null {
 }
 
 /**
- * Get user tier from request using secure JWT validation.
+ * Get user tier from request.
  *
- * SECURITY: This replaces header-based tier resolution.
- * - If no valid JWT session → FREE tier
- * - If valid JWT → lookup user tier from database
- * - Never trusts client-provided headers for tier
- * - FAIL CLOSED: Non-ACTIVE users (PENDING_DELETION, DELETED) get FREE tier
+ * V1: All users receive PREMIUM capabilities. Tier enforcement is disabled.
+ * The function signature is preserved for API compatibility.
  */
-export async function getUserTier(req: Request): Promise<UserTier> {
-  const userId = extractUserIdFromJwt(req)
-
-  if (!userId) {
-    return 'FREE'
-  }
-
-  try {
-    const user = await prisma.users.findUnique({
-      where: { id: userId },
-      select: { tier: true, status: true }
-    })
-
-    // SECURITY: Fail closed - non-ACTIVE users get FREE tier
-    // This prevents suspended/deleted users from retaining premium features
-    if (!user || user.status !== 'ACTIVE') {
-      if (user && user.status !== 'ACTIVE') {
-        log.info('Denying tier for non-ACTIVE user', {
-          userId,
-          status: user.status,
-          requestedTier: user.tier
-        })
-      }
-      return 'FREE'
-    }
-
-    return (user.tier as UserTier) || 'FREE'
-  } catch {
-    return 'FREE'
-  }
+export async function getUserTier(_req: Request): Promise<UserTier> {
+  // V1: All users get premium capabilities
+  return 'PREMIUM'
 }
 
 /**

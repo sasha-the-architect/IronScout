@@ -9,9 +9,8 @@
 
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
-import { saveItem, unsaveItem, getSavedItems } from '../services/saved-items'
-import { getUserTier, getAuthenticatedUserId } from '../middleware/auth'
-import { getMaxWatchlistItems } from '../config/tiers'
+import { saveItem, getSavedItems } from '../services/saved-items'
+import { getAuthenticatedUserId } from '../middleware/auth'
 import { loggers } from '../config/logger'
 
 const log = loggers.alerts
@@ -78,7 +77,6 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const userTier = await getUserTier(req)
     const items = await getSavedItems(userId)
 
     // Return in legacy format
@@ -100,12 +98,12 @@ router.get('/', async (req: Request, res: Response) => {
       },
     }))
 
+    // V1: Unlimited alerts for all users
     res.json({
       alerts,
       _meta: {
         activeCount: alerts.length,
-        limit: getMaxWatchlistItems(userTier),
-        tier: userTier,
+        limit: -1, // Unlimited
         canCreateMore: true,
       },
       _deprecated: 'This endpoint is deprecated. Use GET /api/saved-items instead.',

@@ -1,9 +1,8 @@
 'use client'
 
-import { Sparkles, Info, Crown, X } from 'lucide-react'
+import { Sparkles, Info, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
-import Link from 'next/link'
 import type { SearchIntent, PremiumSearchIntent } from '@/lib/api'
 
 interface AIExplanationBannerProps {
@@ -12,36 +11,44 @@ interface AIExplanationBannerProps {
   processingTimeMs?: number
 }
 
-export function AIExplanationBanner({ intent, isPremium, processingTimeMs }: AIExplanationBannerProps) {
+export function AIExplanationBanner({ intent, isPremium: _isPremium, processingTimeMs }: AIExplanationBannerProps) {
   const [dismissed, setDismissed] = useState(false)
   
   if (dismissed) return null
   
   const premiumIntent = intent.premiumIntent
-  const hasExplanation = isPremium && premiumIntent?.explanation
+  const hasExplanation = !!premiumIntent?.explanation
+  const hasBasicSignals = !!intent.purposeDetected || (intent.calibers?.length ?? 0) > 0 || (intent.grainWeights?.length ?? 0) > 0
+
+  if (!hasExplanation && !hasBasicSignals) return null
   
-  // For FREE users, show basic purpose detection
-  if (!isPremium) {
-    if (!intent.purposeDetected && intent.confidence < 0.5) return null
-    
-    return (
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex-shrink-0">
-            <Sparkles className="h-4 w-4 text-white" />
+  return (
+    <div className="bg-muted/30 border border-border rounded-xl p-4 mb-6">
+      <div className="flex items-start gap-3">
+        <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
+          <Sparkles className="h-4 w-4 text-primary" />
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-medium text-foreground">
+              AI Search Analysis
+            </span>
+            {processingTimeMs && (
+              <span className="text-xs text-muted-foreground">
+                {processingTimeMs}ms
+              </span>
+            )}
           </div>
           
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                AI Search Analysis
-              </span>
-              <span className="text-xs text-blue-700 dark:text-blue-300 opacity-70">
-                (Basic)
-              </span>
-            </div>
-            
-            <p className="text-sm text-blue-800 dark:text-blue-200">
+          {hasExplanation && (
+            <p className="text-sm text-foreground/90 leading-relaxed">
+              {premiumIntent.explanation}
+            </p>
+          )}
+
+          {hasBasicSignals && (
+            <p className="text-sm text-muted-foreground mt-2">
               {intent.purposeDetected && (
                 <>Detected purpose: <strong>{intent.purposeDetected}</strong>. </>
               )}
@@ -52,64 +59,13 @@ export function AIExplanationBanner({ intent, isPremium, processingTimeMs }: AIE
                 <>Recommended weights: {intent.grainWeights.join('/')}&nbsp;gr. </>
               )}
             </p>
-            
-            {/* Upgrade hint */}
-            <div className="mt-3 flex items-center gap-2">
-              <Crown className="h-4 w-4 text-amber-500" />
-              <span className="text-xs text-blue-700 dark:text-blue-300">
-                <Link href="/pricing" className="font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 underline underline-offset-2">
-                  Upgrade to Premium
-                </Link>
-                {' '}for detailed context and product insights
-              </span>
-            </div>
-          </div>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-blue-700 hover:text-blue-900 dark:text-blue-300"
-            onClick={() => setDismissed(true)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    )
-  }
-  
-  // Premium explanation
-  if (!hasExplanation) return null
-  
-  return (
-    <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-6">
-      <div className="flex items-start gap-3">
-        <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex-shrink-0">
-          <Sparkles className="h-4 w-4 text-white" />
-        </div>
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium text-amber-900 dark:text-amber-100">
-              Premium AI Analysis
-            </span>
-            <Crown className="h-3.5 w-3.5 text-amber-600" />
-            {processingTimeMs && (
-              <span className="text-xs text-amber-600 dark:text-amber-400 opacity-70">
-                {processingTimeMs}ms
-              </span>
-            )}
-          </div>
-          
-          <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
-            {premiumIntent.explanation}
-          </p>
+          )}
           
           {/* Reasoning details */}
-          {premiumIntent.reasoning && Object.keys(premiumIntent.reasoning).length > 0 && (
+          {premiumIntent?.reasoning && Object.keys(premiumIntent.reasoning).length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {premiumIntent.environment && (
-                <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200">
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-muted text-foreground">
                   <Info className="h-3 w-3" />
                   {premiumIntent.environment === 'indoor' ? 'Indoor use' : 
                    premiumIntent.environment === 'outdoor' ? 'Outdoor use' : 'Indoor/Outdoor'}
@@ -117,14 +73,14 @@ export function AIExplanationBanner({ intent, isPremium, processingTimeMs }: AIE
               )}
               
               {premiumIntent.barrelLength && (
-                <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200">
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-muted text-foreground">
                   {premiumIntent.barrelLength === 'short' ? 'Short barrel' :
                    premiumIntent.barrelLength === 'long' ? 'Long barrel' : 'Standard barrel'}
                 </span>
               )}
               
               {premiumIntent.suppressorUse && (
-                <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200">
+                <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-muted text-foreground">
                   Suppressor use
                 </span>
               )}
@@ -132,14 +88,14 @@ export function AIExplanationBanner({ intent, isPremium, processingTimeMs }: AIE
               {premiumIntent.safetyConstraints?.map(constraint => (
                 <span 
                   key={constraint}
-                  className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200"
+                  className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-muted text-foreground"
                 >
                   {constraint.replace(/-/g, ' ')}
                 </span>
               ))}
               
               {premiumIntent.priorityFocus && (
-                <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-800/50 text-orange-800 dark:text-orange-200">
+                <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-muted text-foreground">
                   Priority: {premiumIntent.priorityFocus}
                 </span>
               )}
@@ -147,8 +103,8 @@ export function AIExplanationBanner({ intent, isPremium, processingTimeMs }: AIE
           )}
           
           {/* Preferred bullet types */}
-          {premiumIntent.preferredBulletTypes && premiumIntent.preferredBulletTypes.length > 0 && (
-            <div className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+          {premiumIntent?.preferredBulletTypes && premiumIntent.preferredBulletTypes.length > 0 && (
+            <div className="mt-2 text-xs text-muted-foreground">
               <span className="opacity-70">Matching types: </span>
               <span className="font-medium">{premiumIntent.preferredBulletTypes.join(', ')}</span>
             </div>
@@ -158,7 +114,7 @@ export function AIExplanationBanner({ intent, isPremium, processingTimeMs }: AIE
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 w-6 p-0 text-amber-700 hover:text-amber-900 dark:text-amber-300"
+          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
           onClick={() => setDismissed(true)}
         >
           <X className="h-4 w-4" />

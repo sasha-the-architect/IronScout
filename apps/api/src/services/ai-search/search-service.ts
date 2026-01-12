@@ -87,30 +87,31 @@ export interface AISearchOptions {
 
 /**
  * AI-powered semantic search with optional explicit filter overrides
- * 
+ *
  * The search process:
  * 1. Parse natural language query to extract intent (caliber, purpose, grain, etc.)
  * 2. Merge explicit filters on top of AI intent (explicit filters take priority)
  * 3. Execute hybrid search (vector + structured)
- * 4. Apply tier-appropriate ranking:
- *    - FREE: Basic relevance ranking
- *    - PREMIUM: Performance-aware ranking with Best Value scores
+ * 4. Apply performance-aware ranking with price context
+ *
+ * V1: All users get full search capabilities (no tier restrictions)
  */
 export async function aiSearch(
   query: string,
   options: AISearchOptions = {}
 ): Promise<AISearchResult> {
   const startTime = Date.now()
-  const { 
-    page = 1, 
-    limit = 20, 
-    sortBy = 'relevance', 
+  const {
+    page = 1,
+    limit = 20,
+    sortBy = 'relevance',
     useVectorSearch = true,
     explicitFilters = {},
-    userTier = 'FREE'
+    userTier = 'PREMIUM' // V1: All users get premium capabilities
   } = options
-  
-  const isPremium = userTier === 'PREMIUM'
+
+  // V1: All users get premium features
+  const isPremium = true
   const premiumFeaturesUsed: string[] = []
   
   log.debug('Starting search', {
@@ -303,12 +304,10 @@ export async function aiSearch(
 
   const processingTimeMs = Date.now() - startTime
 
-  // 12. Strip premium explanation fields for FREE users
-  const sanitizedIntent = stripPremiumExplanations(intent, isPremium)
-
+  // V1: All users get full intent with explanations
   return {
     products: formattedProducts,
-    intent: sanitizedIntent,
+    intent,
     facets,
     pagination: {
       page,
@@ -323,8 +322,8 @@ export async function aiSearch(
         grainWeights: intent.grainWeights,
         caseMaterials: intent.caseMaterials,
         qualityLevel: intent.qualityLevel,
-        // Premium parsed fields
-        ...(isPremium && intent.premiumIntent ? {
+        // V1: All advanced parsed fields included
+        ...(intent.premiumIntent ? {
           environment: intent.premiumIntent.environment,
           barrelLength: intent.premiumIntent.barrelLength,
           suppressorUse: intent.premiumIntent.suppressorUse,
@@ -336,7 +335,7 @@ export async function aiSearch(
       aiEnhanced: intent.confidence > 0.5,
       vectorSearchUsed,
       processingTimeMs,
-      userTier,
+      userTier: 'PREMIUM', // V1: All users get premium
       ...(premiumFeaturesUsed.length > 0 ? { premiumFeaturesUsed } : {})
     }
   }
@@ -892,35 +891,6 @@ function reRankProducts(products: any[], intent: SearchIntent): any[] {
     
     return { ...product, _relevanceScore: score }
   }).sort((a, b) => b._relevanceScore - a._relevanceScore)
-}
-
-/**
- * Strip premium explanation fields from intent for FREE users.
- * Premium intent contains AI-generated explanations and reasoning
- * that should only be shown to Premium subscribers.
- */
-function stripPremiumExplanations(intent: SearchIntent, isPremium: boolean): SearchIntent {
-  if (isPremium) {
-    // Premium users get the full intent with explanations
-    return intent
-  }
-
-  // FREE users: strip explanation and reasoning from premiumIntent
-  if (!intent.premiumIntent) {
-    return intent
-  }
-
-  const { explanation, reasoning, ...restPremiumIntent } = intent.premiumIntent
-
-  return {
-    ...intent,
-    premiumIntent: {
-      ...restPremiumIntent,
-      // Remove explanation and reasoning for FREE users
-      explanation: undefined as any,
-      reasoning: undefined,
-    },
-  }
 }
 
 /**

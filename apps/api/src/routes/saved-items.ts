@@ -21,8 +21,7 @@ import {
   updateSavedItemPrefs,
   countSavedItems,
 } from '../services/saved-items'
-import { getUserTier, getAuthenticatedUserId } from '../middleware/auth'
-import { getMaxWatchlistItems, hasReachedWatchlistLimit } from '../config/tiers'
+import { getAuthenticatedUserId } from '../middleware/auth'
 import { loggers } from '../config/logger'
 
 const log = loggers.watchlist
@@ -53,17 +52,15 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const userTier = await getUserTier(req)
     const items = await getSavedItems(userId)
-    const itemLimit = getMaxWatchlistItems(userTier)
 
+    // V1: Unlimited saved items for all users
     res.json({
       items,
       _meta: {
-        tier: userTier,
         itemCount: items.length,
-        itemLimit,
-        canAddMore: itemLimit === -1 || items.length < itemLimit,
+        itemLimit: -1, // Unlimited
+        canAddMore: true,
       },
     })
   } catch (error) {
@@ -89,37 +86,21 @@ router.post('/:productId', async (req: Request, res: Response) => {
     }
 
     const { productId } = req.params
-    const userTier = await getUserTier(req)
 
-    // Check if item already exists (for limit checking)
+    // Check if item already exists (for idempotent response)
     const existing = await getSavedItemByProductId(userId, productId)
 
-    if (!existing) {
-      // Check tier limit only for new items
-      const currentCount = await countSavedItems(userId)
-      if (hasReachedWatchlistLimit(userTier, currentCount)) {
-        const limit = getMaxWatchlistItems(userTier)
-        return res.status(403).json({
-          error: 'Saved items limit reached',
-          message: `Free accounts are limited to ${limit} saved items. Upgrade to Premium for unlimited tracking.`,
-          currentCount,
-          limit,
-          tier: userTier,
-        })
-      }
-    }
+    // V1: No limits on saved items
 
     const item = await saveItem(userId, productId)
     const newCount = await countSavedItems(userId)
-    const itemLimit = getMaxWatchlistItems(userTier)
 
     res.status(existing ? 200 : 201).json({
       ...item,
       _meta: {
-        tier: userTier,
         itemCount: newCount,
-        itemLimit,
-        canAddMore: itemLimit === -1 || newCount < itemLimit,
+        itemLimit: -1, // Unlimited
+        canAddMore: true,
         wasExisting: !!existing,
       },
     })
