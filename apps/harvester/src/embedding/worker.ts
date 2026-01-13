@@ -191,14 +191,12 @@ export async function startEmbeddingWorker(options?: {
   })
 
   embeddingWorker.on('error', (error: Error) => {
-    log.error(
-      'EMBEDDING_WORKER_ERROR',
-      {
-        event_name: 'EMBEDDING_WORKER_ERROR',
-        errorMessage: error.message,
-      },
-      error
-    )
+    // Transient network errors (ECONNRESET, ETIMEDOUT, etc.) are expected
+    // in long-running processes - log as warn, not error
+    log.warn('EMBEDDING_WORKER_ERROR', {
+      event_name: 'EMBEDDING_WORKER_ERROR',
+      errorMessage: error.message,
+    })
   })
 
   return embeddingWorker

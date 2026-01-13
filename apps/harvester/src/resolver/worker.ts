@@ -112,11 +112,13 @@ export async function startProductResolverWorker(options?: {
   })
 
   productResolverWorker.on('error', (error: Error) => {
-    log.error('RESOLVER_WORKER_ERROR', {
+    // Transient network errors (ECONNRESET, ETIMEDOUT, etc.) are expected
+    // in long-running processes - log as warn, not error
+    log.warn('RESOLVER_WORKER_ERROR', {
       event_name: 'RESOLVER_WORKER_ERROR',
       errorMessage: error.message,
       errorName: error.name,
-    }, error)
+    })
   })
 
   productResolverWorker.on('stalled', (jobId: string) => {
