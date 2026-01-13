@@ -95,8 +95,8 @@ If an alert resembles advertising, it violates this policy.
 To prevent alert fatigue, the following limits apply:
 
 ### Per-Item Limits
-- Price drop alerts: max **1 per 24 hours per item**
-- Back-in-stock alerts: max **1 per 24 hours per item**
+- Price drop alerts: max **1 per 7 days per item** (conservative to prevent fluctuation noise)
+- Back-in-stock alerts: max **1 per 24 hours per item** (configurable 1-168h per item)
 
 ### Per-User Limits
 - Max **1 alert per 6 hours**
@@ -107,6 +107,11 @@ If multiple events occur simultaneously, priority is:
 2. Meaningful price drop
 
 Lower-priority alerts must be suppressed.
+
+### Implementation Reference
+- Per-item cooldowns: `apps/harvester/src/alerter/index.ts` (COOLDOWN_HOURS constant)
+- Per-user rate limits: Redis-backed atomic counters
+- Stock cooldown customization: `watchlist_items.stockAlertCooldownHours` field
 
 ---
 

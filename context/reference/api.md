@@ -149,42 +149,185 @@ MUST:
 
 ---
 
-## Alerts
+## Saved Items (ADR-011 Unified API)
 
-### POST /alerts
-Create an alert.
+Per ADR-011, watchlist and alerts are unified under "Saved Items". A single save action
+creates both tracking and notification rules.
 
-Payload (conceptual):
-- `productId` or query spec
-- threshold rules (price below, in-stock)
-- notification preferences
+### GET /api/saved-items
+List all saved items for authenticated user.
+
+Response:
+```json
+{
+  "items": [
+    {
+      "id": "...",
+      "productId": "...",
+      "name": "...",
+      "brand": "...",
+      "caliber": "...",
+      "price": 24.99,
+      "inStock": true,
+      "savedAt": "2026-01-13T...",
+      "notificationsEnabled": true,
+      "priceDropEnabled": true,
+      "backInStockEnabled": true,
+      "minDropPercent": 5,
+      "minDropAmount": 5.0,
+      "stockAlertCooldownHours": 24
+    }
+  ],
+  "_meta": {
+    "itemCount": 10,
+    "itemLimit": -1,
+    "canAddMore": true
+  }
+}
+```
+
+### POST /api/saved-items/:productId
+Save an item (idempotent). Creates watchlist entry and alert rules in single transaction.
+
+Returns 201 if new, 200 if already saved.
+
+### DELETE /api/saved-items/:productId
+Remove saved item (soft delete). Preserves preferences for potential resurrection.
+
+### PATCH /api/saved-items/:productId
+Update notification preferences for a saved item.
+
+Payload:
+```json
+{
+  "notificationsEnabled": true,
+  "priceDropEnabled": true,
+  "backInStockEnabled": true,
+  "minDropPercent": 5,
+  "minDropAmount": 5.0,
+  "stockAlertCooldownHours": 24
+}
+```
+
+Validation:
+- `minDropPercent`: 0-100
+- `minDropAmount`: >= 0
+- `stockAlertCooldownHours`: 1-168 (1 hour to 1 week)
+
+### GET /api/saved-items/history
+Get alert notification history for authenticated user.
+
+Query params:
+- `limit`: max items per page (default 50, max 100)
+- `offset`: pagination offset (default 0)
+
+Response:
+```json
+{
+  "history": [
+    {
+      "id": "...",
+      "type": "PRICE_DROP",
+      "productId": "...",
+      "productName": "...",
+      "triggeredAt": "2026-01-13T...",
+      "reason": "Price dropped from $25 to $20",
+      "metadata": {
+        "oldPrice": 25.0,
+        "newPrice": 20.0,
+        "retailer": "..."
+      }
+    }
+  ],
+  "_meta": {
+    "total": 100,
+    "limit": 50,
+    "offset": 0,
+    "hasMore": true
+  }
+}
+```
 
 MUST:
 - Validate server-side.
-- Enforce alert limits and cadence (uniform for all users).
-
-### GET /alerts
-List alerts for authenticated user.
-
-### DELETE /alerts/:id
-Delete an alert (owner only).
-
-Alert evaluation (system behavior):
-- Must not trigger from ineligible or unlisted Retailer inventory.
-- Must fail closed on ambiguous eligibility.
+- Enforce alert limits and cadence (uniform for all users in v1).
+- Alert evaluation must not trigger from ineligible or unlisted Retailer inventory.
+- Fail closed on ambiguous eligibility.
 
 ---
 
-## Watchlists
+## Legacy Alerts/Watchlist Endpoints (Deprecated)
 
-### POST /watchlist
-Add product to watchlist.
+The following endpoints are deprecated and return 410 Gone:
+- `PUT /api/alerts/:id`
+- `DELETE /api/alerts/:id`
+- Watchlist collection endpoints
 
-### GET /watchlist
-List watchlist.
+Use the unified `/api/saved-items/*` endpoints instead.
 
-### DELETE /watchlist/:id
-Remove item.
+---
+
+## Dashboard (v4 State-Driven)
+
+The dashboard uses a state-driven model with 6 user states that determine UI presentation.
+
+### GET /api/dashboard/state
+Get resolved dashboard state for authenticated user.
+
+Response:
+```json
+{
+  "state": "HEALTHY",
+  "watchlistCount": 12,
+  "alertsConfigured": 10,
+  "alertsMissing": 2,
+  "priceDropsThisWeek": 3
+}
+```
+
+States:
+- `BRAND_NEW`: 0 saved items
+- `NEW`: 1-4 saved items
+- `NEEDS_ALERTS`: 5+ items, some without alerts configured
+- `HEALTHY`: 5+ items, all alerts active
+- `RETURNING`: 5+ items, active alerts with recent notifications
+- `POWER_USER`: 7+ items, active alerts with frequent notifications
+
+### GET /api/dashboard/watchlist-preview
+Get limited preview of saved items for dashboard display.
+
+Query params:
+- `limit`: max items (default 3, max 10)
+
+Response: Subset of saved items with prices.
+
+### GET /api/dashboard/pulse
+Get market pulse data for user's saved calibers.
+
+Query params:
+- `windowDays`: 1 or 7 (default 7)
+
+Response:
+```json
+{
+  "calibers": [
+    {
+      "caliber": "9mm",
+      "currentAvg": 0.28,
+      "trend": "DOWN",
+      "trendPercent": -5.2,
+      "priceContext": "LOWER_THAN_RECENT",
+      "contextMeta": { "historicalAvg": 0.30 }
+    }
+  ],
+  "_meta": {
+    "calibersLimit": -1,
+    "windowDays": 7
+  }
+}
+```
+
+Trend values: `UP` (>3%), `DOWN` (<-3%), `STABLE` (within ±3%)
 
 ---
 
