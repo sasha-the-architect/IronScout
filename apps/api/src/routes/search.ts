@@ -418,40 +418,6 @@ router.get('/premium-filters', async (_req: Request, res: Response) => {
 // ============================================
 
 /**
- * Get embedding statistics
- * GET /api/search/admin/embedding-stats
- */
-router.get('/admin/embedding-stats', requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const stats = await prisma.$queryRaw<Array<{
-      total: bigint
-      with_embedding: bigint
-      without_embedding: bigint
-    }>>`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(embedding) as with_embedding,
-        COUNT(*) - COUNT(embedding) as without_embedding
-      FROM products
-    `
-    
-    const result = stats[0]
-    
-    res.json({
-      total: Number(result.total),
-      withEmbedding: Number(result.with_embedding),
-      withoutEmbedding: Number(result.without_embedding),
-      percentComplete: result.total > 0 
-        ? Math.round((Number(result.with_embedding) / Number(result.total)) * 100)
-        : 0
-    })
-  } catch (error) {
-    log.error('Embedding stats error', {}, error)
-    res.status(500).json({ error: 'Failed to get embedding stats' })
-  }
-})
-
-/**
  * Get ballistic field statistics (Phase 2)
  * GET /api/search/admin/ballistic-stats
  */
@@ -606,11 +572,12 @@ router.get('/admin/backfill-progress', requireAdmin, (req: Request, res: Respons
  */
 router.get('/admin/embedding-stats', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const [totalProducts, productsWithEmbedding] = await Promise.all([
+    const [totalProducts, productsWithEmbedding, queueStats] = await Promise.all([
       prisma.products.count(),
       prisma.$queryRaw<[{ count: bigint }]>`
         SELECT COUNT(*) as count FROM products WHERE embedding IS NOT NULL
       `.then(r => Number(r[0].count)),
+      getEmbeddingQueueStats(),
     ])
 
     const productsWithoutEmbedding = totalProducts - productsWithEmbedding
@@ -618,13 +585,21 @@ router.get('/admin/embedding-stats', requireAdmin, async (req: Request, res: Res
       ? Math.round((productsWithEmbedding / totalProducts) * 100)
       : 0
 
+    // Queue is processing if there are waiting or active jobs
+    const queueProcessing = queueStats.waiting > 0 || queueStats.active > 0
+
     res.json({
       totalProducts,
       productsWithEmbedding,
       productsWithoutEmbedding,
       coveragePercent,
-      backfillInProgress,
-      backfillProgress: backfillInProgress ? backfillProgress : null,
+      backfillInProgress: queueProcessing,
+      backfillProgress: queueProcessing ? {
+        processed: queueStats.completed,
+        total: queueStats.waiting + queueStats.active + queueStats.completed,
+        errors: [],
+      } : null,
+      queueStats,
     })
   } catch (error) {
     log.error('Embedding stats error', {}, error)

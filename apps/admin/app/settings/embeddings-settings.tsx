@@ -14,6 +14,12 @@ interface EmbeddingStats {
     total: number;
     errors: string[];
   } | null;
+  queueStats?: {
+    waiting: number;
+    active: number;
+    completed: number;
+    failed: number;
+  };
 }
 
 export function EmbeddingsSettings() {
@@ -24,7 +30,11 @@ export function EmbeddingsSettings() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/search/admin/embedding-stats');
+      const response = await fetch('/api/search/admin/embedding-stats', {
+        headers: {
+          'X-Admin-Key': process.env.NEXT_PUBLIC_ADMIN_API_KEY || '',
+        },
+      });
       if (!response.ok) throw new Error('Failed to fetch stats');
       const data = await response.json();
       setStats(data);
@@ -38,13 +48,15 @@ export function EmbeddingsSettings() {
 
   useEffect(() => {
     fetchStats();
+  }, []);
 
-    // Poll for updates if backfill is in progress
+  // Faster polling when processing
+  useEffect(() => {
+    if (!stats?.backfillInProgress) return;
+
     const interval = setInterval(() => {
-      if (stats?.backfillInProgress) {
-        fetchStats();
-      }
-    }, 5000);
+      fetchStats();
+    }, 2000); // Poll every 2 seconds while processing
 
     return () => clearInterval(interval);
   }, [stats?.backfillInProgress]);
@@ -56,6 +68,9 @@ export function EmbeddingsSettings() {
     try {
       const response = await fetch('/api/search/admin/backfill-embeddings', {
         method: 'POST',
+        headers: {
+          'X-Admin-Key': process.env.NEXT_PUBLIC_ADMIN_API_KEY || '',
+        },
       });
 
       if (!response.ok) {
@@ -112,39 +127,47 @@ export function EmbeddingsSettings() {
           </div>
 
           {/* Backfill Progress */}
-          {stats.backfillInProgress && stats.backfillProgress && (
+          {stats.backfillInProgress && stats.queueStats && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                <span className="font-medium text-blue-900">Backfill in Progress</span>
+                <span className="font-medium text-blue-900">Generating Embeddings</span>
               </div>
               <div className="relative pt-1">
                 <div className="flex mb-2 items-center justify-between">
                   <div className="text-xs text-blue-600">
-                    {stats.backfillProgress.processed} / {stats.backfillProgress.total} products
+                    {stats.queueStats.completed} completed
                   </div>
                   <div className="text-xs text-blue-600">
-                    {stats.backfillProgress.total > 0
-                      ? Math.round((stats.backfillProgress.processed / stats.backfillProgress.total) * 100)
+                    {stats.backfillProgress && stats.backfillProgress.total > 0
+                      ? Math.round((stats.queueStats.completed / stats.backfillProgress.total) * 100)
                       : 0}%
                   </div>
                 </div>
                 <div className="overflow-hidden h-2 text-xs flex rounded bg-blue-200">
                   <div
                     style={{
-                      width: `${stats.backfillProgress.total > 0
-                        ? (stats.backfillProgress.processed / stats.backfillProgress.total) * 100
+                      width: `${stats.backfillProgress && stats.backfillProgress.total > 0
+                        ? (stats.queueStats.completed / stats.backfillProgress.total) * 100
                         : 0}%`
                     }}
                     className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-600 transition-all duration-500"
                   />
                 </div>
               </div>
-              {stats.backfillProgress.errors.length > 0 && (
-                <div className="mt-2 text-xs text-red-600">
-                  {stats.backfillProgress.errors.length} errors occurred
-                </div>
-              )}
+              <div className="mt-3 flex items-center gap-4 text-xs">
+                <span className="text-blue-700">
+                  <span className="font-medium">{stats.queueStats.active}</span> active
+                </span>
+                <span className="text-blue-600">
+                  <span className="font-medium">{stats.queueStats.waiting}</span> waiting
+                </span>
+                {stats.queueStats.failed > 0 && (
+                  <span className="text-red-600">
+                    <span className="font-medium">{stats.queueStats.failed}</span> failed
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
