@@ -24,6 +24,7 @@ const mockParseFeed = vi.fn()
 const mockProcessProducts = vi.fn()
 const mockEvaluateCircuitBreaker = vi.fn()
 const mockPromoteProducts = vi.fn()
+const mockCopySeenFromPreviousRun = vi.fn()
 const mockNotifyFailed = vi.fn()
 const mockNotifyCircuitBreaker = vi.fn()
 const mockNotifyAutoDisabled = vi.fn()
@@ -68,6 +69,7 @@ vi.mock('../processor', () => ({
 vi.mock('../circuit-breaker', () => ({
   evaluateCircuitBreaker: mockEvaluateCircuitBreaker,
   promoteProducts: mockPromoteProducts,
+  copySeenFromPreviousRun: mockCopySeenFromPreviousRun,
 }))
 
 vi.mock('@ironscout/notifications', () => ({

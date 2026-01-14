@@ -61,6 +61,7 @@ vi.mock('../../config/logger', () => {
 vi.mock('../circuit-breaker', () => ({
   evaluateCircuitBreaker: vi.fn().mockResolvedValue({ passed: true, metrics: {} }),
   promoteProducts: vi.fn().mockResolvedValue(0),
+  copySeenFromPreviousRun: vi.fn().mockResolvedValue(0),
 }))
 
 // Import after mocks

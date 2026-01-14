@@ -28,7 +28,7 @@ import { acquireAdvisoryLock, releaseAdvisoryLock } from './lock'
 import { downloadFeed } from './fetcher'
 import { parseFeed } from './parser'
 import { processProducts } from './processor'
-import { evaluateCircuitBreaker, promoteProducts } from './circuit-breaker'
+import { evaluateCircuitBreaker, promoteProducts, copySeenFromPreviousRun } from './circuit-breaker'
 import { AffiliateFeedError, FAILURE_KIND, ERROR_CODES } from './types'
 import type { FeedRunContext, RunStatus, FailureKind, ErrorCode } from './types'
 
@@ -380,6 +380,78 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
     })
 
     if (result.skipped) {
+      const shouldRefreshFromPreviousRun =
+        result.skippedReason === 'UNCHANGED_HASH' || result.skippedReason === 'UNCHANGED_MTIME'
+      if (shouldRefreshFromPreviousRun) {
+        const previousRun = await prisma.affiliate_feed_runs.findFirst({
+          where: {
+            feedId: feed.id,
+            status: 'SUCCEEDED',
+            ignoredAt: null,
+            id: { not: run.id },
+          },
+          orderBy: [{ finishedAt: 'desc' }, { startedAt: 'desc' }],
+          select: {
+            id: true,
+            productsUpserted: true,
+            productsRejected: true,
+            duplicateKeyCount: true,
+            urlHashFallbackCount: true,
+          },
+        })
+
+        if (previousRun) {
+          const copiedCount = await copySeenFromPreviousRun(previousRun.id, run.id, t0)
+          if (copiedCount > 0) {
+            log.info('AFFILIATE_REFRESH_FROM_PREVIOUS_RUN', {
+              feedId: feed.id,
+              runId: run.id,
+              previousRunId: previousRun.id,
+              copiedCount,
+              skippedReason: result.skippedReason,
+            })
+
+            const refreshPhase1: Phase1Result = {
+              skipped: false,
+              metrics: {
+                downloadBytes: 0,
+                rowsRead: 0,
+                rowsParsed: 0,
+                productsUpserted: copiedCount,
+                pricesWritten: 0,
+                productsRejected: previousRun.productsRejected ?? 0,
+                duplicateKeyCount: previousRun.duplicateKeyCount ?? 0,
+                urlHashFallbackCount: previousRun.urlHashFallbackCount ?? 0,
+                errorCount: 0,
+              },
+            }
+
+            const phase2Result = await executePhase2(context, refreshPhase1, log)
+
+            await finalizeRun(context, 'SUCCEEDED', {
+              ...refreshPhase1.metrics,
+              productsPromoted: phase2Result.productsPromoted,
+              skippedReason: result.skippedReason,
+            }, log)
+
+            return
+          }
+
+          log.warn('AFFILIATE_REFRESH_NO_SEEN_ROWS', {
+            feedId: feed.id,
+            runId: run.id,
+            previousRunId: previousRun.id,
+            skippedReason: result.skippedReason,
+          })
+        } else {
+          log.warn('AFFILIATE_REFRESH_NO_PREVIOUS_RUN', {
+            feedId: feed.id,
+            runId: run.id,
+            skippedReason: result.skippedReason,
+          })
+        }
+      }
+
       // Per spec Q8.2.3: Use SUCCEEDED + skippedReason, not separate SKIPPED status
       // FILE_NOT_FOUND gets WARN level for visibility; others get DEBUG
       if (result.skippedReason === 'FILE_NOT_FOUND') {

@@ -290,6 +290,42 @@ export async function promoteProducts(runId: string, t0: Date): Promise<number> 
 }
 
 /**
+ * Copy seen rows from a previous run and refresh presence timestamps.
+ * Used when a feed is unchanged but needs freshness refresh after downtime.
+ */
+export async function copySeenFromPreviousRun(
+  previousRunId: string,
+  runId: string,
+  t0: Date
+): Promise<number> {
+  const copiedCount = await prisma.$executeRaw`
+    INSERT INTO source_product_seen ("id", "runId", "sourceProductId", "createdAt")
+    SELECT gen_random_uuid(), ${runId}, sps."sourceProductId", ${t0}
+    FROM source_product_seen sps
+    WHERE sps."runId" = ${previousRunId}
+    ON CONFLICT ("runId", "sourceProductId") DO NOTHING
+  `
+
+  await prisma.$executeRaw`
+    INSERT INTO source_product_presence ("id", "sourceProductId", "lastSeenAt", "updatedAt")
+    SELECT gen_random_uuid(), sps."sourceProductId", ${t0}, ${t0}
+    FROM source_product_seen sps
+    WHERE sps."runId" = ${runId}
+    ON CONFLICT ("sourceProductId") DO UPDATE SET
+      "lastSeenAt" = ${t0},
+      "updatedAt" = ${t0}
+  `
+
+  log.info('Seen rows copied for refresh', {
+    previousRunId,
+    runId,
+    count: copiedCount,
+  })
+
+  return copiedCount
+}
+
+/**
  * Get expiry status for a feed (for monitoring)
  */
 export async function getExpiryStatus(
