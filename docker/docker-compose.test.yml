@@ -1,0 +1,39 @@
+# Test Docker Compose
+#
+# Usage:
+#   pnpm test:up      # Start test PostgreSQL + Redis
+#   pnpm test:down    # Stop test containers
+#
+# Uses different ports (5433, 6380) to avoid conflicts with dev containers.
+# Data is ephemeral - no volumes, destroyed on container stop.
+
+services:
+  postgres-test:
+    image: pgvector/pgvector:pg16
+    container_name: ironscout-postgres-test
+    environment:
+      POSTGRES_USER: ironscout_test
+      POSTGRES_PASSWORD: ironscout_test
+      POSTGRES_DB: ironscout_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ironscout_test -d ironscout_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: ironscout-redis-test
+    ports:
+      - "6380:6379"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
