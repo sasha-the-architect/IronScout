@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Outfit, JetBrains_Mono } from 'next/font/google'
+import Script from 'next/script'
 import './globals.css'
 import { Providers } from './providers'
 import { Header } from '@/components/layout/header'
@@ -114,9 +115,9 @@ export default function RootLayout({
         <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
         
         {/* Third-party Scripts */}
-        <script
-          type="text/javascript"
+        <Script
           src="https://classic.avantlink.com/affiliate_app_confirm.php?mode=js&authResponse=83b35735960abca5c62924f3fbe01e4e919343a3"
+          strategy="afterInteractive"
         />
       </head>
       <body className="font-display antialiased">

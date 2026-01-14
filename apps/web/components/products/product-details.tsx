@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { ProductImage } from './product-image'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -42,9 +43,9 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     <div className="space-y-6">
       {/* Breadcrumb */}
       <nav className="text-sm text-muted-foreground">
-        <a href="/" className="hover:text-foreground">Home</a>
+        <Link href="/" className="hover:text-foreground">Home</Link>
         <span className="mx-2">/</span>
-        <a href="/search" className="hover:text-foreground">Search</a>
+        <Link href="/search" className="hover:text-foreground">Search</Link>
         <span className="mx-2">/</span>
         <span className="text-foreground">{product.name}</span>
       </nav>

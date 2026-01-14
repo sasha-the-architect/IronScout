@@ -94,6 +94,7 @@ export function Navigation({ admin }: NavigationProps) {
           </div>
         </div>
         
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- API route, not a page */}
         <a
           href="/api/auth/logout"
           className="mt-3 flex items-center gap-2 text-sm text-gray-400 hover:text-white"
