@@ -20,6 +20,7 @@ import { EditFeedSettings } from './edit-feed-settings';
 import { TestConnectionButton } from './test-connection-button';
 import { TrustConfigToggle } from './trust-config-toggle';
 import { FreshnessPanel } from './freshness-panel';
+import { EditNextRunTime } from './edit-next-run-time';
 
 export const dynamic = 'force-dynamic';
 
@@ -292,12 +293,17 @@ export default async function AffiliateFeedDetailPage({
                 <Calendar className="h-4 w-4" />
                 Next Run
               </dt>
-              <dd className="mt-1 text-sm text-gray-900">
-                {feed.nextRunAt
-                  ? new Date(feed.nextRunAt).toLocaleString()
-                  : feed.manualRunPending
-                    ? 'Pending manual run'
-                    : '—'}
+              <dd className="mt-1">
+                {feed.manualRunPending ? (
+                  <span className="text-sm text-amber-600">Pending manual run</span>
+                ) : (
+                  <EditNextRunTime
+                    feedId={feed.id}
+                    currentNextRunAt={feed.nextRunAt}
+                    isEnabled={feed.status === 'ENABLED'}
+                    scheduleFrequencyHours={feed.scheduleFrequencyHours}
+                  />
+                )}
               </dd>
             </div>
 

@@ -555,6 +555,67 @@ export async function resetFeedState(feedId: string) {
   }
 }
 
+/**
+ * Update the next scheduled run time for a feed.
+ * This allows fine-tuning feed schedules to space them out.
+ * Future runs will be calculated by adding scheduleFrequencyHours to this time.
+ */
+export async function updateNextRunAt(feedId: string, nextRunAt: Date) {
+  const session = await getAdminSession();
+
+  if (!session) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  try {
+    const feed = await prisma.affiliate_feeds.findUnique({
+      where: { id: feedId },
+    });
+
+    if (!feed) {
+      return { success: false, error: 'Feed not found' };
+    }
+
+    if (feed.status !== 'ENABLED') {
+      return { success: false, error: 'Can only adjust schedule for enabled feeds' };
+    }
+
+    // Validate the new time is in the future
+    const now = new Date();
+    if (nextRunAt <= now) {
+      return { success: false, error: 'Next run time must be in the future' };
+    }
+
+    // Validate it's not more than 7 days out (reasonable limit)
+    const maxFuture = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    if (nextRunAt > maxFuture) {
+      return { success: false, error: 'Next run time cannot be more than 7 days in the future' };
+    }
+
+    const oldNextRunAt = feed.nextRunAt;
+
+    await prisma.affiliate_feeds.update({
+      where: { id: feedId },
+      data: { nextRunAt },
+    });
+
+    await logAdminAction(session.userId, 'UPDATE_NEXT_RUN_AT', {
+      resource: 'AffiliateFeed',
+      resourceId: feedId,
+      oldValue: { nextRunAt: oldNextRunAt?.toISOString() ?? null },
+      newValue: { nextRunAt: nextRunAt.toISOString() },
+    });
+
+    revalidatePath('/affiliate-feeds');
+    revalidatePath(`/affiliate-feeds/${feedId}`);
+
+    return { success: true };
+  } catch (error) {
+    loggers.feeds.error('Failed to update next run time', { feedId }, error instanceof Error ? error : new Error(String(error)));
+    return { success: false, error: 'Failed to update next run time' };
+  }
+}
+
 export async function forceReprocess(feedId: string) {
   const session = await getAdminSession();
 
