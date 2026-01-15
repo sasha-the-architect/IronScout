@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-01-14T22:06:07.993Z",
+  "generatedAt": "2026-01-15T02:08:45.963Z",
   "expectations": [
     {
       "file": "impact_edge_cases.csv",
@@ -107,6 +107,22 @@
         "missingUrl": 15,
         "invalidUrl": 19,
         "invalidPrice": 17
+      },
+      "quarantinedRows": 200,
+      "needsResolverRows": 400,
+      "urlHashFallbackRows": 100,
+      "duplicateIdentityRows": 60
+    },
+    {
+      "file": "test_feed_ammo_depot.delta.csv",
+      "totalRows": 20000,
+      "parsedRows": 19940,
+      "rejectedRows": 60,
+      "rejectedBreakdown": {
+        "missingName": 18,
+        "missingUrl": 16,
+        "invalidUrl": 12,
+        "invalidPrice": 14
       },
       "quarantinedRows": 200,
       "needsResolverRows": 400,

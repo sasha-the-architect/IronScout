@@ -19,11 +19,30 @@ const DEFAULT_ROW_COUNTS = {
   'impact_large_messy.csv': 20000,
 }
 
-const BRANDS = ['Federal', 'Winchester', 'Hornady', 'Remington', 'Sig Sauer', 'Speer', 'PMC']
-const CALIBERS = ['9mm', '.223 Remington', '5.56 NATO', '.308 Winchester', '.45 ACP', '12 Gauge']
-const GRAINS = [55, 62, 77, 124, 147, 150, 168, 230]
-const ROUNDS = [20, 50, 100, 200, 500, 1000]
-const STYLES = ['FMJ', 'JHP', 'SP', 'BTHP', 'M193', 'M855']
+const BRANDS = [
+  'Federal',
+  'Winchester',
+  'Hornady',
+  'Remington',
+  'Sig Sauer',
+  'Speer',
+  'PMC',
+  'Fiocchi',
+  'CCI',
+]
+const HANDGUN_CALIBERS = ['9mm', '9mm', '9mm', '.45 ACP', '.45 ACP', '.40 S&W', '.380 ACP']
+const RIFLE_CALIBERS = ['.223 Remington', '.223 Remington', '5.56 NATO', '5.56 NATO', '.308 Winchester']
+const SHOTGUN_CALIBERS = ['12 Gauge', '12 Gauge', '20 Gauge']
+const HANDGUN_GRAINS = [90, 115, 124, 147, 165, 180, 230]
+const RIFLE_GRAINS = [55, 62, 69, 77, 150, 168]
+const SHOTGUN_SHOT_SIZES = ['#7.5', '#8', '#4 Buck', '00 Buck']
+const SHOTGUN_LOADS = ['Buckshot', 'Birdshot', 'Slug']
+const HANDGUN_ROUNDS = [20, 50, 100, 200]
+const RIFLE_ROUNDS = [20, 50, 100, 200]
+const SHOTGUN_ROUNDS = [5, 10, 25]
+const HANDGUN_STYLES = ['FMJ', 'JHP']
+const RIFLE_STYLES = ['FMJ', 'BTHP', 'M193', 'M855']
+const STOCK_STATUSES = ['In Stock', 'In Stock', 'In Stock', 'Limited', 'Out of Stock']
 
 function mulberry32(seed) {
   let t = seed >>> 0
@@ -63,29 +82,67 @@ function buildUrl(domain, name, id) {
   return `https://${domain}/item/${slug}-${id}`
 }
 
+function pickType(rng) {
+  const roll = rng()
+  if (roll < 0.45) return 'HANDGUN'
+  if (roll < 0.85) return 'RIFLE'
+  return 'SHOTGUN'
+}
+
 function makeBaseProduct(rng, id, domain) {
   const brand = pick(rng, BRANDS)
-  const caliber = pick(rng, CALIBERS)
-  const grain = pick(rng, GRAINS)
-  const rounds = pick(rng, ROUNDS)
-  const style = pick(rng, STYLES)
-  const name = `${brand} ${caliber} ${grain}gr ${style} - ${rounds} Round Box`
+  const type = pickType(rng)
+  let caliber = ''
+  let grain = null
+  let rounds = 0
+  let style = ''
+  let shotSize = null
+  let loadType = null
+
+  if (type === 'SHOTGUN') {
+    caliber = pick(rng, SHOTGUN_CALIBERS)
+    rounds = pick(rng, SHOTGUN_ROUNDS)
+    loadType = pick(rng, SHOTGUN_LOADS)
+    shotSize = loadType === 'Slug' ? null : pick(rng, SHOTGUN_SHOT_SIZES)
+    style = loadType
+  } else if (type === 'RIFLE') {
+    caliber = pick(rng, RIFLE_CALIBERS)
+    grain = pick(rng, RIFLE_GRAINS)
+    rounds = pick(rng, RIFLE_ROUNDS)
+    style = pick(rng, RIFLE_STYLES)
+  } else {
+    caliber = pick(rng, HANDGUN_CALIBERS)
+    grain = pick(rng, HANDGUN_GRAINS)
+    rounds = pick(rng, HANDGUN_ROUNDS)
+    style = pick(rng, HANDGUN_STYLES)
+  }
+
+  const nameParts = [brand, caliber]
+  if (grain) nameParts.push(`${grain}gr`)
+  if (shotSize) nameParts.push(shotSize)
+  if (style) nameParts.push(style)
+  const name = `${nameParts.join(' ')} - ${rounds} Round Box`
   const url = buildUrl(domain, name, id)
-  const price = (15 + rng() * 85).toFixed(2)
-  const originalPrice = (Number(price) + rng() * 10).toFixed(2)
+  const grainFactor = grain ? (grain / 230) * 10 : 0
+  const basePrice = 10 + (rounds / 20) * 6 + grainFactor
+  const price = Math.max(8, basePrice + rng() * 12).toFixed(2)
+  const originalPrice = (Number(price) + 2 + rng() * 12).toFixed(2)
 
   return {
     brand,
+    type,
     caliber,
     grain,
     rounds,
     style,
+    shotSize,
+    loadType,
     name,
     url,
     price,
     originalPrice,
     currency: 'USD',
-    inStock: rng() > 0.08 ? 'In Stock' : 'Out of Stock',
+    inStock: pick(rng, STOCK_STATUSES),
   }
 }
 
@@ -102,15 +159,24 @@ function buildRow(headers, product, identity, opts) {
   const row = Object.fromEntries(headers.map((h) => [h, '']))
   const jsonAttrs = JSON.stringify({
     caliber: product.caliber,
-    grain: product.grain,
+    grain: product.grain ?? undefined,
     rounds: product.rounds,
+    loadType: product.loadType ?? undefined,
+    shotSize: product.shotSize ?? undefined,
   })
+  const descriptionParts = [`${product.brand} ${product.caliber}`]
+  if (product.grain) descriptionParts.push(`${product.grain}gr`)
+  if (product.shotSize) descriptionParts.push(product.shotSize)
+  if (product.style) descriptionParts.push(product.style)
+  const description = `${descriptionParts.join(' ')}. ${product.rounds} rounds per box.`
 
   for (const header of headers) {
     const key = normalizeHeader(header)
 
     if (key === 'name' || key === 'product name' || key === 'productname' || key === 'title') {
       assignValue(row, header, product.name)
+    } else if (key === 'description') {
+      assignValue(row, header, description)
     } else if (key === 'url' || key === 'product url' || key === 'producturl' || key === 'link') {
       assignValue(row, header, product.url)
     } else if (key === 'imageurl' || key === 'image url' || key === 'image') {
@@ -130,7 +196,7 @@ function buildRow(headers, product, identity, opts) {
     } else if (key === 'manufacturer' || key === 'brand') {
       assignValue(row, header, product.brand)
     } else if (key === 'category' || key === 'product type') {
-      assignValue(row, header, product.caliber.includes('Gauge') ? 'Shotgun' : 'Ammunition')
+      assignValue(row, header, product.caliber.includes('Gauge') ? 'Shotgun Shells' : 'Ammunition')
     } else if (key === 'subcategory') {
       assignValue(row, header, product.style)
     } else if (key === 'attributes') {
@@ -192,6 +258,9 @@ function buildRow(headers, product, identity, opts) {
       }
       if (normalizeHeader(header) === 'url' || normalizeHeader(header) === 'product url' || normalizeHeader(header) === 'producturl' || normalizeHeader(header) === 'link') {
         row[header] = buildUrl(opts.domain, `${product.brand}-${product.style}-${product.rounds}rd`, opts.id)
+      }
+      if (normalizeHeader(header) === 'description') {
+        row[header] = `${product.brand} ${product.style}. ${product.rounds} rounds per box.`
       }
     }
   }
@@ -339,8 +408,8 @@ function generateFile(fileName) {
     const rowType = rowTypes[i]
     const product = makeBaseProduct(rng, i + 1, `${domain}.example.com`)
     const identity = {
-      impactItemId: `CID${String(i + 1).padStart(6, '0')}`,
-      sku: `SKU-${String(i + 1).padStart(6, '0')}`,
+      impactItemId: `CID${String(100000 + i).padStart(7, '0')}`,
+      sku: `SKU-${String(200000 + i).padStart(7, '0')}`,
       gtin: String(100000000000 + i).slice(0, 12),
     }
 
@@ -390,6 +459,11 @@ function generateFile(fileName) {
       identity.impactItemId = prev.impactItemId
       identity.sku = prev.sku
       identity.gtin = prev.gtin
+    }
+
+    // Add tracking parameters to a small slice of URLs to test normalization.
+    if (rng() < 0.015) {
+      product.url = `${product.url}?utm_source=impactradius&clickid=${Math.floor(rng() * 1e8)}`
     }
 
     identities.push(identity)
