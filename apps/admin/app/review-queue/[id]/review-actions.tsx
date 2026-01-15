@@ -20,6 +20,8 @@ interface Candidate {
   packCount?: number;
   grain?: number;
   score: number;
+  name?: string | null;
+  upcNorm?: string | null;
 }
 
 interface SearchProduct {
@@ -168,19 +170,30 @@ export function ReviewActions({
           <h3 className="text-sm font-medium text-gray-900 mb-3">
             Quick Link to Top Candidate
           </h3>
+          {(() => {
+            const topCandidate = candidates[0];
+            const candidateName = topCandidate.name ?? 'Unknown product';
+            const candidateUpc = topCandidate.upcNorm ? `UPC ${topCandidate.upcNorm}` : 'UPC unknown';
+            const quickLinkLabel = `Link to ${candidateName} : ${candidateUpc}`;
+
+            return (
           <button
-            onClick={() => handleLinkToCandidate(candidates[0])}
+            onClick={() => handleLinkToCandidate(topCandidate)}
             disabled={isSubmitting}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed min-w-0"
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <LinkIcon className="h-4 w-4" />
             )}
-            Link to {candidates[0].canonicalKey?.slice(0, 20) ?? candidates[0].productId.slice(0, 8)}
-            <span className="text-purple-200">({(candidates[0].score * 100).toFixed(0)}%)</span>
+            <span className="min-w-0 flex-1 truncate" title={quickLinkLabel}>
+              {quickLinkLabel}
+            </span>
+            <span className="text-purple-200">({(topCandidate.score * 100).toFixed(0)}%)</span>
           </button>
+            );
+          })()}
         </div>
       )}
 

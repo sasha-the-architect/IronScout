@@ -19,6 +19,7 @@ interface Candidate {
   productId: string;
   canonicalKey: string;
   name?: string | null;
+  upcNorm?: string | null;
   brandNorm?: string | null;
   caliberNorm?: string | null;
   packCount?: number | null;

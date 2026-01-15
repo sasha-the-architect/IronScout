@@ -24,6 +24,7 @@ interface Candidate {
   productId: string;
   canonicalKey: string;
   name?: string | null;
+  upcNorm?: string | null;
   brandNorm?: string | null;
   caliberNorm?: string | null;
   packCount?: number | null;
@@ -263,6 +264,9 @@ export function CandidateCard({
                   {candidate.canonicalKey}
                 </div>
               )}
+              <div className="text-xs text-gray-500 font-mono mt-0.5">
+                UPC: {candidate.upcNorm ?? 'unknown'}
+              </div>
               {hasMismatches && (
                 <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
                   <XCircle className="h-3 w-3" />

@@ -144,11 +144,11 @@ export default async function ReviewDetailPage({
   // Fetch candidate product names, stats, and price ranges in parallel
   const [candidateProducts, candidateStats, priceRanges30d, priceRangesAllTime, searchProducts, distinctBrands, distinctCalibers] =
     await Promise.all([
-      // Product names for candidates
+      // Product names and UPCs for candidates
       candidateIds.length > 0
         ? prisma.products.findMany({
             where: { id: { in: candidateIds } },
-            select: { id: true, name: true },
+            select: { id: true, name: true, upcNorm: true },
           })
         : Promise.resolve([]),
 
@@ -251,12 +251,18 @@ export default async function ReviewDetailPage({
 
   // Convert stats and prices to lookup maps
   const productNameMap = new Map(candidateProducts.map((p) => [p.id, p.name]));
+  const productUpcMap = new Map(candidateProducts.map((p) => [p.id, p.upcNorm]));
   const statsMap = new Map(candidateStats.map((s) => [s.productId, s]));
   const price30dMap = new Map(priceRanges30d.map((p) => [p.productId, p]));
   const priceAllTimeMap = new Map(priceRangesAllTime.map((p) => [p.productId, p]));
 
   const brands = distinctBrands.map((b) => b.brandNorm!).filter(Boolean);
   const calibers = distinctCalibers.map((c) => c.caliberNorm!).filter(Boolean);
+  const candidatesForActions = candidates.map((candidate) => ({
+    ...candidate,
+    name: productNameMap.get(candidate.productId) ?? null,
+    upcNorm: productUpcMap.get(candidate.productId) ?? null,
+  }));
 
   // Get reason code display
   const reasonCodeDisplay = link.reasonCode ?? 'Needs Review';
@@ -320,7 +326,7 @@ export default async function ReviewDetailPage({
           <div className="lg:sticky lg:top-4">
             <ReviewActions
               sourceProductId={id}
-              candidates={candidates}
+              candidates={candidatesForActions}
               searchProducts={searchProducts.map((p) => ({
                 id: p.id,
                 name: p.name,
@@ -375,6 +381,7 @@ export default async function ReviewDetailPage({
                 candidate: {
                   ...candidate,
                   name: productName ?? null,
+                  upcNorm: productUpcMap.get(candidate.productId) ?? null,
                 },
                 stats: stats
                   ? {
