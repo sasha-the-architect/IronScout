@@ -229,6 +229,7 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
         expectedStatus: 'RUNNING',
         actualStatus: run.status,
         feedId,
+        feedName: feed.sources.name,
         message: 'Retry found run not in RUNNING status - potential duplicate or stale retry',
       })
       log.info('AFFILIATE_JOB_END', {
@@ -252,6 +253,7 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
       log.warn('RETRY_LOCK_CONFLICT', {
         runId: existingRunId,
         feedId,
+        feedName: feed.sources.name,
         feedLockId: feedLockId.toString(),
         message: 'Another run started - this retry is obsolete',
       })
@@ -439,6 +441,7 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
 
           log.warn('AFFILIATE_REFRESH_NO_SEEN_ROWS', {
             feedId: feed.id,
+            feedName: feed.sources.name,
             runId: run.id,
             previousRunId: previousRun.id,
             skippedReason: result.skippedReason,
@@ -446,6 +449,7 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
         } else {
           log.warn('AFFILIATE_REFRESH_NO_PREVIOUS_RUN', {
             feedId: feed.id,
+            feedName: feed.sources.name,
             runId: run.id,
             skippedReason: result.skippedReason,
           })
@@ -504,6 +508,7 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
 
         log.error('Processing failure detected - no products saved', {
           feedId: feed.id,
+          feedName: feed.sources.name,
           runId: run.id,
           rowsRead: result.metrics.rowsRead,
           rowsParsed: result.metrics.rowsParsed,
@@ -542,6 +547,7 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
     log.error('Affiliate feed processing failed', {
       correlationId,
       feedId,
+      feedName: feed?.sources?.name,
       runId: run.id,
       failureKind: feedError.kind,
       failureCode: feedError.code,
@@ -560,6 +566,7 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
       log.warn('Discarding non-retryable job', {
         correlationId,
         feedId,
+        feedName: feed?.sources?.name,
         runId: run.id,
         failureKind: feedError.kind,
         failureCode: feedError.code,
@@ -765,7 +772,7 @@ async function executePhase2(
 
   const bypassCircuitBreaker = await isCircuitBreakerBypassed()
   if (bypassCircuitBreaker) {
-    log.warn('Circuit breaker BYPASSED globally', { feedId: feed.id, runId: run.id })
+    log.warn('Circuit breaker BYPASSED globally', { feedId: feed.id, feedName: feed.sources.name, runId: run.id })
   }
 
   log.info('Evaluating circuit breaker', { feedId: feed.id, runId: run.id })
@@ -789,7 +796,7 @@ async function executePhase2(
 
   if (!cbResult.passed) {
     log.warn('Circuit breaker triggered', {
-      feedId: feed.id, runId: run.id, reason: cbResult.reason, metrics: cbResult.metrics,
+      feedId: feed.id, feedName: feed.sources.name, runId: run.id, reason: cbResult.reason, metrics: cbResult.metrics,
     })
     await prisma.affiliate_feed_runs.update({
       where: { id: run.id },
@@ -852,9 +859,9 @@ async function finalizeRun(
   if (status === 'SUCCEEDED') {
     const wasRecovery = feed.consecutiveFailures > 0 && !metrics.skippedReason
     updateData.consecutiveFailures = 0
-    if (feed.scheduleFrequencyHours) {
-      updateData.nextRunAt = new Date(finishedAt.getTime() + feed.scheduleFrequencyHours * 3600000)
-    }
+    // Note: nextRunAt is managed by the scheduler when claiming the feed.
+    // We don't update it here to preserve the configured schedule offset.
+    // This ensures feeds run at consistent times (e.g., every 6h at X:30).
     const changeDetection = metrics.changeDetection as { mtime: Date | null; size: bigint; contentHash: string } | undefined
     if (changeDetection) {
       updateData.lastRemoteMtime = changeDetection.mtime
@@ -883,7 +890,7 @@ async function finalizeRun(
 
     if (newFailureCount >= MAX_CONSECUTIVE_FAILURES) {
       log.error('Auto-disabling feed after consecutive failures', {
-        feedId: feed.id, runId: run.id, failures: newFailureCount,
+        feedId: feed.id, feedName: feed.sources.name, runId: run.id, failures: newFailureCount,
       })
       updateData.status = 'DISABLED'
       updateData.nextRunAt = null
@@ -893,9 +900,9 @@ async function finalizeRun(
           network: feed.network, runId: run.id, correlationId: metrics.correlationId as string | undefined },
         newFailureCount, (metrics.errorMessage as string) || 'Unknown error'
       ).catch((err) => moduleLog.error('Failed to send auto-disable notification', {}, err))
-    } else if (feed.scheduleFrequencyHours) {
-      updateData.nextRunAt = new Date(finishedAt.getTime() + feed.scheduleFrequencyHours * 3600000)
     }
+    // Note: For non-auto-disabled failures, nextRunAt is already set by the scheduler.
+    // We don't update it here to preserve the configured schedule offset.
   }
 
   await prisma.affiliate_feeds.update({ where: { id: feed.id }, data: updateData })
