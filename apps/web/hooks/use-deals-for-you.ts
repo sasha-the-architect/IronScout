@@ -73,6 +73,9 @@ export function useDealsForYou(): UseDealsResult {
     }
     if (token) {
       fetchDeals()
+    } else {
+      // Authenticated but no token - stop loading
+      setLoading(false)
     }
   }, [token, status, fetchDeals])
 

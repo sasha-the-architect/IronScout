@@ -49,6 +49,9 @@ export function useSavings(): UseSavingsResult {
     }
     if (token) {
       fetchSavings()
+    } else {
+      // Authenticated but no token - stop loading
+      setLoading(false)
     }
   }, [token, status, fetchSavings])
 

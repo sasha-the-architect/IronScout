@@ -99,6 +99,11 @@ export function useSavedItems(): UseSavedItemsResult {
     }
     if (token) {
       fetchSavedItems()
+    } else {
+      // Authenticated but no token (session issue) - stop loading to avoid infinite spinner
+      logger.warn('Authenticated but no accessToken in session', { status })
+      setLoading(false)
+      setError('Session token missing. Please sign out and sign back in.')
     }
   }, [token, status, fetchSavedItems])
 

@@ -72,6 +72,9 @@ export function useMarketPulse(): UseMarketPulseResult {
     }
     if (token) {
       fetchPulse()
+    } else {
+      // Authenticated but no token - stop loading
+      setLoading(false)
     }
   }, [token, status, fetchPulse])
 
