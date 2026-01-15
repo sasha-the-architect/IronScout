@@ -1,6 +1,6 @@
 import { prisma } from '@ironscout/db';
 import Link from 'next/link';
-import { AlertTriangle, Filter, ChevronRight } from 'lucide-react';
+import { AlertTriangle, Filter, ChevronRight, Eye } from 'lucide-react';
 import { QuarantineFilters } from './quarantine-filters';
 
 export const dynamic = 'force-dynamic';
@@ -122,6 +122,9 @@ export default async function QuarantinePage({ searchParams }: PageProps) {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -180,12 +183,21 @@ export default async function QuarantinePage({ searchParams }: PageProps) {
                       {record.status}
                     </span>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <Link
+                      href={`/quarantine/${record.id}`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View
+                    </Link>
+                  </td>
                 </tr>
               );
             })}
             {records.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                   No quarantined records found
                 </td>
               </tr>
