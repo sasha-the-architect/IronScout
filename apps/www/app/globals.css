@@ -178,7 +178,8 @@ body {
 }
 
 .section-heading {
-  @apply font-display text-3xl md:text-4xl font-bold tracking-tight;
+  @apply text-3xl md:text-4xl font-bold tracking-tight;
+  font-family: var(--font-display), system-ui, sans-serif;
 }
 
 .text-gradient {
