@@ -15,7 +15,6 @@
     "@ironscout/db": "workspace:*",
     "@ironscout/logger": "workspace:*",
     "@ironscout/notifications": "workspace:*",
-    "@types/ioredis": "^5.0.0",
     "basic-ftp": "^5.1.0",
     "bullmq": "^5.66.4",
     "clsx": "^2.1.1",
