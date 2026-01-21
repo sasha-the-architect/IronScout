@@ -47,7 +47,9 @@
     "logs": "node scripts/dev/logs.mjs",
     "build:all": "node scripts/build/build-all.mjs",
     "verify:all": "node scripts/build/verify-all.mjs",
-    "validate:schema": "node scripts/validate-db-schema.mjs"
+    "validate:schema": "node scripts/validate-db-schema.mjs",
+    "dev:www": "pnpm --filter @ironscout/www dev",
+    "build:www": "pnpm --filter @ironscout/www build"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",

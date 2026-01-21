@@ -1,0 +1,5 @@
+# www.ironscout.ai robots.txt
+User-agent: *
+Allow: /
+
+Sitemap: https://www.ironscout.ai/sitemap.xml
