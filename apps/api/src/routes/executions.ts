@@ -102,7 +102,7 @@ router.get('/stats', async (req: Request, res: Response) => {
 // GET /api/executions/:id - Get single execution with logs
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
 
     const execution = await prisma.executions.findUnique({
       where: { id },
@@ -128,7 +128,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 // GET /api/executions/:id/logs - Get logs for execution
 router.get('/:id/logs', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
     const { level, event } = req.query
 
     const where: any = { executionId: id }
@@ -150,7 +150,7 @@ router.get('/:id/logs', async (req: Request, res: Response) => {
 // DELETE /api/executions/:id - Delete execution and its logs
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
 
     await prisma.executions.delete({
       where: { id },

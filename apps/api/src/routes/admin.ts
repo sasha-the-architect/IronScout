@@ -56,7 +56,7 @@ router.get('/rate-limits', async (req: Request, res: Response) => {
  */
 router.get('/rate-limits/:endpoint', async (req: Request, res: Response) => {
   try {
-    const { endpoint } = req.params
+    const endpoint = req.params.endpoint as string
     const date = req.query.date as string | undefined
 
     const validEndpoints = ['signin', 'signup', 'refresh', 'oauth']

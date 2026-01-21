@@ -600,7 +600,7 @@ router.post('/refresh', authRateLimits.refresh, async (req: Request, res: Respon
 
 router.get('/user/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
 
     // Verify authorization
     const authHeader = req.headers.authorization

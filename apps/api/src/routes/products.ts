@@ -250,7 +250,7 @@ router.get('/search', async (req: Request, res: Response) => {
 
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
 
     // Per Spec v1.2 §0.0: Get prices through product_links
     const product = await prisma.products.findUnique({
@@ -306,7 +306,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 // Get price consolidation across all retailers
 router.get('/:id/prices', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
 
     // Per Spec v1.2 §0.0: Get prices through product_links
     const product = await prisma.products.findUnique({
@@ -397,7 +397,7 @@ router.get('/:id/prices', async (req: Request, res: Response) => {
 // Get price history for a product
 router.get('/:id/history', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
     const { days = '30', retailerId } = req.query
 
     // Check user tier for price history access

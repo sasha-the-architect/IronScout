@@ -47,7 +47,7 @@ router.get('/', async (req: Request, res: Response) => {
 // GET /api/sources/:id - Get single source
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
 
     const source = await prisma.sources.findUnique({
       where: { id },
@@ -92,7 +92,7 @@ router.post('/', async (req: Request, res: Response) => {
 // PUT /api/sources/:id - Update source
 router.put('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
     const data = updateSourceSchema.parse(req.body)
 
     const source = await prisma.sources.update({
@@ -113,7 +113,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 // DELETE /api/sources/:id - Delete source
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
 
     await prisma.sources.delete({
       where: { id },
@@ -129,7 +129,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 // POST /api/sources/:id/toggle - Toggle source enabled status
 router.post('/:id/toggle', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
+    const id = req.params.id as string
 
     const source = await prisma.sources.findUnique({
       where: { id },

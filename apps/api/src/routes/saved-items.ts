@@ -124,7 +124,7 @@ router.post('/:productId', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const { productId } = req.params
+    const productId = req.params.productId as string
 
     // Check if item already exists (for idempotent response)
     const existing = await getSavedItemByProductId(userId, productId)
@@ -165,7 +165,7 @@ router.delete('/:productId', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const { productId } = req.params
+    const productId = req.params.productId as string
 
     await unsaveItem(userId, productId)
 
@@ -192,7 +192,7 @@ router.patch('/:productId', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const { productId } = req.params
+    const productId = req.params.productId as string
     const prefs = updatePrefsSchema.parse(req.body)
 
     const item = await updateSavedItemPrefs(userId, productId, prefs)
@@ -228,7 +228,7 @@ router.get('/:productId', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const { productId } = req.params
+    const productId = req.params.productId as string
     const item = await getSavedItemByProductId(userId, productId)
 
     if (!item) {

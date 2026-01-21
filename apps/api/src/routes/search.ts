@@ -613,8 +613,8 @@ router.get('/admin/embedding-stats', requireAdmin, async (req: Request, res: Res
  */
 router.post('/admin/update-embedding/:productId', requireAdmin, rateLimit({ max: 100, windowMs: 60000 }), async (req: Request, res: Response) => {
   try {
-    const { productId } = req.params
-    
+    const productId = req.params.productId as string
+
     await updateProductEmbedding(productId)
     
     res.json({ success: true, productId })

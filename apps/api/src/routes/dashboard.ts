@@ -596,7 +596,7 @@ router.get('/price-history/:caliber', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' })
     }
 
-    const { caliber } = req.params
+    const caliber = req.params.caliber as string
     const { days } = priceHistorySchema.parse(req.query)
 
     const userTier = await getUserTier(req)
