@@ -26,7 +26,7 @@ function formatDuration(ms: number | null): string {
 export function FeedRunsTable({ runs }: FeedRunsTableProps) {
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+      <table className="min-w-full divide-y divide-gray-200" data-testid="feed-runs-table">
         <thead>
           <tr>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">

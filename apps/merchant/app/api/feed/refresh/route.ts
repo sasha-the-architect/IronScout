@@ -14,17 +14,15 @@ async function getQueue() {
   if (!retailerFeedIngestQueue) {
     logger.debug('Initializing BullMQ queue connection');
     const { Queue } = await import('bullmq');
-    const Redis = (await import('ioredis')).default;
 
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
     logger.debug('Connecting to Redis', { redisUrl: redisUrl.replace(/\/\/.*@/, '//***@') });
 
-    const redisConnection = new Redis(redisUrl, {
-      maxRetriesPerRequest: null,
-    });
-
     retailerFeedIngestQueue = new Queue('retailer-feed-ingest', {
-      connection: redisConnection,
+      connection: {
+        url: redisUrl,
+        maxRetriesPerRequest: null,
+      },
     });
 
     logger.info('BullMQ queue initialized');

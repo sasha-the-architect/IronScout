@@ -41,6 +41,12 @@ const SESSION_COOKIE_NAME = process.env.NODE_ENV === 'production'
 const SESSION_COOKIE = 'merchant-session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
+const E2E_AUTH_BYPASS = process.env.E2E_AUTH_BYPASS === 'true';
+const E2E_MERCHANT_ID = process.env.E2E_MERCHANT_ID || 'e2e-merchant';
+const E2E_MERCHANT_USER_ID = process.env.E2E_MERCHANT_USER_ID || 'e2e-merchant-user';
+const E2E_MERCHANT_EMAIL = process.env.E2E_MERCHANT_EMAIL || 'e2e-merchant@ironscout.local';
+const E2E_BUSINESS_NAME = process.env.E2E_MERCHANT_BUSINESS || 'E2E Ammo';
+
 async function decodeAdminToken(token: string, secret: string) {
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
@@ -92,6 +98,73 @@ export type MerchantUserWithMerchant = merchant_users & { merchants: merchants }
 export type DealerSession = MerchantSession;
 /** @deprecated Use MerchantUserWithMerchant instead */
 export type DealerUserWithDealer = MerchantUserWithMerchant;
+
+function getE2eMerchantSession(): MerchantSession {
+  return {
+    type: 'merchant',
+    merchantUserId: E2E_MERCHANT_USER_ID,
+    merchantId: E2E_MERCHANT_ID,
+    email: E2E_MERCHANT_EMAIL,
+    name: 'E2E User',
+    role: 'OWNER',
+    businessName: E2E_BUSINESS_NAME,
+    status: 'ACTIVE',
+    tier: 'FOUNDING',
+  };
+}
+
+function getE2eMerchantBundle(): {
+  session: MerchantSession;
+  merchant: merchants;
+  merchantUser: merchant_users;
+} {
+  const now = new Date();
+
+  return {
+    session: getE2eMerchantSession(),
+    merchant: {
+      id: E2E_MERCHANT_ID,
+      businessName: E2E_BUSINESS_NAME,
+      websiteUrl: 'https://e2e.example',
+      phone: null,
+      storeType: 'ONLINE_ONLY',
+      status: 'ACTIVE',
+      tier: 'FOUNDING',
+      pixelApiKey: 'e2e-pixel-key',
+      pixelEnabled: true,
+      shippingType: 'UNKNOWN',
+      shippingFlat: null,
+      shippingPerUnit: null,
+      createdAt: now,
+      updatedAt: now,
+      contactFirstName: 'E2E',
+      contactLastName: 'Merchant',
+      lastSubscriptionNotifyAt: null,
+      subscriptionExpiresAt: null,
+      subscriptionGraceDays: 7,
+      subscriptionStatus: 'ACTIVE',
+      autoRenew: true,
+      paymentMethod: null,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+    },
+    merchantUser: {
+      id: E2E_MERCHANT_USER_ID,
+      merchantId: E2E_MERCHANT_ID,
+      email: E2E_MERCHANT_EMAIL,
+      passwordHash: 'e2e',
+      name: 'E2E User',
+      role: 'OWNER',
+      emailVerified: true,
+      verifyToken: null,
+      resetToken: null,
+      resetTokenExp: null,
+      lastLoginAt: now,
+      createdAt: now,
+      updatedAt: now,
+    },
+  };
+}
 
 // =============================================
 // Password Utilities
@@ -286,6 +359,10 @@ export async function getAdminSession(): Promise<AdminSession | null> {
  * Returns merchant session (real or impersonated) or admin session if present.
  */
 export async function getSession(): Promise<Session | null> {
+  if (E2E_AUTH_BYPASS) {
+    return getE2eMerchantSession();
+  }
+
   const merchantSession = await getMerchantSession();
   if (merchantSession) {
     return merchantSession;
@@ -316,6 +393,10 @@ export async function getSessionWithMerchant(): Promise<{
   merchant?: merchants;
   merchantUser?: merchant_users;
 } | null> {
+  if (E2E_AUTH_BYPASS) {
+    return getE2eMerchantBundle();
+  }
+
   const session = await getSession();
 
   if (!session) return null;
@@ -1137,4 +1218,3 @@ export async function getRetailerContext(
     throw error
   }
 }
-

@@ -224,6 +224,7 @@ export function FeedConfigForm({ initialData, onSuccess }: FeedConfigFormProps) 
           required
           value={formData.url}
           onChange={handleChange}
+          data-testid="feed-url-input"
           placeholder={
             formData.accessType === 'FTP' || formData.accessType === 'SFTP'
               ? 'ftp://example.com/feeds/products.csv'
@@ -303,6 +304,7 @@ export function FeedConfigForm({ initialData, onSuccess }: FeedConfigFormProps) 
           type="button"
           onClick={handleTest}
           disabled={isTesting || !formData.url}
+          data-testid="feed-test-connection"
           className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isTesting ? 'Testing...' : 'Test Connection'}
@@ -311,6 +313,7 @@ export function FeedConfigForm({ initialData, onSuccess }: FeedConfigFormProps) 
         <button
           type="submit"
           disabled={isLoading}
+          data-testid="feed-save-submit"
           className="inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? 'Saving...' : initialData?.id ? 'Update Feed' : 'Save Feed'}

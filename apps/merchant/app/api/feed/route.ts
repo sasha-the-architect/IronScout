@@ -7,6 +7,32 @@ import { logger } from '@/lib/logger';
 // Force dynamic rendering - this route uses cookies for auth
 export const dynamic = 'force-dynamic';
 
+const isE2E = process.env.E2E_TEST_MODE === 'true';
+
+const e2eRetailerContext = {
+  retailerId: 'e2e-retailer',
+  retailerName: 'E2E Retailer',
+  listingStatus: 'LISTED',
+  relationshipStatus: 'ACTIVE',
+  userRole: 'ADMIN',
+  isMerchantAdmin: true,
+};
+
+function getE2eFeed() {
+  return {
+    id: 'e2e-feed',
+    retailerId: 'e2e-retailer',
+    accessType: 'URL',
+    formatType: 'AMMOSEEK_V1',
+    url: 'https://e2e.example/feed.csv',
+    username: null,
+    password: null,
+    scheduleMinutes: 60,
+    status: 'HEALTHY',
+    enabled: true,
+  };
+}
+
 const feedSchema = z.object({
   id: z.string().optional(),
   retailerId: z.string().optional(), // Optional: for multi-retailer merchants
@@ -24,6 +50,10 @@ export async function GET(request: Request) {
   reqLogger.debug('Feed GET request received');
 
   try {
+    if (isE2E) {
+      return NextResponse.json({ feed: getE2eFeed(), retailerContext: e2eRetailerContext });
+    }
+
     const session = await getSession();
 
     if (!session || session.type !== 'merchant') {
@@ -72,6 +102,10 @@ export async function POST(request: Request) {
   reqLogger.info('Feed create request received');
 
   try {
+    if (isE2E) {
+      return NextResponse.json({ success: true, feed: getE2eFeed(), retailerContext: e2eRetailerContext });
+    }
+
     const session = await getSession();
 
     if (!session || session.type !== 'merchant') {
@@ -173,6 +207,10 @@ export async function PUT(request: Request) {
   reqLogger.info('Feed update request received');
 
   try {
+    if (isE2E) {
+      return NextResponse.json({ success: true, feed: getE2eFeed(), retailerContext: e2eRetailerContext });
+    }
+
     const session = await getSession();
 
     if (!session || session.type !== 'merchant') {
@@ -276,6 +314,10 @@ export async function DELETE(request: Request) {
   reqLogger.info('Feed delete request received');
 
   try {
+    if (isE2E) {
+      return NextResponse.json({ success: true });
+    }
+
     const session = await getSession();
 
     if (!session || session.type !== 'merchant') {

@@ -18,6 +18,7 @@ import { FeedStatusActions } from './feed-status-actions';
 
 export default async function FeedPage() {
   const session = await getSession();
+  const isE2E = process.env.E2E_TEST_MODE === 'true';
 
   if (!session || session.type !== 'merchant') {
     redirect('/login');
@@ -25,30 +26,88 @@ export default async function FeedPage() {
 
   const merchantId = session.merchantId;
 
-  // Look up retailerId via merchant_retailers
-  const merchantRetailer = await prisma.merchant_retailers.findFirst({
-    where: { merchantId },
-    select: { retailerId: true }
-  });
-  const retailerId = merchantRetailer?.retailerId;
+  let feed: {
+    id: string;
+    accessType: 'URL' | 'AUTH_URL' | 'FTP' | 'SFTP';
+    formatType: 'AMMOSEEK_V1' | 'GUNENGINE_V2';
+    url: string | null;
+    username: string | null;
+    password: string | null;
+    scheduleMinutes: number;
+    status: 'PENDING' | 'HEALTHY' | 'WARNING' | 'FAILED';
+    enabled: boolean;
+    lastSuccessAt: Date | null;
+    lastError: string | null;
+  } | null = null;
+  let recentRuns: Array<{
+    id: string;
+    status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'WARNING' | 'FAILURE' | 'SKIPPED';
+    startedAt: Date;
+    duration: number | null;
+    rowCount: number;
+    indexedCount: number;
+    quarantinedCount: number;
+    rejectedCount: number;
+  }> = [];
+  let quarantineCount = 0;
 
-  // Get feed, recent runs, and quarantine count
-  const [feed, recentRuns, quarantineCount] = await Promise.all([
-    retailerId ? prisma.retailer_feeds.findFirst({
-      where: { retailerId },
-    }) : Promise.resolve(null),
-    retailerId ? prisma.retailer_feed_runs.findMany({
-      where: { retailerId },
-      orderBy: { startedAt: 'desc' },
-      take: 10,
-    }) : Promise.resolve([]),
-    retailerId ? prisma.quarantined_records.count({
-      where: {
-        retailerId,
-        status: 'QUARANTINED',
+  if (isE2E) {
+    feed = {
+      id: 'e2e-feed',
+      accessType: 'URL',
+      formatType: 'AMMOSEEK_V1',
+      url: 'https://e2e.example/feed.csv',
+      username: null,
+      password: null,
+      scheduleMinutes: 60,
+      status: 'HEALTHY',
+      enabled: true,
+      lastSuccessAt: new Date(),
+      lastError: null,
+    };
+    recentRuns = [
+      {
+        id: 'e2e-run-1',
+        status: 'SUCCESS',
+        startedAt: new Date(),
+        duration: 120000,
+        rowCount: 120,
+        indexedCount: 118,
+        quarantinedCount: 2,
+        rejectedCount: 0,
       },
-    }) : Promise.resolve(0),
-  ]);
+    ];
+    quarantineCount = 0;
+  } else {
+    // Look up retailerId via merchant_retailers
+    const merchantRetailer = await prisma.merchant_retailers.findFirst({
+      where: { merchantId },
+      select: { retailerId: true }
+    });
+    const retailerId = merchantRetailer?.retailerId;
+
+    // Get feed, recent runs, and quarantine count
+    const [feedRow, runRows, quarantine] = await Promise.all([
+      retailerId ? prisma.retailer_feeds.findFirst({
+        where: { retailerId },
+      }) : Promise.resolve(null),
+      retailerId ? prisma.retailer_feed_runs.findMany({
+        where: { retailerId },
+        orderBy: { startedAt: 'desc' },
+        take: 10,
+      }) : Promise.resolve([]),
+      retailerId ? prisma.quarantined_records.count({
+        where: {
+          retailerId,
+          status: 'QUARANTINED',
+        },
+      }) : Promise.resolve(0),
+    ]);
+
+    feed = feedRow;
+    recentRuns = runRows;
+    quarantineCount = quarantine;
+  }
 
   // Status configuration matching affiliate feeds pattern
   const statusConfig = {
