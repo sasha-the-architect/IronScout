@@ -153,9 +153,10 @@ async function schedulerTick(): Promise<{ processed: number }> {
           id: string
           sourceId: string
           scheduleFrequencyHours: number | null
+          nextRunAt: Date
         }>
       >`
-        SELECT id, "sourceId", "scheduleFrequencyHours"
+        SELECT id, "sourceId", "scheduleFrequencyHours", "nextRunAt"
         FROM affiliate_feeds
         WHERE status = 'ENABLED'
           AND "nextRunAt" <= ${now}
