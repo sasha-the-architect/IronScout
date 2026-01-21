@@ -269,7 +269,8 @@ function displayStatus(services) {
   for (const svc of services) {
     const name = svc.name.padEnd(16)
     const port = svc.service.port ? String(svc.service.port).padEnd(10) : 'N/A'.padEnd(10)
-    const running = svc.process && !svc.process.killed
+    // exitCode is null while process is running, set to a number once it exits
+    const running = svc.process && svc.process.exitCode === null
     const status = running ? 'Running' : 'Stopped'
     const statusColor = running ? colors.green : colors.red
     const url = svc.service.healthCheck || '(worker)'
