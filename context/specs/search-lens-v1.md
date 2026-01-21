@@ -1,7 +1,7 @@
 # IronScout Lens Specification
 
 ## Status
-Accepted — v1.0.2
+Accepted — v1.0.3
 
 ## Purpose
 
@@ -623,6 +623,8 @@ The system must log:
 - zeroResults (boolean)
 - extractorModelId (string)
 - reasonCode (ReasonCode)
+- intentSignals (object) — full signal output from extractor, for audit replay
+- priceLookbackDays (number) — CURRENT_PRICE_LOOKBACK_DAYS config value used
 
 High override rates indicate misclassification and require review.
 High ambiguous rates indicate overlapping trigger definitions.
