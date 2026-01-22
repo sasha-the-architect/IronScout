@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { Menu, X, User, Bookmark, Settings, LayoutDashboard, ChevronDown, Search, LogOut } from 'lucide-react'
+import { Menu, X, User, Bookmark, Settings, LayoutDashboard, ChevronDown, Search, LogOut, DollarSign } from 'lucide-react'
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -33,6 +33,9 @@ export function Header() {
           <nav className="hidden md:flex items-center space-x-6">
             <Link href="/search" className="text-sm font-medium hover:text-primary transition-colors">
               Search
+            </Link>
+            <Link href="/price-check" className="text-sm font-medium hover:text-primary transition-colors">
+              Price Check
             </Link>
             <a
               href="https://www.ironscout.ai/retailers"
@@ -140,6 +143,14 @@ export function Header() {
                 onClick={() => setIsMenuOpen(false)}
               >
                 Search
+              </Link>
+              <Link
+                href="/price-check"
+                className="flex items-center text-sm font-medium hover:text-primary transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Price Check
               </Link>
               <a
                 href="https://www.ironscout.ai/retailers"

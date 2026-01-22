@@ -1329,3 +1329,267 @@ export async function getSavedItem(token: string, productId: string): Promise<Sa
 
   return response.json()
 }
+
+// ============================================
+// Gun Locker API
+// ============================================
+
+/**
+ * Canonical calibers per spec - constrained enum
+ */
+export const CALIBERS = [
+  { value: '9mm', label: '9mm' },
+  { value: '.45_acp', label: '.45 ACP' },
+  { value: '.40_sw', label: '.40 S&W' },
+  { value: '.380_acp', label: '.380 ACP' },
+  { value: '.22_lr', label: '.22 LR' },
+  { value: '.223_556', label: '.223 / 5.56' },
+  { value: '.308_762x51', label: '.308 / 7.62x51' },
+  { value: '.30-06', label: '.30-06' },
+  { value: '6.5_creedmoor', label: '6.5 Creedmoor' },
+  { value: '7.62x39', label: '7.62x39' },
+  { value: '12ga', label: '12 Gauge' },
+  { value: '20ga', label: '20 Gauge' },
+] as const
+
+export type CaliberValue = typeof CALIBERS[number]['value']
+
+/**
+ * Gun in the user's Gun Locker
+ */
+export interface Gun {
+  id: string
+  caliber: CaliberValue
+  nickname: string | null
+  createdAt: string
+}
+
+export interface GunLockerResponse {
+  guns: Gun[]
+  _meta: {
+    count: number
+  }
+}
+
+export interface AddGunResponse {
+  gun: Gun
+  _meta: {
+    count: number
+  }
+}
+
+// E2E mock state
+let e2eGuns: Gun[] = []
+
+/**
+ * Get all guns in the user's Gun Locker
+ */
+export async function getGunLocker(token: string): Promise<GunLockerResponse> {
+  if (E2E_TEST_MODE) {
+    return {
+      guns: e2eGuns,
+      _meta: { count: e2eGuns.length },
+    }
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/gun-locker`, {
+    headers: buildAuthHeaders(token),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to fetch gun locker')
+  }
+
+  return response.json()
+}
+
+/**
+ * Add a gun to the user's Gun Locker
+ */
+export async function addGun(
+  token: string,
+  caliber: CaliberValue,
+  nickname?: string | null
+): Promise<AddGunResponse> {
+  if (E2E_TEST_MODE) {
+    const newGun: Gun = {
+      id: `e2e-gun-${Date.now()}`,
+      caliber,
+      nickname: nickname || null,
+      createdAt: new Date().toISOString(),
+    }
+    e2eGuns = [...e2eGuns, newGun]
+    return {
+      gun: newGun,
+      _meta: { count: e2eGuns.length },
+    }
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/gun-locker`, {
+    method: 'POST',
+    headers: buildAuthHeaders(token),
+    body: JSON.stringify({ caliber, nickname }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to add gun')
+  }
+
+  return response.json()
+}
+
+/**
+ * Remove a gun from the user's Gun Locker
+ */
+export async function removeGun(token: string, gunId: string): Promise<void> {
+  if (E2E_TEST_MODE) {
+    e2eGuns = e2eGuns.filter((g) => g.id !== gunId)
+    return
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/gun-locker/${gunId}`, {
+    method: 'DELETE',
+    headers: buildAuthHeaders(token),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to remove gun')
+  }
+}
+
+// ============================================
+// Market Deals API
+// ============================================
+
+/**
+ * Market Deal per dashboard_market_deals_v1_spec.md
+ */
+export interface MarketDeal {
+  productId: string
+  productName: string
+  caliber: CaliberValue | null
+  pricePerRound: number
+  price: number
+  retailerName: string
+  retailerId: string
+  url: string
+  contextLine: string
+  dropPercent: number | null
+  detectedAt: string
+  reason: 'PRICE_DROP' | 'BACK_IN_STOCK' | 'LOWEST_90D'
+}
+
+export interface MarketDealsSection {
+  title: string
+  deals: MarketDeal[]
+}
+
+export interface MarketDealsResponse {
+  hero: MarketDeal | null
+  sections: MarketDealsSection[]
+  lastCheckedAt: string
+  _meta: {
+    personalized: boolean
+    userCalibers?: CaliberValue[]
+  }
+}
+
+/**
+ * Get market deals for dashboard
+ * Returns personalized deals if user has Gun Locker
+ */
+export async function getMarketDeals(token?: string): Promise<MarketDealsResponse> {
+  if (E2E_TEST_MODE) {
+    return {
+      hero: null,
+      sections: [{ title: 'Notable Deals Today', deals: [] }],
+      lastCheckedAt: new Date().toISOString(),
+      _meta: { personalized: false },
+    }
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/dashboard/market-deals`, {
+    headers: token ? buildAuthHeaders(token) : { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch market deals')
+  }
+
+  return response.json()
+}
+
+// ============================================
+// Price Check API
+// ============================================
+
+export type PriceClassification = 'LOWER' | 'TYPICAL' | 'HIGHER' | 'INSUFFICIENT_DATA'
+
+export interface PriceCheckResult {
+  classification: PriceClassification
+  enteredPricePerRound: number
+  caliber: CaliberValue
+  context: {
+    minPrice: number | null
+    maxPrice: number | null
+    medianPrice: number | null
+    pricePointCount: number
+    daysWithData: number
+  }
+  freshnessIndicator: string
+  message: string
+  _meta: {
+    hasGunLocker: boolean
+    authenticated: boolean
+  }
+}
+
+export interface PriceCheckParams {
+  caliber: CaliberValue
+  pricePerRound: number
+  brand?: string
+  grain?: number
+}
+
+/**
+ * Check a price against recent market data
+ * Per mobile_price_check_v1_spec.md
+ */
+export async function checkPrice(params: PriceCheckParams, token?: string): Promise<PriceCheckResult> {
+  if (E2E_TEST_MODE) {
+    return {
+      classification: 'TYPICAL',
+      enteredPricePerRound: params.pricePerRound,
+      caliber: params.caliber,
+      context: {
+        minPrice: 0.25,
+        maxPrice: 0.45,
+        medianPrice: 0.32,
+        pricePointCount: 50,
+        daysWithData: 28,
+      },
+      freshnessIndicator: 'Based on prices from the last 28 days',
+      message: 'Typical range',
+      _meta: {
+        hasGunLocker: false,
+        authenticated: false,
+      },
+    }
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/price-check`, {
+    method: 'POST',
+    headers: token ? buildAuthHeaders(token) : { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to check price')
+  }
+
+  return response.json()
+}

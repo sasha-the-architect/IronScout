@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   LogOut,
+  Crosshair,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
@@ -33,6 +34,11 @@ const navItems = [
     title: 'Watchlist',
     href: '/dashboard/saved',
     icon: Bookmark,
+  },
+  {
+    title: 'Gun Locker',
+    href: '/dashboard/gun-locker',
+    icon: Crosshair,
   },
   {
     title: 'Settings',

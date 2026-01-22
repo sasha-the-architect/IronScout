@@ -1,0 +1,257 @@
+/**
+ * Price Check Service
+ *
+ * Per mobile_price_check_v1_spec.md:
+ * - Answers: "Is this price normal, high, or unusually low right now?"
+ * - Classification requires ≥5 price points in trailing 30 days
+ * - No verdicts or recommendations
+ */
+
+import { prisma } from '@ironscout/db'
+import { CANONICAL_CALIBERS, type CaliberValue, isValidCaliber } from './gun-locker'
+
+/**
+ * Price classification
+ */
+export type PriceClassification = 'LOWER' | 'TYPICAL' | 'HIGHER' | 'INSUFFICIENT_DATA'
+
+/**
+ * Price Check result
+ */
+export interface PriceCheckResult {
+  classification: PriceClassification
+  enteredPricePerRound: number
+  caliber: CaliberValue
+  context: {
+    minPrice: number | null
+    maxPrice: number | null
+    medianPrice: number | null
+    pricePointCount: number
+    daysWithData: number
+  }
+  freshnessIndicator: string
+  message: string
+}
+
+/**
+ * Check a price against recent market data
+ *
+ * @param caliber - Canonical caliber value
+ * @param pricePerRound - Entered price per round in cents (e.g., 0.30 = $0.30/rd)
+ * @param brand - Optional brand filter
+ * @param grain - Optional grain weight filter
+ */
+export async function checkPrice(
+  caliber: string,
+  pricePerRound: number,
+  brand?: string,
+  grain?: number
+): Promise<PriceCheckResult> {
+  // Validate caliber is canonical
+  if (!isValidCaliber(caliber)) {
+    throw new Error(`Invalid caliber: ${caliber}. Must be one of: ${CANONICAL_CALIBERS.join(', ')}`)
+  }
+
+  const now = new Date()
+  const thirtyDaysAgo = new Date(now)
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+  // Normalize caliber for database query (handle aliases)
+  const caliberConditions = getCaliberConditions(caliber)
+
+  // Build brand/grain filters
+  let brandCondition = ''
+  let grainCondition = ''
+  const params: any[] = [thirtyDaysAgo, ...caliberConditions.params]
+
+  if (brand) {
+    brandCondition = `AND LOWER(p.brand) LIKE $${params.length + 1}`
+    params.push(`%${brand.toLowerCase()}%`)
+  }
+
+  if (grain) {
+    grainCondition = `AND p."grainWeight" = $${params.length + 1}`
+    params.push(grain)
+  }
+
+  // Get daily best prices per product for the caliber in trailing 30 days
+  // Per spec: "One daily best price per product per caliber (lowest visible offer price on a given UTC calendar day)"
+  const priceData = await prisma.$queryRawUnsafe<
+    Array<{
+      pricePerRound: any
+      observedDate: Date
+    }>
+  >(
+    `
+    WITH daily_best AS (
+      SELECT
+        p.id as product_id,
+        DATE_TRUNC('day', pr."observedAt" AT TIME ZONE 'UTC') as observed_day,
+        MIN(CASE WHEN p."roundCount" > 0 THEN pr.price / p."roundCount" ELSE pr.price END) as price_per_round
+      FROM products p
+      JOIN product_links pl ON pl."productId" = p.id
+      JOIN prices pr ON pr."sourceProductId" = pl."sourceProductId"
+      JOIN retailers r ON r.id = pr."retailerId"
+      LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
+      WHERE pl.status IN ('MATCHED', 'CREATED')
+        AND pr."observedAt" >= $1
+        AND pr."inStock" = true
+        AND r."visibilityStatus" = 'ELIGIBLE'
+        AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
+        AND (${caliberConditions.sql})
+        ${brandCondition}
+        ${grainCondition}
+      GROUP BY p.id, DATE_TRUNC('day', pr."observedAt" AT TIME ZONE 'UTC')
+    )
+    SELECT
+      price_per_round as "pricePerRound",
+      observed_day as "observedDate"
+    FROM daily_best
+    ORDER BY observed_day DESC
+  `,
+    ...params
+  )
+
+  const pricePointCount = priceData.length
+  const uniqueDays = new Set(priceData.map((p) => p.observedDate.toISOString().split('T')[0]))
+  const daysWithData = uniqueDays.size
+
+  // Handle sparse/no data per spec
+  if (pricePointCount === 0) {
+    return {
+      classification: 'INSUFFICIENT_DATA',
+      enteredPricePerRound: pricePerRound,
+      caliber: caliber as CaliberValue,
+      context: {
+        minPrice: null,
+        maxPrice: null,
+        medianPrice: null,
+        pricePointCount: 0,
+        daysWithData: 0,
+      },
+      freshnessIndicator: '',
+      message: `No recent data for ${getCaliberLabel(caliber)}.`,
+    }
+  }
+
+  // Calculate statistics
+  const prices = priceData.map((p) => parseFloat(p.pricePerRound.toString()))
+  prices.sort((a, b) => a - b)
+
+  const minPrice = prices[0]
+  const maxPrice = prices[prices.length - 1]
+  const medianPrice = prices[Math.floor(prices.length / 2)]
+
+  // Per spec: Classification requires ≥5 price points
+  if (pricePointCount < 5) {
+    return {
+      classification: 'INSUFFICIENT_DATA',
+      enteredPricePerRound: pricePerRound,
+      caliber: caliber as CaliberValue,
+      context: {
+        minPrice: round(minPrice, 4),
+        maxPrice: round(maxPrice, 4),
+        medianPrice: round(medianPrice, 4),
+        pricePointCount,
+        daysWithData,
+      },
+      freshnessIndicator: `Based on prices from the last ${daysWithData} days`,
+      message: `Limited data. Recent range: $${formatPrice(minPrice)}–$${formatPrice(maxPrice)}/rd.`,
+    }
+  }
+
+  // Classify price relative to distribution
+  // Lower: at or below 25th percentile
+  // Higher: at or above 75th percentile
+  // Typical: between 25th and 75th percentile
+  const p25 = prices[Math.floor(prices.length * 0.25)]
+  const p75 = prices[Math.floor(prices.length * 0.75)]
+
+  let classification: PriceClassification
+  let message: string
+
+  if (pricePerRound <= p25) {
+    classification = 'LOWER'
+    message = 'Lower than usual'
+  } else if (pricePerRound >= p75) {
+    classification = 'HIGHER'
+    message = 'Higher than usual'
+  } else {
+    classification = 'TYPICAL'
+    message = 'Typical range'
+  }
+
+  return {
+    classification,
+    enteredPricePerRound: pricePerRound,
+    caliber: caliber as CaliberValue,
+    context: {
+      minPrice: round(minPrice, 4),
+      maxPrice: round(maxPrice, 4),
+      medianPrice: round(medianPrice, 4),
+      pricePointCount,
+      daysWithData,
+    },
+    freshnessIndicator: `Based on prices from the last ${daysWithData} days`,
+    message,
+  }
+}
+
+/**
+ * Get SQL conditions for caliber matching (handles aliases)
+ */
+function getCaliberConditions(caliber: CaliberValue): { sql: string; params: string[] } {
+  // Map canonical caliber to possible database values
+  const aliasGroups: Record<CaliberValue, string[]> = {
+    '9mm': ['9mm', '9mm luger', '9mm parabellum', '9x19', '9x19mm'],
+    '.45_acp': ['.45 acp', '45 acp', '.45acp', '.45 auto'],
+    '.40_sw': ['.40 s&w', '40 s&w', '.40sw', '.40 smith & wesson'],
+    '.380_acp': ['.380 acp', '380 acp', '.380acp', '.380 auto'],
+    '.22_lr': ['.22 lr', '22 lr', '.22lr', '22lr', '.22 long rifle'],
+    '.223_556': ['.223 rem', '.223 remington', '223 rem', '5.56', '5.56mm', '5.56x45', '5.56 nato', '.223/5.56'],
+    '.308_762x51': ['.308 win', '.308 winchester', '308 win', '7.62x51', '7.62x51mm', '7.62 nato', '.308/7.62x51'],
+    '.30-06': ['.30-06', '30-06', '.30-06 springfield', '.30-06 sprg'],
+    '6.5_creedmoor': ['6.5 creedmoor', '6.5mm creedmoor', '6.5 cm'],
+    '7.62x39': ['7.62x39', '7.62x39mm'],
+    '12ga': ['12 gauge', '12 ga', '12ga', '12g'],
+    '20ga': ['20 gauge', '20 ga', '20ga', '20g'],
+  }
+
+  const aliases = aliasGroups[caliber] || [caliber]
+  const placeholders = aliases.map((_, i) => `LOWER(p.caliber) = LOWER($${i + 2})`).join(' OR ')
+
+  return {
+    sql: placeholders,
+    params: aliases,
+  }
+}
+
+/**
+ * Get human-readable caliber label
+ */
+function getCaliberLabel(caliber: string): string {
+  const labels: Record<string, string> = {
+    '9mm': '9mm',
+    '.45_acp': '.45 ACP',
+    '.40_sw': '.40 S&W',
+    '.380_acp': '.380 ACP',
+    '.22_lr': '.22 LR',
+    '.223_556': '.223 / 5.56',
+    '.308_762x51': '.308 / 7.62x51',
+    '.30-06': '.30-06',
+    '6.5_creedmoor': '6.5 Creedmoor',
+    '7.62x39': '7.62x39',
+    '12ga': '12 Gauge',
+    '20ga': '20 Gauge',
+  }
+  return labels[caliber] || caliber
+}
+
+function round(value: number, decimals: number): number {
+  const multiplier = Math.pow(10, decimals)
+  return Math.round(value * multiplier) / multiplier
+}
+
+function formatPrice(price: number): string {
+  return price.toFixed(2)
+}

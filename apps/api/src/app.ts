@@ -37,6 +37,8 @@ import { authRouter } from './routes/auth'
 import { dashboardRouter } from './routes/dashboard'
 import { watchlistRouter } from './routes/watchlist'
 import { savedItemsRouter } from './routes/saved-items'
+import { gunLockerRouter } from './routes/gun-locker'
+import { priceCheckRouter } from './routes/price-check'
 import { adminRouter } from './routes/admin'
 import { usersRouter } from './routes/users'
 
@@ -159,6 +161,8 @@ app.use('/api/auth', authRouter)
 app.use('/api/dashboard', dashboardRouter)
 app.use('/api/watchlist', watchlistRouter)
 app.use('/api/saved-items', savedItemsRouter)
+app.use('/api/gun-locker', gunLockerRouter)
+app.use('/api/price-check', priceCheckRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/users', usersRouter)
 

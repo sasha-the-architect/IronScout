@@ -19,6 +19,8 @@ import {
   type DashboardState,
   type DashboardStateContext
 } from '../services/dashboard-state'
+import { getMarketDeals, getMarketDealsWithGunLocker } from '../services/market-deals'
+import { getUserCalibers, type CaliberValue } from '../services/gun-locker'
 
 const log = loggers.dashboard
 
@@ -79,6 +81,57 @@ router.get('/watchlist-preview', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid parameters', details: error.issues })
     }
     res.status(500).json({ error: 'Failed to fetch watchlist preview' })
+  }
+})
+
+// ============================================================================
+// MARKET DEALS ENDPOINT (dashboard_market_deals_v1_spec.md)
+// Returns notable market-wide price events for dashboard display
+// Eligibility: ≥15% below 30-day median, back in stock after 7+ days, lowest in 90 days
+// Hero selection: largest drop %, then earliest timestamp, then productId ASC
+// ============================================================================
+
+router.get('/market-deals', async (req: Request, res: Response) => {
+  try {
+    // Auth is optional - market deals are public, but Gun Locker personalization requires auth
+    const userId = getAuthenticatedUserId(req)
+
+    if (userId) {
+      // Get user's Gun Locker calibers for personalization
+      const userCalibers = await getUserCalibers(userId)
+
+      if (userCalibers.length > 0) {
+        const { forYourGuns, otherDeals, hero, lastCheckedAt } = await getMarketDealsWithGunLocker(userCalibers)
+
+        return res.json({
+          hero,
+          sections: [
+            { title: 'For Your Guns', deals: forYourGuns },
+            { title: 'Other Notable Deals', deals: otherDeals },
+          ],
+          lastCheckedAt,
+          _meta: {
+            personalized: true,
+            userCalibers,
+          },
+        })
+      }
+    }
+
+    // Non-personalized: "Notable Deals Today"
+    const { deals, hero, lastCheckedAt } = await getMarketDeals()
+
+    res.json({
+      hero,
+      sections: [{ title: 'Notable Deals Today', deals: deals.slice(0, 5) }],
+      lastCheckedAt,
+      _meta: {
+        personalized: false,
+      },
+    })
+  } catch (error) {
+    log.error('Market deals error', { error }, error as Error)
+    res.status(500).json({ error: 'Failed to fetch market deals' })
   }
 })
 

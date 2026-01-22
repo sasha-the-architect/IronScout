@@ -4,6 +4,7 @@ import { useDashboardState } from '@/hooks/use-dashboard-state'
 import { StateBanner } from '@/components/dashboard/organisms/state-banner'
 import { WatchlistPreviewV4 } from '@/components/dashboard/organisms/watchlist-preview-v4'
 import { BestPrices } from '@/components/dashboard/organisms/best-prices'
+import { MarketDeals } from '@/components/dashboard/market-deals'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
 
@@ -87,6 +88,11 @@ export default function DashboardPage() {
           />
         </section>
       )}
+
+      {/* Market Deals - per dashboard_market_deals_v1_spec.md */}
+      <section>
+        <MarketDeals />
+      </section>
 
       {/* Best Prices (always shown) */}
       <section>

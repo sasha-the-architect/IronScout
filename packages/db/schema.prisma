@@ -10,7 +10,7 @@ datasource db {
 }
 
 model Account {
-  id                String  @id @default(cuid())
+  id                String  @id
   userId            String
   type              String
   provider          String
@@ -22,17 +22,17 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  user              users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  users             users   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
 
 model Session {
-  id           String   @id @default(cuid())
+  id           String   @id
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user         users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  users        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
@@ -44,7 +44,7 @@ model VerificationToken {
 }
 
 model admin_audit_logs {
-  id          String   @id @default(cuid())
+  id          String   @id
   adminUserId String
   merchantId  String?
   action      String
@@ -62,10 +62,8 @@ model admin_audit_logs {
   @@index([merchantId])
 }
 
-// DELETED: advertisements model (orphaned v1 placeholder, removed 2026-01-12)
-
 model affiliate_feed_run_errors {
-  id                  String              @id @default(cuid())
+  id                  String              @id
   runId               String
   code                String
   message             String
@@ -77,50 +75,45 @@ model affiliate_feed_run_errors {
   @@index([runId])
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model affiliate_feed_runs {
-  id                   String                  @id @default(cuid())
-  feedId               String
-  sourceId             String
-  trigger              AffiliateFeedRunTrigger @default(SCHEDULED)
-  status               AffiliateFeedRunStatus  @default(RUNNING)
-  startedAt            DateTime                @default(now())
-  finishedAt           DateTime?
-  durationMs           Int?
-  downloadBytes        BigInt?
-  rowsRead             Int?
-  rowsParsed           Int?
-  productsUpserted     Int?
-  pricesWritten        Int?
-  productsPromoted     Int?
-  errorCount           Int?
-  productsExpired      Int?
-  productsRejected     Int?
-  duplicateKeyCount    Int?
-  urlHashFallbackCount Int?
-  activeCountBefore    Int?
-  seenSuccessCount     Int?
-  wouldExpireCount     Int?
-  skippedReason        String?
-  failureKind          String?
-  failureCode          String?
-  failureMessage       String?
-  isPartial            Boolean                 @default(false)
-  expiryStepFailed     Boolean                 @default(false)
-  expiryBlocked        Boolean                 @default(false)
-  expiryBlockedReason  String?
-  expiryApprovedAt     DateTime?
-  expiryApprovedBy     String?
-  artifactUrl          String?
-  correlationId        String?
-
-  /// ADR-015: Run ignore semantics for corrections
-  /// When set, prices from this run are excluded from consumer queries
-  ignoredAt     DateTime?
-  /// Who ignored the run (admin user ID or 'system')
-  ignoredBy     String?
-  /// Reason for ignoring (e.g., 'bad_feed_data', 'duplicate_run', 'test_run')
-  ignoredReason String?
-
+  id                        String                      @id
+  feedId                    String
+  sourceId                  String
+  trigger                   AffiliateFeedRunTrigger     @default(SCHEDULED)
+  status                    AffiliateFeedRunStatus      @default(RUNNING)
+  startedAt                 DateTime                    @default(now())
+  finishedAt                DateTime?
+  durationMs                Int?
+  downloadBytes             BigInt?
+  rowsRead                  Int?
+  rowsParsed                Int?
+  productsUpserted          Int?
+  pricesWritten             Int?
+  productsPromoted          Int?
+  errorCount                Int?
+  productsExpired           Int?
+  productsRejected          Int?
+  duplicateKeyCount         Int?
+  urlHashFallbackCount      Int?
+  activeCountBefore         Int?
+  seenSuccessCount          Int?
+  wouldExpireCount          Int?
+  skippedReason             String?
+  failureKind               String?
+  failureCode               String?
+  failureMessage            String?
+  isPartial                 Boolean                     @default(false)
+  expiryStepFailed          Boolean                     @default(false)
+  expiryBlocked             Boolean                     @default(false)
+  expiryBlockedReason       String?
+  expiryApprovedAt          DateTime?
+  expiryApprovedBy          String?
+  artifactUrl               String?
+  correlationId             String?
+  ignoredAt                 DateTime?
+  ignoredBy                 String?
+  ignoredReason             String?
   affiliate_feed_run_errors affiliate_feed_run_errors[]
   affiliate_feeds           affiliate_feeds             @relation(fields: [feedId], references: [id], onDelete: Cascade)
   prices                    prices[]
@@ -133,9 +126,8 @@ model affiliate_feed_runs {
 }
 
 model affiliate_feeds {
-  id                     String                @id @default(cuid())
+  id                     String                @id
   sourceId               String
-  variant                FeedVariant           @default(FULL)
   network                AffiliateNetwork
   status                 AffiliateFeedStatus   @default(DRAFT)
   scheduleFrequencyHours Int?
@@ -161,11 +153,11 @@ model affiliate_feeds {
   maxRowCount            Int?
   feedLockId             BigInt                @unique @default(autoincrement())
   createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
+  updatedAt              DateTime
   createdBy              String?
+  variant                FeedVariant           @default(FULL)
   affiliate_feed_runs    affiliate_feed_runs[]
   sources                sources               @relation(fields: [sourceId], references: [id])
-  // REMOVED: @@index([sourceId]) - redundant, covered by unique([sourceId, variant])
 
   @@unique([sourceId, variant])
   @@index([nextRunAt])
@@ -174,381 +166,100 @@ model affiliate_feeds {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model alerts {
-  id              String         @id @default(cuid())
-  userId          String
-  productId       String
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  watchlistItemId String?
-  ruleType        AlertRuleType?
-  isEnabled       Boolean        @default(true)
-
-  /// ADR-015: Alert suppression for retroactive correction handling
-  /// When set, alert is hidden in UI and never re-fired
+  id               String           @id
+  userId           String
+  productId        String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  watchlistItemId  String?
+  ruleType         AlertRuleType?
+  isEnabled        Boolean          @default(true)
   suppressedAt     DateTime?
-  /// Who suppressed the alert (admin user ID or 'system')
   suppressedBy     String?
-  /// Reason for suppression (e.g., 'run_ignored', 'correction_applied')
   suppressedReason String?
-
-  products        products         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  users           users            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  watchlist_items watchlist_items? @relation(fields: [watchlistItemId], references: [id], onDelete: Cascade)
+  products         products         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  users            users            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  watchlist_items  watchlist_items? @relation(fields: [watchlistItemId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId, ruleType], map: "alerts_userid_productid_ruletype_key")
   @@index([productId])
-  // REMOVED: @@index([userId]) - redundant, covered by unique([userId, productId, ruleType])
   @@index([suppressedAt])
   @@index([watchlistItemId])
 }
 
-// DELETED: benchmarks model (benchmark subsystem removed for v1)
-// DELETED: canonical_skus model (benchmark subsystem removed for v1)
+model brand_alias_applications_daily {
+  aliasId   String
+  date      DateTime @db.Date
+  count     Int      @default(0)
+  updatedAt DateTime
+
+  @@id([aliasId, date])
+  @@index([aliasId])
+  @@index([date])
+}
+
+model brand_aliases {
+  id                   String               @id
+  canonicalName        String
+  canonicalNorm        String
+  normalizationVersion Int                  @default(1)
+  aliasName            String
+  aliasNorm            String               @unique
+  status               BrandAliasStatus     @default(DRAFT)
+  sourceType           BrandAliasSourceType
+  sourceRef            String?
+  evidence             Json?
+  notes                String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime
+  createdBy            String
+  updatedBy            String
+  disabledAt           DateTime?
+  disabledBy           String?
+  disableReason        String?
+
+  @@index([canonicalNorm])
+  @@index([createdAt])
+  @@index([status])
+}
 
 model click_events {
-  id              String   @id @default(cuid())
-  clickId         String   @unique @default(cuid()) // Passed as affiliate subId for conversion tracking
-  retailerId      String // Which retailer clicked to
-  sourceId        String? // Which affiliate source
-  sourceProductId String? // Which product listing was clicked
+  id              String           @id
   sessionId       String?
   userAgent       String?
   ipHash          String?
   referrer        String?
-  targetUrl       String? // Final affiliate URL clicked
-  createdAt       DateTime @default(now())
-
-  // Relations
+  createdAt       DateTime         @default(now())
+  clickId         String           @unique
+  sourceId        String?
+  sourceProductId String?
+  targetUrl       String?
+  retailerId      String
   retailers       retailers        @relation(fields: [retailerId], references: [id], onDelete: Cascade)
-  sources         sources?         @relation(fields: [sourceId], references: [id], onDelete: SetNull)
-  source_products source_products? @relation(fields: [sourceProductId], references: [id], onDelete: SetNull)
+  sources         sources?         @relation(fields: [sourceId], references: [id])
+  source_products source_products? @relation(fields: [sourceProductId], references: [id])
 
   @@index([createdAt])
   @@index([retailerId])
   @@index([sessionId])
-  // REMOVED: @@index([clickId]) - redundant, field has @unique constraint
   @@index([sourceId])
   @@index([sourceProductId])
 }
 
 model data_subscriptions {
-  id        String             @id @default(cuid())
+  id        String             @id
   userId    String
   plan      DaaSPlan           @default(BASIC)
   status    SubscriptionStatus @default(ACTIVE)
   apiKey    String             @unique
   rateLimit Int                @default(1000)
   createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  updatedAt DateTime
   users     users              @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model merchant_contacts {
-  id                 String                @id @default(cuid())
-  merchantId         String
-  firstName          String
-  lastName           String
-  email              String
-  phone              String?
-  marketingOptIn     Boolean               @default(false)
-  communicationOptIn Boolean               @default(true)
-  isAccountOwner     Boolean               @default(false)
-  isActive           Boolean               @default(true)
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  roles              MerchantContactRole[] @default([])
-  merchants          merchants             @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-
-  @@unique([merchantId, email])
-  // REMOVED: @@index([merchantId]) - redundant, covered by unique([merchantId, email])
-  @@index([email])
-}
-
-model retailer_feed_runs {
-  id               String        @id @default(cuid())
-  retailerId       String
-  feedId           String
-  status           FeedRunStatus
-  errors           Json?
-  rowCount         Int           @default(0)
-  duration         Int?
-  startedAt        DateTime      @default(now())
-  completedAt      DateTime?
-  primaryErrorCode String?
-  quarantinedCount Int           @default(0)
-  coercionCount    Int           @default(0)
-  errorCodes       Json?
-  indexedCount     Int           @default(0)
-  rejectedCount    Int           @default(0)
-  matchedCount     Int           @default(0)
-
-  /// ADR-015: Run ignore semantics for corrections
-  /// When set, prices from this run are excluded from consumer queries
-  ignoredAt     DateTime?
-  /// Who ignored the run (admin user ID or 'system')
-  ignoredBy     String?
-  /// Reason for ignoring (e.g., 'bad_feed_data', 'duplicate_run', 'test_run')
-  ignoredReason String?
-
-  retailer_feeds retailer_feeds @relation(fields: [feedId], references: [id], onDelete: Cascade)
-
-  @@index([retailerId])
-  @@index([feedId])
-  @@index([startedAt])
-  @@index([ignoredAt])
-}
-
-model retailer_feed_test_runs {
-  id               String         @id @default(cuid())
-  retailerId       String
-  feedId           String
-  sampleSize       Int            @default(50)
-  status           TestRunStatus
-  recordsParsed    Int            @default(0)
-  wouldIndex       Int            @default(0)
-  wouldQuarantine  Int            @default(0)
-  wouldReject      Int            @default(0)
-  warningCount     Int            @default(0)
-  errorCount       Int            @default(0)
-  primaryErrorCode String?
-  errorSamples     Json?
-  coercionSummary  Json?
-  duration         Int?
-  startedAt        DateTime       @default(now())
-  completedAt      DateTime?
-  retailer_feeds   retailer_feeds @relation(fields: [feedId], references: [id], onDelete: Cascade)
-
-  @@index([retailerId])
-  @@index([feedId])
-  @@index([startedAt])
-}
-
-model retailer_feeds {
-  id                      String                    @id @default(cuid())
-  retailerId              String
-  name                    String?
-  url                     String?
-  username                String?
-  password                String?
-  scheduleMinutes         Int                       @default(60)
-  status                  FeedStatus                @default(PENDING)
-  feedHash                String?
-  lastSuccessAt           DateTime?
-  lastFailureAt           DateTime?
-  lastError               String?
-  createdAt               DateTime                  @default(now())
-  updatedAt               DateTime                  @updatedAt
-  accessType              FeedAccessType            @default(URL)
-  enabled                 Boolean                   @default(true)
-  formatType              FeedFormatType            @default(GENERIC)
-  lastRunAt               DateTime?
-  primaryErrorCode        String?
-  retailer_feed_runs      retailer_feed_runs[]
-  retailer_feed_test_runs retailer_feed_test_runs[]
-  retailers               retailers                 @relation(fields: [retailerId], references: [id], onDelete: Cascade)
-  retailer_skus           retailer_skus[]
-  feed_corrections        feed_corrections[]
-
-  @@index([retailerId])
-  @@index([enabled])
-}
-
-// DELETED: merchant_insights model (benchmark subsystem removed for v1)
-
-model merchant_invites {
-  id             String           @id @default(cuid())
-  merchantId     String
-  email          String
-  role           MerchantUserRole @default(MEMBER)
-  inviteToken    String           @unique
-  invitedById    String
-  expiresAt      DateTime
-  acceptedAt     DateTime?
-  createdAt      DateTime         @default(now())
-  merchants      merchants        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  merchant_users merchant_users   @relation(fields: [invitedById], references: [id])
-  // REMOVED: @@index([merchantId]) - redundant, covered by unique([merchantId, email])
-  // REMOVED: @@index([inviteToken]) - redundant, field has @unique constraint
-
-  @@unique([merchantId, email])
-}
-
-model merchant_notification_prefs {
-  id                 String    @id @default(cuid())
-  merchantId         String    @unique
-  fatalFeedErrors    Boolean   @default(true)
-  nonFatalFeedIssues Boolean   @default(false)
-  successfulUpdates  Boolean   @default(false)
-  weeklyPulse        Boolean   @default(true)
-  insightAlerts      Boolean   @default(true)
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  merchants          merchants @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-}
-
-model retailer_skus {
-  id               String          @id @default(cuid())
-  retailerId       String
-  feedId           String?
-  feedRunId        String?
-  rawTitle         String
-  rawDescription   String?
-  rawPrice         Decimal         @db.Decimal(10, 2)
-  rawUpc           String?
-  rawSku           String?
-  rawCaliber       String?
-  rawGrain         String?
-  rawCase          String?
-  rawBulletType    String?
-  rawBrand         String?
-  rawPackSize      Int?
-  rawInStock       Boolean         @default(true)
-  rawUrl           String?
-  rawImageUrl      String?
-  parsedCaliber    String?
-  parsedGrain      Int?
-  parsedPackSize   Int?
-  parsedBulletType String?
-  parsedBrand      String?
-  parseConfidence  Decimal?        @db.Decimal(3, 2)
-  retailerSkuHash  String?
-  contentHash      String? // Hash of mutable fields for change detection
-  isActive         Boolean         @default(true)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  lastSeenAt       DateTime?       @default(now())
-  missingCount     Int             @default(0)
-  productType      String?
-  coercionsApplied Json?
-  retailers        retailers       @relation(fields: [retailerId], references: [id], onDelete: Cascade)
-  retailer_feeds   retailer_feeds? @relation(fields: [feedId], references: [id])
-  prices           prices[] // PR #2: Unified price history for retailer SKUs
-
-  @@unique([retailerId, retailerSkuHash])
-  // REMOVED: @@index([retailerId]) - redundant, covered by unique([retailerId, retailerSkuHash])
-  @@index([feedId])
-  @@index([isActive])
-}
-
-model merchant_users {
-  id                      String                    @id @default(cuid())
-  merchantId              String
-  email                   String
-  passwordHash            String
-  name                    String
-  role                    MerchantUserRole          @default(MEMBER)
-  emailVerified           Boolean                   @default(false)
-  verifyToken             String?
-  resetToken              String?
-  resetTokenExp           DateTime?
-  lastLoginAt             DateTime?
-  createdAt               DateTime                  @default(now())
-  updatedAt               DateTime                  @updatedAt
-  merchant_invites        merchant_invites[]
-  merchants               merchants                 @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  merchant_user_retailers merchant_user_retailers[]
-
-  @@unique([merchantId, email])
-  // REMOVED: @@index([merchantId]) - redundant, covered by unique([merchantId, email])
-  @@index([email])
-}
-
-model merchants {
-  id                          String                       @id @default(cuid())
-  businessName                String
-  websiteUrl                  String
-  phone                       String?
-  storeType                   StoreType                    @default(ONLINE_ONLY)
-  status                      MerchantStatus               @default(PENDING)
-  tier                        MerchantTier                 @default(FOUNDING)
-  pixelApiKey                 String?                      @unique
-  pixelEnabled                Boolean                      @default(false)
-  shippingType                ShippingType                 @default(UNKNOWN)
-  shippingFlat                Decimal?                     @db.Decimal(10, 2)
-  shippingPerUnit             Decimal?                     @db.Decimal(10, 2)
-  createdAt                   DateTime                     @default(now())
-  updatedAt                   DateTime                     @updatedAt
-  contactFirstName            String
-  contactLastName             String
-  lastSubscriptionNotifyAt    DateTime?
-  subscriptionExpiresAt       DateTime?
-  subscriptionGraceDays       Int                          @default(7)
-  subscriptionStatus          MerchantSubscriptionStatus   @default(ACTIVE)
-  autoRenew                   Boolean                      @default(true)
-  paymentMethod               MerchantPaymentMethod?
-  stripeCustomerId            String?                      @unique
-  stripeSubscriptionId        String?                      @unique
-  merchant_contacts           merchant_contacts[]
-  merchant_invites            merchant_invites[]
-  merchant_notification_prefs merchant_notification_prefs?
-  merchant_users              merchant_users[]
-  pixel_events                pixel_events[]
-  merchant_retailers          merchant_retailers[]
-  prices                      prices[]
-}
-
-/// Explicit Merchant↔Retailer relationship.
-/// Per Merchant-and-Retailer-Reference: One Merchant can administer many Retailers.
-/// This replaces the deprecated retailers.merchantId optional field.
-/// Merchant-Retailer relationship. One Merchant can have many Retailers, one Retailer can have many Merchants.
-/// The @@unique([merchantId, retailerId]) constraint prevents duplicate relationships.
-model merchant_retailers {
-  id         String                 @id @default(cuid())
-  merchantId String
-  retailerId String
-  /// Status of the merchant-retailer relationship
-  status     MerchantRetailerStatus @default(ACTIVE)
-  createdAt  DateTime               @default(now())
-  createdBy  String?
-  updatedAt  DateTime               @updatedAt
-
-  /// Listing status for consumer visibility (paid entitlement).
-  /// Consumer visibility = retailers.visibilityStatus=ELIGIBLE AND listingStatus=LISTED AND status=ACTIVE
-  listingStatus  MerchantRetailerListingStatus @default(UNLISTED)
-  /// When retailer was listed (paid entitlement activated)
-  listedAt       DateTime?
-  /// Who listed the retailer (admin user ID or 'system' for auto)
-  listedBy       String?
-  /// When retailer was unlisted
-  unlistedAt     DateTime?
-  /// Who unlisted the retailer
-  unlistedBy     String?
-  /// Reason for unlisting (billing_delinquent, manual, policy_violation, etc.)
-  unlistedReason String?
-
-  merchants               merchants                 @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  retailers               retailers                 @relation(fields: [retailerId], references: [id], onDelete: Cascade)
-  merchant_user_retailers merchant_user_retailers[]
-
-  @@unique([merchantId, retailerId])
-  // REMOVED: @@index([merchantId]) - redundant, covered by unique([merchantId, retailerId])
-  @@index([retailerId])
-  @@index([status])
-  @@index([listingStatus])
-}
-
-/// Per-retailer permissions for merchant users.
-/// Per Merchant-and-Retailer-Reference: Permissions are per Retailer, explicit and auditable.
-model merchant_user_retailers {
-  id                 String               @id @default(cuid())
-  merchantUserId     String
-  merchantRetailerId String
-  /// Role for this user on this specific retailer
-  role               MerchantRetailerRole @default(VIEWER)
-  createdAt          DateTime             @default(now())
-  createdBy          String?
-  updatedAt          DateTime             @updatedAt
-
-  merchant_users     merchant_users     @relation(fields: [merchantUserId], references: [id], onDelete: Cascade)
-  merchant_retailers merchant_retailers @relation(fields: [merchantRetailerId], references: [id], onDelete: Cascade)
-
-  @@unique([merchantUserId, merchantRetailerId])
-  // REMOVED: @@index([merchantUserId]) - redundant, covered by unique([merchantUserId, merchantRetailerId])
-  @@index([merchantRetailerId])
-}
-
 model execution_logs {
-  id          String     @id @default(cuid())
+  id          String     @id
   executionId String
   level       LogLevel   @default(INFO)
   event       String
@@ -562,25 +273,20 @@ model execution_logs {
   @@index([level])
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model executions {
-  id            String          @id @default(cuid())
-  sourceId      String
-  status        ExecutionStatus @default(PENDING)
-  startedAt     DateTime        @default(now())
-  completedAt   DateTime?
-  duration      Int?
-  itemsFound    Int             @default(0)
-  itemsUpserted Int             @default(0)
-  errorMessage  String?
-
-  /// ADR-015: Run ignore semantics for corrections
-  /// When set, prices from this run are excluded from consumer queries
-  ignoredAt     DateTime?
-  /// Who ignored the run (admin user ID or 'system')
-  ignoredBy     String?
-  /// Reason for ignoring (e.g., 'bad_scrape_data', 'duplicate_run', 'test_run')
-  ignoredReason String?
-
+  id             String           @id
+  sourceId       String
+  status         ExecutionStatus  @default(PENDING)
+  startedAt      DateTime         @default(now())
+  completedAt    DateTime?
+  duration       Int?
+  itemsFound     Int              @default(0)
+  itemsUpserted  Int              @default(0)
+  errorMessage   String?
+  ignoredAt      DateTime?
+  ignoredBy      String?
+  ignoredReason  String?
   execution_logs execution_logs[]
   sources        sources          @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
@@ -588,8 +294,7 @@ model executions {
 }
 
 model feed_corrections {
-  id                  String               @id @default(cuid())
-  retailerId          String
+  id                  String               @id
   feedId              String
   quarantinedRecordId String?
   recordRef           String
@@ -598,18 +303,162 @@ model feed_corrections {
   newValue            String
   createdBy           String
   createdAt           DateTime             @default(now())
+  retailerId          String
   retailer_feeds      retailer_feeds       @relation(fields: [feedId], references: [id], onDelete: Cascade)
   quarantined_records quarantined_records? @relation(fields: [quarantinedRecordId], references: [id])
 
-  @@index([retailerId])
   @@index([feedId, recordRef])
   @@index([quarantinedRecordId])
+  @@index([retailerId])
 }
 
-// DELETED: market_reports model (orphaned v1 placeholder, removed 2026-01-12)
+model merchant_contacts {
+  id                 String                @id
+  merchantId         String
+  firstName          String
+  lastName           String
+  email              String
+  phone              String?
+  marketingOptIn     Boolean               @default(false)
+  communicationOptIn Boolean               @default(true)
+  isAccountOwner     Boolean               @default(false)
+  isActive           Boolean               @default(true)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime
+  roles              MerchantContactRole[] @default([])
+  merchants          merchants             @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, email], map: "dealer_contacts_dealerId_email_key")
+  @@index([email], map: "dealer_contacts_email_idx")
+}
+
+model merchant_invites {
+  id             String           @id
+  merchantId     String
+  email          String
+  role           MerchantUserRole @default(MEMBER)
+  inviteToken    String           @unique(map: "dealer_invites_inviteToken_key")
+  invitedById    String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  merchant_users merchant_users   @relation(fields: [invitedById], references: [id], map: "dealer_invites_invitedById_fkey")
+  merchants      merchants        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, email], map: "dealer_invites_dealerId_email_key")
+}
+
+model merchant_notification_prefs {
+  id                 String    @id
+  merchantId         String    @unique(map: "dealer_notification_prefs_dealerId_key")
+  fatalFeedErrors    Boolean   @default(true)
+  nonFatalFeedIssues Boolean   @default(false)
+  successfulUpdates  Boolean   @default(false)
+  weeklyPulse        Boolean   @default(true)
+  insightAlerts      Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime
+  merchants          merchants @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model merchant_retailers {
+  id                      String                        @id
+  merchantId              String
+  retailerId              String
+  status                  MerchantRetailerStatus        @default(ACTIVE)
+  createdAt               DateTime                      @default(now())
+  createdBy               String?
+  updatedAt               DateTime
+  listingStatus           MerchantRetailerListingStatus @default(UNLISTED)
+  listedAt                DateTime?
+  listedBy                String?
+  unlistedAt              DateTime?
+  unlistedBy              String?
+  unlistedReason          String?
+  merchants               merchants                     @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  retailers               retailers                     @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  merchant_user_retailers merchant_user_retailers[]
+
+  @@unique([merchantId, retailerId])
+  @@index([listingStatus])
+  @@index([retailerId])
+  @@index([status])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model merchant_user_retailers {
+  id                 String               @id
+  merchantUserId     String
+  merchantRetailerId String
+  role               MerchantRetailerRole @default(VIEWER)
+  createdAt          DateTime             @default(now())
+  createdBy          String?
+  updatedAt          DateTime
+  merchant_retailers merchant_retailers   @relation(fields: [merchantRetailerId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantUserId, merchantRetailerId])
+  @@index([merchantRetailerId])
+}
+
+model merchant_users {
+  id               String             @id
+  merchantId       String
+  email            String
+  passwordHash     String
+  name             String
+  role             MerchantUserRole   @default(MEMBER)
+  emailVerified    Boolean            @default(false)
+  verifyToken      String?
+  resetToken       String?
+  resetTokenExp    DateTime?
+  lastLoginAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  merchant_invites merchant_invites[]
+  merchants        merchants          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, email])
+  @@index([email], map: "dealer_users_email_idx")
+}
+
+model merchants {
+  id                          String                       @id(map: "dealers_pkey")
+  businessName                String
+  websiteUrl                  String
+  phone                       String?
+  storeType                   StoreType                    @default(ONLINE_ONLY)
+  status                      MerchantStatus               @default(PENDING)
+  tier                        MerchantTier                 @default(FOUNDING)
+  pixelApiKey                 String?                      @unique(map: "dealers_pixelApiKey_key")
+  pixelEnabled                Boolean                      @default(false)
+  shippingType                ShippingType                 @default(UNKNOWN)
+  shippingFlat                Decimal?                     @db.Decimal(10, 2)
+  shippingPerUnit             Decimal?                     @db.Decimal(10, 2)
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime
+  retailerId                  String?
+  contactFirstName            String
+  contactLastName             String
+  lastSubscriptionNotifyAt    DateTime?
+  subscriptionExpiresAt       DateTime?
+  subscriptionGraceDays       Int                          @default(7)
+  subscriptionStatus          MerchantSubscriptionStatus   @default(ACTIVE)
+  autoRenew                   Boolean                      @default(true)
+  paymentMethod               MerchantPaymentMethod?
+  stripeCustomerId            String?                      @unique(map: "dealers_stripeCustomerId_key")
+  stripeSubscriptionId        String?                      @unique(map: "dealers_stripeSubscriptionId_key")
+  merchant_contacts           merchant_contacts[]
+  merchant_invites            merchant_invites[]
+  merchant_notification_prefs merchant_notification_prefs?
+  merchant_retailers          merchant_retailers[]
+  merchant_users              merchant_users[]
+  pixel_events                pixel_events[]
+  prices                      prices[]
+}
 
 model pixel_events {
-  id            String    @id @default(cuid())
+  id            String    @id
   merchantId    String
   orderId       String
   orderValue    Decimal   @db.Decimal(10, 2)
@@ -629,109 +478,113 @@ model pixel_events {
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// Per ADR-015: Price history is append-only. Provenance fields enable corrections.
-/// PR #2: Unified prices table supports both canonical products AND retailer SKUs.
-/// - productId: Set when linked to canonical product (affiliate/crawl pipelines)
-/// - retailerSkuId: Set when linked to retailer SKU (retailer pipeline)
-/// - Both can be null initially; linked later via resolver
+model price_corrections {
+  id           String                   @id
+  scopeType    PriceCorrectionScopeType
+  scopeId      String
+  startTs      DateTime                 @db.Timestamptz(6)
+  endTs        DateTime                 @db.Timestamptz(6)
+  action       PriceCorrectionAction
+  value        Decimal?                 @db.Decimal(10, 4)
+  reason       String
+  createdAt    DateTime                 @default(now()) @db.Timestamptz(6)
+  createdBy    String
+  revokedAt    DateTime?                @db.Timestamptz(6)
+  revokedBy    String?
+  revokeReason String?
+
+  @@index([createdAt])
+  @@index([revokedAt])
+  @@index([scopeType, scopeId])
+  @@index([startTs, endTs])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model prices {
-  id                  String     @id @default(cuid())
+  id                  String               @id
   productId           String?
   retailerId          String
-  merchantId          String?
-  sourceId            String?
-  retailerSkuId       String? // PR #2: Link to retailer_skus for unified price history
-  price               Decimal    @db.Decimal(10, 2)
-  currency            String     @default("USD")
+  price               Decimal              @db.Decimal(10, 2)
+  currency            String               @default("USD")
   url                 String
-  inStock             Boolean    @default(true)
-  createdAt           DateTime   @default(now())
-  /// ADR-015: When the price was observed at the source (not when written to DB)
-  /// This is the canonical timestamp for correction matching and provenance
-  observedAt          DateTime   @default(now())
-  freeShippingMinimum Decimal?   @db.Decimal(10, 2)
-  shippingCost        Decimal?   @db.Decimal(10, 2)
+  inStock             Boolean              @default(true)
+  createdAt           DateTime             @default(now())
+  freeShippingMinimum Decimal?             @db.Decimal(10, 2)
+  shippingCost        Decimal?             @db.Decimal(10, 2)
   shippingNotes       String?
-  originalPrice       Decimal?   @db.Decimal(10, 2)
+  originalPrice       Decimal?             @db.Decimal(10, 2)
   priceType           PriceType?
   saleStartsAt        DateTime?
   saleEndsAt          DateTime?
   affiliateFeedRunId  String?
   priceSignatureHash  String?
   sourceProductId     String?
-
-  /// ADR-015 Provenance: Type of ingestion run that created this price
-  ingestionRunType IngestionRunType?
-  /// ADR-015 Provenance: ID of the specific run (execution, affiliate_feed_run, retailer_feed_run)
-  ingestionRunId   String?
-  /// ADR-015 Provenance: Affiliate network ID if from affiliate feed
-  affiliateId      String?
-
+  ingestionRunType    IngestionRunType?
+  ingestionRunId      String?
+  affiliateId         String?
+  observedAt          DateTime             @default(now()) @db.Timestamptz(6)
+  merchantId          String?
+  sourceId            String?
+  retailerSkuId       String?
   affiliate_feed_runs affiliate_feed_runs? @relation(fields: [affiliateFeedRunId], references: [id])
+  merchants           merchants?           @relation(fields: [merchantId], references: [id])
   products            products?            @relation(fields: [productId], references: [id], onDelete: Cascade)
   retailers           retailers            @relation(fields: [retailerId], references: [id], onDelete: Cascade)
-  merchants           merchants?           @relation(fields: [merchantId], references: [id], onDelete: SetNull)
-  sources             sources?             @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  retailer_skus       retailer_skus?       @relation(fields: [retailerSkuId], references: [id])
+  sources             sources?             @relation(fields: [sourceId], references: [id])
   source_products     source_products?     @relation(fields: [sourceProductId], references: [id])
-  retailer_skus       retailer_skus?       @relation(fields: [retailerSkuId], references: [id], onDelete: SetNull)
   product_reports     product_reports[]
 
   @@index([inStock])
+  @@index([ingestionRunId])
+  @@index([merchantId])
+  @@index([observedAt])
   @@index([productId])
   @@index([retailerId])
-  @@index([sourceProductId])
-  @@index([merchantId])
-  @@index([sourceId])
   @@index([retailerSkuId])
-  // REMOVED: @@index([ingestionRunType]) - unused, no query filtering on this column
-  @@index([ingestionRunId])
-  @@index([observedAt])
+  @@index([sourceId])
+  @@index([sourceProductId])
 }
 
-// DELETED: pricing_snapshots model (benchmark subsystem removed for v1)
+model product_aliases {
+  id                                               String   @id
+  fromProductId                                    String   @unique
+  toProductId                                      String
+  reason                                           String
+  createdAt                                        DateTime @default(now())
+  createdBy                                        String?
+  products_product_aliases_fromProductIdToproducts products @relation("product_aliases_fromProductIdToproducts", fields: [fromProductId], references: [id])
+  products_product_aliases_toProductIdToproducts   products @relation("product_aliases_toProductIdToproducts", fields: [toProductId], references: [id])
 
-/// ADR-015: Corrections overlay for price history.
-/// Corrections are explicit, auditable overlays that modify how facts are interpreted.
-/// Facts (prices, pricing_snapshots) are never mutated; corrections change visibility/value at read time.
-model price_corrections {
-  id String @id @default(cuid())
+  @@index([toProductId])
+}
 
-  /// Scope type determines what entity the correction applies to
-  scopeType PriceCorrectionScopeType
-  /// ID of the scoped entity (productId, retailerId, merchantId, sourceId, affiliateId, or runId)
-  scopeId   String
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model product_links {
+  id              String                 @id
+  sourceProductId String                 @unique
+  productId       String?
+  matchType       ProductLinkMatchType
+  status          ProductLinkStatus
+  reasonCode      ProductLinkReasonCode?
+  confidence      Decimal                @db.Decimal(5, 4)
+  resolverVersion String
+  evidence        Json
+  resolvedAt      DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime
+  products        products?              @relation(fields: [productId], references: [id])
+  source_products source_products        @relation(fields: [sourceProductId], references: [id], onDelete: Cascade)
 
-  /// Time window for the correction (observedAt must be in [startTs, endTs))
-  startTs DateTime
-  endTs   DateTime
-
-  /// What action to take
-  action PriceCorrectionAction
-
-  /// Value for MULTIPLIER action (e.g., 0.9 for 10% discount correction)
-  /// Must be NULL for IGNORE action
-  value Decimal? @db.Decimal(10, 4)
-
-  /// Human-readable reason for the correction
-  reason String
-
-  /// Audit fields for creation
-  createdAt DateTime @default(now())
-  createdBy String
-
-  /// Soft-revoke fields - corrections are never deleted
-  revokedAt    DateTime?
-  revokedBy    String?
-  revokeReason String?
-
-  @@index([scopeType, scopeId])
-  @@index([startTs, endTs])
-  @@index([revokedAt])
-  @@index([createdAt])
+  @@index([matchType])
+  @@index([productId])
+  @@index([resolvedAt])
+  @@index([resolverVersion])
+  @@index([status, matchType])
 }
 
 model product_reports {
-  id          String           @id @default(cuid())
+  id          String           @id
   productId   String
   userId      String?
   priceId     String?
@@ -741,434 +594,348 @@ model product_reports {
   reviewedBy  String?
   reviewNotes String?
   createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  updatedAt   DateTime
   resolvedAt  DateTime?
   prices      prices?          @relation(fields: [priceId], references: [id])
   products    products         @relation(fields: [productId], references: [id], onDelete: Cascade)
   users       users?           @relation(fields: [userId], references: [id])
 }
 
+model product_resolve_requests {
+  id              String                      @id
+  idempotencyKey  String                      @unique
+  sourceProductId String
+  sourceId        String
+  status          ProductResolveRequestStatus @default(PENDING)
+  attempts        Int                         @default(0)
+  lastAttemptAt   DateTime?
+  errorMessage    String?
+  resultProductId String?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @default(now())
+  products        products?                   @relation(fields: [resultProductId], references: [id])
+  sources         sources                     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  source_products source_products             @relation(fields: [sourceProductId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([sourceId])
+  @@index([sourceProductId])
+  @@index([status, updatedAt])
+}
+
 model products {
-  id                    String                 @id @default(cuid())
-  name                  String
-  description           String?
-  category              String
-  brand                 String?
-  imageUrl              String?
-  upc                   String?                @unique
-  caliber               String?
-  grainWeight           Int?
-  caseMaterial          String?
-  purpose               String?
-  roundCount            Int?
-  metadata              Json?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  embedding             Unsupported("vector")?
-  /// When the embedding was last generated (for staleness tracking)
-  lastEmbeddedAt        DateTime?
-  barrelLengthReference Decimal?               @db.Decimal(4, 2)
-  bulletType            BulletType?
-  controlledExpansion   Boolean?
-  dataConfidence        Decimal?               @db.Decimal(3, 2)
-  dataSource            DataSource?            @default(UNKNOWN)
-  factoryNew            Boolean?               @default(true)
-  isSubsonic            Boolean?
-  lowFlash              Boolean?
-  lowRecoil             Boolean?
-  matchGrade            Boolean?
-  muzzleVelocityFps     Int?
-  pressureRating        PressureRating?        @default(STANDARD)
-  shortBarrelOptimized  Boolean?
-  suppressorSafe        Boolean?
+  id                                                      String                     @id
+  name                                                    String
+  description                                             String?
+  category                                                String
+  brand                                                   String?
+  imageUrl                                                String?
+  upc                                                     String?                    @unique
+  caliber                                                 String?
+  grainWeight                                             Int?
+  caseMaterial                                            String?
+  purpose                                                 String?
+  roundCount                                              Int?
+  metadata                                                Json?
+  createdAt                                               DateTime                   @default(now())
+  updatedAt                                               DateTime
+  embedding                                               Unsupported("vector")?
+  barrelLengthReference                                   Decimal?                   @db.Decimal(4, 2)
+  bulletType                                              BulletType?
+  controlledExpansion                                     Boolean?
+  dataConfidence                                          Decimal?                   @db.Decimal(3, 2)
+  dataSource                                              DataSource?                @default(UNKNOWN)
+  factoryNew                                              Boolean?                   @default(true)
+  isSubsonic                                              Boolean?
+  lowFlash                                                Boolean?
+  lowRecoil                                               Boolean?
+  matchGrade                                              Boolean?
+  muzzleVelocityFps                                       Int?
+  pressureRating                                          PressureRating?            @default(STANDARD)
+  shortBarrelOptimized                                    Boolean?
+  suppressorSafe                                          Boolean?
+  canonicalKey                                            String?                    @unique
+  upcNorm                                                 String?                    @unique
+  brandNorm                                               String?
+  caliberNorm                                             String?
+  specs                                                   Json?
+  lastEmbeddedAt                                          DateTime?
+  alerts                                                  alerts[]
+  prices                                                  prices[]
+  product_aliases_product_aliases_fromProductIdToproducts product_aliases?           @relation("product_aliases_fromProductIdToproducts")
+  product_aliases_product_aliases_toProductIdToproducts   product_aliases[]          @relation("product_aliases_toProductIdToproducts")
+  product_links                                           product_links[]
+  product_reports                                         product_reports[]
+  product_resolve_requests                                product_resolve_requests[]
+  watchlist_items                                         watchlist_items[]
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Product Resolver fields (Spec v1.2 §0.1)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /// Immutable canonical key for product identity. Format: "UPC:<upcNorm>" or "FP:<hash>"
-  /// Per Spec v1.2: MUST NOT change after creation.
-  canonicalKey String? @unique
-  /// Normalized UPC (12-digit, no check digit issues). Immutable after creation.
-  upcNorm      String? @unique
-  /// Normalized brand name for fingerprint matching
-  brandNorm    String?
-  /// Normalized caliber for fingerprint matching
-  caliberNorm  String?
-  /// Additive-only product specifications (grain, packCount, etc.)
-  specs        Json?
-
-  // Relations
-  alerts                   alerts[]
-  prices                   prices[]
-  product_reports          product_reports[]
-  source_products          source_products[]
-  watchlist_items          watchlist_items[]
-  product_links            product_links[]
-  aliasesFrom              product_aliases[]          @relation("AliasFrom")
-  aliasesTo                product_aliases[]          @relation("AliasTo")
-  product_resolve_requests product_resolve_requests[]
-
+  @@index([brandNorm, caliberNorm])
   @@index([bulletType])
   @@index([caliber])
   @@index([isSubsonic])
   @@index([pressureRating])
   @@index([purpose])
-  @@index([brandNorm, caliberNorm])
 }
 
-/// Unified quarantine table for all feed types (retailer and affiliate)
-/// Records that fail trust-critical validation are stored here for review
 model quarantined_records {
-  id               String             @id @default(cuid())
-  feedType         QuarantineFeedType @default(RETAILER)
-  feedId           String // ID of retailer_feeds or affiliate_feeds (no FK for flexibility)
+  id               String             @id
+  feedId           String
   runId            String?
-  retailerId       String? // For retailer feeds: denormalized retailerId
-  sourceId         String? // For affiliate feeds: sourceId for grouping
   productType      String?
-  matchKey         String // Identity key for deduplication
-  rawData          Json // Original parsed product data
-  parsedFields     Json? // Partially normalized fields
-  blockingErrors   Json // Array of error codes/messages
+  matchKey         String
+  rawData          Json
+  parsedFields     Json?
+  blockingErrors   Json
   status           QuarantineStatus   @default(QUARANTINED)
   createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  updatedAt        DateTime
+  retailerId       String?
+  feedType         QuarantineFeedType @default(RETAILER)
+  sourceId         String?
   feed_corrections feed_corrections[]
 
   @@unique([feedId, matchKey])
-  @@index([feedType])
   @@index([feedId, status])
-  @@index([status])
+  @@index([feedType])
   @@index([retailerId])
   @@index([sourceId])
+  @@index([status])
 }
 
-model retailers {
-  id        String       @id @default(cuid())
-  name      String
-  website   String       @unique
-  logoUrl   String?
-  tier      RetailerTier @default(STANDARD)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+model retailer_feed_runs {
+  id               String         @id(map: "dealer_feed_runs_pkey")
+  feedId           String
+  status           FeedRunStatus
+  errors           Json?
+  rowCount         Int            @default(0)
+  duration         Int?
+  startedAt        DateTime       @default(now())
+  completedAt      DateTime?
+  primaryErrorCode String?
+  quarantinedCount Int            @default(0)
+  coercionCount    Int            @default(0)
+  errorCodes       Json?
+  indexedCount     Int            @default(0)
+  rejectedCount    Int            @default(0)
+  matchedCount     Int            @default(0)
+  retailerId       String?
+  retailer_feeds   retailer_feeds @relation(fields: [feedId], references: [id], onDelete: Cascade)
 
-  /// Consumer visibility state per ADR-005.
-  /// ELIGIBLE = visible in consumer search, alerts, watchlists
-  /// INELIGIBLE = hidden from consumers (policy, data quality, etc.)
-  /// SUSPENDED = explicit block, under review
-  visibilityStatus    RetailerVisibility @default(ELIGIBLE)
+  @@index([startedAt], map: "dealer_feed_runs_startedAt_idx")
+  @@index([feedId], map: "merchant_feed_runs_feedId_idx")
+  @@index([feedId])
+  @@index([retailerId])
+}
+
+model retailer_feed_test_runs {
+  id               String         @id(map: "dealer_feed_test_runs_pkey")
+  feedId           String
+  sampleSize       Int            @default(50)
+  status           TestRunStatus
+  recordsParsed    Int            @default(0)
+  wouldIndex       Int            @default(0)
+  wouldQuarantine  Int            @default(0)
+  wouldReject      Int            @default(0)
+  warningCount     Int            @default(0)
+  errorCount       Int            @default(0)
+  primaryErrorCode String?
+  errorSamples     Json?
+  coercionSummary  Json?
+  duration         Int?
+  startedAt        DateTime       @default(now())
+  completedAt      DateTime?
+  retailerId       String
+  retailer_feeds   retailer_feeds @relation(fields: [feedId], references: [id], onDelete: Cascade)
+
+  @@index([feedId])
+  @@index([retailerId])
+  @@index([startedAt])
+}
+
+model retailer_feeds {
+  id                      String                    @id(map: "dealer_feeds_pkey")
+  name                    String?
+  url                     String?
+  username                String?
+  password                String?
+  scheduleMinutes         Int                       @default(60)
+  status                  FeedStatus                @default(PENDING)
+  feedHash                String?
+  lastSuccessAt           DateTime?
+  lastFailureAt           DateTime?
+  lastError               String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  accessType              FeedAccessType            @default(URL)
+  enabled                 Boolean                   @default(true)
+  formatType              FeedFormatType            @default(GENERIC)
+  lastRunAt               DateTime?
+  primaryErrorCode        String?
+  retailerId              String?
+  feed_corrections        feed_corrections[]
+  retailer_feed_runs      retailer_feed_runs[]
+  retailer_feed_test_runs retailer_feed_test_runs[]
+  retailers               retailers?                @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  retailer_skus           retailer_skus[]
+
+  @@index([enabled], map: "dealer_feeds_enabled_idx")
+  @@index([retailerId])
+}
+
+model retailer_skus {
+  id               String          @id(map: "dealer_skus_pkey")
+  feedId           String?
+  feedRunId        String?
+  rawTitle         String
+  rawDescription   String?
+  rawPrice         Decimal         @db.Decimal(10, 2)
+  rawUpc           String?
+  rawSku           String?
+  rawCaliber       String?
+  rawGrain         String?
+  rawCase          String?
+  rawBulletType    String?
+  rawBrand         String?
+  rawPackSize      Int?
+  rawInStock       Boolean         @default(true)
+  rawUrl           String?
+  rawImageUrl      String?
+  canonicalSkuId   String?
+  parsedCaliber    String?
+  parsedGrain      Int?
+  parsedPackSize   Int?
+  parsedBulletType String?
+  parsedBrand      String?
+  parseConfidence  Decimal?        @db.Decimal(3, 2)
+  retailerSkuHash  String?
+  isActive         Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime
+  lastSeenAt       DateTime?
+  missingCount     Int             @default(0)
+  productType      String?
+  coercionsApplied Json?
+  retailerId       String?
+  contentHash      String?
+  prices           prices[]
+  retailer_feeds   retailer_feeds? @relation(fields: [feedId], references: [id], map: "dealer_skus_feedId_fkey")
+  retailers        retailers?      @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+
+  @@unique([retailerId, retailerSkuHash])
+  @@index([isActive], map: "dealer_skus_isActive_idx")
+  @@index([feedId])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model retailers {
+  id                  String               @id
+  name                String
+  website             String               @unique
+  logoUrl             String?
+  tier                RetailerTier         @default(STANDARD)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime
+  visibilityStatus    RetailerVisibility   @default(ELIGIBLE)
   visibilityReason    String?
   visibilityUpdatedAt DateTime?
   visibilityUpdatedBy String?
-
-  prices             prices[]
-  sources            sources[]
-  subscriptions      subscriptions[]
-  merchant_retailers merchant_retailers[]
-  retailer_feeds     retailer_feeds[]
-  retailer_skus      retailer_skus[]
-  click_events       click_events[]
+  click_events        click_events[]
+  merchant_retailers  merchant_retailers[]
+  prices              prices[]
+  retailer_feeds      retailer_feeds[]
+  retailer_skus       retailer_skus[]
+  sources             sources[]
+  subscriptions       subscriptions[]
 
   @@index([visibilityStatus])
 }
 
+model source_product_identifiers {
+  id              String         @id @default(dbgenerated("(gen_random_uuid())::text"))
+  sourceProductId String
+  idType          IdentifierType
+  idValue         String
+  namespace       String         @default("")
+  isCanonical     Boolean        @default(false)
+  normalizedValue String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @default(now())
+
+  @@unique([sourceProductId, idType, idValue, namespace], map: "source_product_identifiers_unique")
+  @@index([sourceProductId, isCanonical], map: "source_product_identifiers_canonical")
+  @@index([idType, idValue, namespace], map: "source_product_identifiers_lookup")
+}
+
 model source_product_presence {
-  id                String          @id @default(cuid())
+  id                String          @id
   sourceProductId   String          @unique
   lastSeenAt        DateTime
   lastSeenSuccessAt DateTime?
-  updatedAt         DateTime        @updatedAt
+  updatedAt         DateTime
   source_products   source_products @relation(fields: [sourceProductId], references: [id], onDelete: Cascade)
 
   @@index([lastSeenSuccessAt])
 }
 
 model source_product_seen {
-  id                  String              @id @default(cuid())
+  id                  String              @id
   runId               String
   sourceProductId     String
   createdAt           DateTime            @default(now())
   affiliate_feed_runs affiliate_feed_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
   source_products     source_products     @relation(fields: [sourceProductId], references: [id], onDelete: Cascade)
-  // REMOVED: @@index([runId]) - redundant, covered by unique([runId, sourceProductId])
 
   @@unique([runId, sourceProductId])
 }
 
-/// One row per product per source. Contains product attributes.
-/// Identifiers now live in source_product_identifiers child table.
-/// Identity mapping lives in product_links table (Spec v1.2).
 model source_products {
-  id       String @id @default(cuid())
-  sourceId String
+  id                       String                     @id
+  sourceId                 String
+  title                    String
+  url                      String
+  imageUrl                 String?
+  normalizedUrl            String?
+  createdByRunId           String?
+  lastUpdatedByRunId       String?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime
+  productId                String?
+  brand                    String?
+  description              String?
+  category                 String?
+  normalizedHash           String?
+  identityKey              String?
+  caliber                  String?
+  grainWeight              Int?
+  roundCount               Int?
+  brandNorm                String?
+  click_events             click_events[]
+  prices                   prices[]
+  product_links            product_links?
+  product_resolve_requests product_resolve_requests[]
+  source_product_presence  source_product_presence?
+  source_product_seen      source_product_seen[]
+  sources                  sources                    @relation(fields: [sourceId], references: [id])
 
-  // Product attributes
-  title         String
-  url           String
-  imageUrl      String?
-  brand         String?
-  brandNorm     String? // Normalized brand for alias matching and impact estimation
-  description   String?
-  category      String?
-  caliber       String?
-  grainWeight   Int?
-  roundCount    Int?
-  normalizedUrl String?
-
-  // Legacy: Direct product linkage (deprecated, use product_links instead)
-  // Kept for backward compatibility during migration
-  productId String?
-
-  // Run tracking
-  createdByRunId     String?
-  lastUpdatedByRunId String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Product Resolver fields (Spec v1.2 §0.1)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /// Hash of normalized input fields for reconciliation trigger detection.
-  /// Per Spec v1.2 §6: Resolver compares this against prior inputHash.
-  normalizedHash String?
-
-  /// Canonical identity key for this source product.
-  /// Namespaced string: "upc:12345678901", "sku:ABC123", "urlhash:deadbeef"
-  /// Precedence: UPC > SKU > URL hash. Used for idempotency and dedup.
-  identityKey String?
-
-  // Relations
-  prices                     prices[]
-  source_product_presence    source_product_presence?
-  source_product_seen        source_product_seen[]
-  source_product_identifiers source_product_identifiers[]
-  sources                    sources                      @relation(fields: [sourceId], references: [id])
-  products                   products?                    @relation(fields: [productId], references: [id])
-  product_links              product_links?
-  product_resolve_requests   product_resolve_requests[]
-  click_events               click_events[]
-
-  @@index([productId])
-  @@index([sourceId])
+  @@index([brandNorm, createdAt])
+  @@index([identityKey])
   @@index([normalizedHash])
-  @@index([identityKey]) // For dedupe and idempotency lookups
-  @@index([brandNorm, createdAt]) // For brand alias impact estimation
-}
-
-/// All identifiers observed for a source product.
-/// Supports multiple identifier types per product (SKU, UPC, network IDs, etc.)
-/// One identifier is marked canonical for upsert/dedupe purposes.
-model source_product_identifiers {
-  id              String         @id @default(cuid())
-  sourceProductId String
-  idType          IdentifierType
-  idValue         String
-  /// Namespace for scoping: network name (IMPACT, AVANTLINK), retailer ID, etc.
-  /// Required for NETWORK_ITEM_ID, MERCHANT_SKU. Empty string for universal codes (UPC, EAN).
-  namespace       String         @default("")
-  /// Exactly one identifier per source_product should be canonical (used for upsert matching)
-  isCanonical     Boolean        @default(false)
-  /// Normalized value for consistent matching (trimmed, uppercased where appropriate)
-  normalizedValue String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-
-  source_products source_products @relation(fields: [sourceProductId], references: [id], onDelete: Cascade)
-
-  // Unique: same identifier can't appear twice for same product
-  @@unique([sourceProductId, idType, idValue, namespace], name: "source_product_identifiers_unique")
-  // Fast lookup by identifier (for find-by-any-identifier upsert)
-  @@index([idType, idValue, namespace], name: "source_product_identifiers_lookup")
-  // Find canonical identifier for a product
-  @@index([sourceProductId, isCanonical], name: "source_product_identifiers_canonical")
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Product Resolver Tables (Spec v1.2)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Product Resolver control plane. Stores all identity decisions.
-/// This is the source of truth for source_product → product linkage.
-/// Per Spec v1.2 §0.0: All product grouping MUST join through this table.
-model product_links {
-  id              String  @id @default(cuid())
-  sourceProductId String  @unique
-  productId       String?
-
-  /// How the link was established
-  matchType       ProductLinkMatchType
-  /// Current resolution status
-  status          ProductLinkStatus
-  /// Why resolution resulted in UNMATCHED or ERROR (null for MATCHED/CREATED)
-  reasonCode      ProductLinkReasonCode?
-  /// Match confidence score (0.0-1.0), deterministic
-  confidence      Decimal                @db.Decimal(5, 4)
-  /// Resolver version that made this decision
-  resolverVersion String
-
-  /// Full audit trail: inputNormalized, inputHash, dictionaryVersion,
-  /// trustConfigVersion, rulesFired, candidates, previousDecision (if relink)
-  evidence Json
-
-  /// When resolver logic last ran (not just row update)
-  resolvedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  // Relations
-  source_products source_products @relation(fields: [sourceProductId], references: [id], onDelete: Cascade)
-  products        products?       @relation(fields: [productId], references: [id], onDelete: SetNull)
-
   @@index([productId])
-  // REMOVED: @@index([status]) - redundant, covered by @@index([status, matchType])
-  @@index([matchType])
-  @@index([status, matchType]) // For filtered queries by resolution state
-  @@index([resolverVersion])
-  @@index([resolvedAt])
-}
-
-/// Brand alias mapping for resolver normalization.
-/// Per brand-aliases-v1 spec: Admin-managed, auditable mapping from brand aliases
-/// to canonical brand names to improve resolver match rates.
-model brand_aliases {
-  id                   String               @id @default(uuid())
-  /// Human-readable canonical brand name
-  canonicalName        String
-  /// Normalized canonical name (for matching)
-  canonicalNorm        String
-  /// Normalization rules version used to compute norms
-  normalizationVersion Int                  @default(1)
-  /// Alias string as entered by admin
-  aliasName            String
-  /// Normalized alias string (for matching)
-  aliasNorm            String               @unique
-  /// Status: DRAFT (not applied), ACTIVE (applied in resolver), DISABLED (soft-deleted)
-  status               BrandAliasStatus     @default(DRAFT)
-  /// Source type: where did this alias come from
-  sourceType           BrandAliasSourceType
-  /// Reference to source (feed name, partner id, or manual note)
-  sourceRef            String?
-  /// Example product IDs or rows that motivated this alias
-  evidence             Json?
-  /// Admin notes for provenance
-  notes                String?
-  /// Timestamps
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  /// Admin user who created this alias
-  createdBy            String
-  /// Admin user who last updated this alias
-  updatedBy            String
-  /// Soft-delete fields
-  disabledAt           DateTime?
-  disabledBy           String?
-  /// Reason for disabling (required when status -> DISABLED)
-  /// Prefix with "REJECTED:" to block re-activation
-  disableReason        String?
-
-  /// Daily application tracking
-  applications brand_alias_applications_daily[]
-
-  @@index([canonicalNorm])
-  @@index([status])
-  @@index([createdAt])
-}
-
-/// Daily application counts for brand aliases.
-/// Per brand-aliases-v1 spec: Track impact for investigations and review.
-model brand_alias_applications_daily {
-  aliasId   String
-  date      DateTime @db.Date
-  count     Int      @default(0)
-  updatedAt DateTime @updatedAt
-
-  brand_aliases brand_aliases @relation(fields: [aliasId], references: [id], onDelete: Cascade)
-
-  @@id([aliasId, date])
-  @@index([date])
-  @@index([aliasId])
-}
-
-/// Alias mapping for canonical product merges.
-/// Allows product consolidation without rewriting history.
-/// Per Spec v1.2 §0.1: Resolver MUST resolve through aliases before persisting links.
-model product_aliases {
-  id            String   @id @default(cuid())
-  /// Product being aliased (merged away)
-  fromProductId String   @unique
-  /// Target product (winner of merge)
-  toProductId   String
-  /// Why the merge happened
-  reason        String
-  createdAt     DateTime @default(now())
-  createdBy     String?
-
-  // Relations - both point to products table
-  // Note: fromProduct is the "loser" that should not be used directly
-  fromProduct products @relation("AliasFrom", fields: [fromProductId], references: [id], onDelete: Restrict)
-  toProduct   products @relation("AliasTo", fields: [toProductId], references: [id], onDelete: Restrict)
-
-  @@index([toProductId])
-}
-
-/// Tracks product resolution requests for intent, dedup, and retries.
-/// Separate from product_links (which tracks outcomes).
-/// Per Spec: idempotencyKey = sourceId + ":" + identityKey
-model product_resolve_requests {
-  id String @id @default(cuid())
-
-  /// sourceId + ":" + identityKey (e.g., "src123:upc:012345678901")
-  idempotencyKey  String @unique
-  sourceProductId String
-  sourceId        String
-
-  /// Current status of this request
-  status ProductResolveRequestStatus @default(PENDING)
-
-  /// Number of processing attempts
-  attempts      Int       @default(0)
-  /// Last attempt timestamp
-  lastAttemptAt DateTime?
-  /// Error message if FAILED
-  errorMessage  String?
-
-  /// Resulting productId if created/matched (denormalized for quick lookup)
-  resultProductId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  source_products source_products @relation(fields: [sourceProductId], references: [id], onDelete: Cascade)
-  sources         sources         @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  products        products?       @relation(fields: [resultProductId], references: [id], onDelete: SetNull)
-
-  @@index([sourceProductId])
   @@index([sourceId])
-  // REMOVED: @@index([status]) - redundant, covered by @@index([status, updatedAt])
-  @@index([createdAt])
-  @@index([status, updatedAt]) // For worker polling queries
 }
 
-/// Per-source trust configuration for identifier eligibility.
-/// Per Spec v1.2 §0.1: Resolver uses this to determine if UPC is trusted.
 model source_trust_config {
-  id         String   @id @default(cuid())
+  id         String   @id
   sourceId   String   @unique
-  /// Whether UPC codes from this source are trusted for canonical matching
   upcTrusted Boolean  @default(false)
-  /// Config version, incremented on every change, recorded in link evidence
   version    Int      @default(1)
-  updatedAt  DateTime @updatedAt
+  updatedAt  DateTime
   updatedBy  String?
-
-  sources sources @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  sources    sources  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 }
 
 model sources {
-  id                        String                     @id @default(cuid())
+  id                        String                     @id
   name                      String
   url                       String
   type                      SourceType                 @default(HTML)
@@ -1179,7 +946,7 @@ model sources {
   affiliateNetwork          AffiliateNetwork?
   feedHash                  String?
   createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime                   @updatedAt
+  updatedAt                 DateTime
   retailerId                String
   affiliateAccountId        String?
   affiliateAccountName      String?
@@ -1190,19 +957,19 @@ model sources {
   isDisplayPrimary          Boolean                    @default(false)
   sourceKind                SourceKind                 @default(DIRECT)
   affiliate_feeds           affiliate_feeds[]
-  executions                executions[]
-  source_products           source_products[]
-  prices                    prices[]
-  retailers                 retailers                  @relation(fields: [retailerId], references: [id])
-  source_trust_config       source_trust_config?
-  product_resolve_requests  product_resolve_requests[]
   click_events              click_events[]
+  executions                executions[]
+  prices                    prices[]
+  product_resolve_requests  product_resolve_requests[]
+  source_products           source_products[]
+  source_trust_config       source_trust_config?
+  retailers                 retailers                  @relation(fields: [retailerId], references: [id])
 
   @@index([retailerId], map: "sources_retailer_id_idx")
 }
 
 model subscriptions {
-  id         String             @id @default(cuid())
+  id         String             @id
   userId     String?
   retailerId String?
   type       SubscriptionType
@@ -1217,15 +984,15 @@ model subscriptions {
 }
 
 model system_settings {
-  key         String   @id @default(cuid())
+  key         String   @id
   value       Json
   description String?
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime
   updatedBy   String?
 }
 
 model users {
-  id                    String                  @id @default(cuid())
+  id                    String                  @id
   email                 String                  @unique
   name                  String?
   image                 String?
@@ -1233,7 +1000,7 @@ model users {
   emailVerified         DateTime?
   tier                  UserTier                @default(FREE)
   createdAt             DateTime                @default(now())
-  updatedAt             DateTime                @updatedAt
+  updatedAt             DateTime
   deletionRequestedAt   DateTime?
   deletionScheduledFor  DateTime?
   status                UserStatus              @default(ACTIVE)
@@ -1243,75 +1010,76 @@ model users {
   data_subscriptions    data_subscriptions[]
   product_reports       product_reports[]
   subscriptions         subscriptions[]
+  user_guns             user_guns[]
   watchlist_collections watchlist_collections[]
   watchlist_items       watchlist_items[]
 }
 
+/// Gun Locker - stores guns a user owns for deal personalization
+model user_guns {
+  id        String   @id
+  userId    String
+  caliber   String   // Canonical caliber value from CaliberEnum
+  nickname  String?
+  createdAt DateTime @default(now())
+  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model watchlist_collections {
-  id              String            @id @default(cuid())
+  id              String            @id
   userId          String
   name            String
   createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  updatedAt       DateTime
   users           users             @relation(fields: [userId], references: [id], onDelete: Cascade)
   watchlist_items watchlist_items[]
 
   @@index([userId])
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// ADR-011A: Intent-Ready Saved Items (WatchlistItem Resolver Seam)
-/// Supports SKU intent (v1) with schema-level preparation for future SEARCH intent.
-/// See context/decisions/ADR-017-Intent-Ready-Saved-Items.md for full specification.
 model watchlist_items {
-  id           String   @id @default(cuid())
-  userId       String
-  productId    String? /// Nullable for future SEARCH intent; v1 enforces non-null for SKU
-  collectionId String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                            String                 @id
+  userId                        String
+  productId                     String?
+  collectionId                  String?
+  createdAt                     DateTime               @default(now())
+  updatedAt                     DateTime
+  notificationsEnabled          Boolean                @default(true)
+  priceDropEnabled              Boolean                @default(true)
+  backInStockEnabled            Boolean                @default(true)
+  minDropPercent                Int                    @default(5)
+  minDropAmount                 Decimal                @default(5.0) @db.Decimal(10, 2)
+  stockAlertCooldownHours       Int                    @default(24)
+  lastStockNotifiedAt           DateTime?
+  lastPriceNotifiedAt           DateTime?
+  intent_type                   String                 @default("SKU")
+  query_snapshot                Json?
+  deleted_at                    DateTime?              @db.Timestamp(6)
+  price_notification_claimed_at DateTime?
+  price_notification_claim_key  String?
+  stock_notification_claimed_at DateTime?
+  stock_notification_claim_key  String?
+  alerts                        alerts[]
+  watchlist_collections         watchlist_collections? @relation(fields: [collectionId], references: [id])
+  products                      products?              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  users                         users                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  /// ADR-011A: Intent-ready fields
-  intentType    String    @default("SKU") @map("intent_type")
-  querySnapshot Json?     @map("query_snapshot") /// For future SEARCH intent
-  deletedAt     DateTime? @map("deleted_at") /// Soft delete timestamp
-
-  /// Notification preferences (per ADR-011)
-  notificationsEnabled    Boolean   @default(true)
-  priceDropEnabled        Boolean   @default(true)
-  backInStockEnabled      Boolean   @default(true)
-  minDropPercent          Int       @default(5)
-  minDropAmount           Decimal   @default(5.0) @db.Decimal(10, 2)
-  stockAlertCooldownHours Int       @default(24)
-  lastStockNotifiedAt     DateTime?
-  lastPriceNotifiedAt     DateTime?
-
-  /// Two-phase notification claim fields (prevents duplicate sends under concurrency)
-  /// Claim is stale after 5 minutes (allows retry if worker crashes)
-  priceNotificationClaimedAt DateTime? @map("price_notification_claimed_at")
-  priceNotificationClaimKey  String?   @map("price_notification_claim_key")
-  stockNotificationClaimedAt DateTime? @map("stock_notification_claimed_at")
-  stockNotificationClaimKey  String?   @map("stock_notification_claim_key")
-
-  /// Relations
-  alerts                alerts[]
-  watchlist_collections watchlist_collections? @relation(fields: [collectionId], references: [id])
-  products              products?              @relation(fields: [productId], references: [id], onDelete: Cascade)
-  users                 users                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Note: Uniqueness for active SKU items enforced by PARTIAL unique index in migration:
-  // CREATE UNIQUE INDEX watchlist_items_sku_active_uniq ON watchlist_items (user_id, product_id)
-  //   WHERE intent_type = 'SKU' AND deleted_at IS NULL AND product_id IS NOT NULL;
-  // Prisma doesn't support partial indexes in schema, so this is managed via raw SQL migration.
-  // See ADR-011A Section 19.1
   @@index([collectionId])
+  @@index([deleted_at])
+  @@index([intent_type])
   @@index([productId])
   @@index([userId])
-  @@index([deletedAt], map: "watchlist_items_deleted_at_idx")
-  @@index([intentType], map: "watchlist_items_intent_type_idx")
 }
 
-// DELETED: AdType enum (unused after advertisements model removed)
+enum AdType {
+  DISPLAY
+  SPONSORED_PRODUCT
+  BANNER
+}
 
 enum AffiliateFeedRunStatus {
   RUNNING
@@ -1342,18 +1110,6 @@ enum AffiliateNetwork {
   RAKUTEN
 }
 
-enum BrandAliasSourceType {
-  RETAILER_FEED
-  AFFILIATE_FEED
-  MANUAL
-}
-
-enum BrandAliasStatus {
-  DRAFT
-  ACTIVE
-  DISABLED
-}
-
 enum AlertRuleType {
   PRICE_DROP
   BACK_IN_STOCK
@@ -1365,8 +1121,23 @@ enum AlertType {
   NEW_PRODUCT
 }
 
-// DELETED: BenchmarkConfidence enum (benchmark subsystem removed for v1)
-// DELETED: BenchmarkSource enum (benchmark subsystem removed for v1)
+enum BenchmarkConfidence {
+  HIGH
+  MEDIUM
+  NONE
+}
+
+enum BrandAliasSourceType {
+  RETAILER_FEED
+  AFFILIATE_FEED
+  MANUAL
+}
+
+enum BrandAliasStatus {
+  DRAFT
+  ACTIVE
+  DISABLED
+}
 
 enum BulletType {
   JHP
@@ -1414,114 +1185,6 @@ enum DataSource {
   UNKNOWN
 }
 
-enum MerchantContactRole {
-  PRIMARY
-  BILLING
-  TECHNICAL
-  MARKETING
-  OTHER
-}
-
-enum MerchantPaymentMethod {
-  STRIPE
-  PURCHASE_ORDER
-}
-
-enum MerchantStatus {
-  PENDING
-  ACTIVE
-  SUSPENDED
-}
-
-enum MerchantSubscriptionStatus {
-  ACTIVE
-  EXPIRED
-  SUSPENDED
-  CANCELLED
-}
-
-enum MerchantTier {
-  FOUNDING
-  BASIC
-  PRO
-  ENTERPRISE
-}
-
-enum MerchantUserRole {
-  OWNER
-  ADMIN
-  MEMBER
-  VIEWER
-}
-
-/// Status of a merchant-retailer relationship
-enum MerchantRetailerStatus {
-  /// Active relationship, merchant can manage retailer
-  ACTIVE
-  /// Relationship pending approval
-  PENDING
-  /// Relationship suspended
-  SUSPENDED
-  /// Relationship terminated
-  INACTIVE
-}
-
-/// Listing status for consumer visibility (paid entitlement).
-/// Per Merchant-and-Retailer-Reference: Merchant pays to list each retailer.
-enum MerchantRetailerListingStatus {
-  /// Retailer is listed and visible to consumers (if also ELIGIBLE)
-  LISTED
-  /// Retailer is unlisted, hidden from consumers
-  UNLISTED
-}
-
-/// Role for a merchant user on a specific retailer
-enum MerchantRetailerRole {
-  /// Full access to retailer management
-  ADMIN
-  /// Can edit feeds and data
-  EDITOR
-  /// Read-only access
-  VIEWER
-}
-
-/// ADR-015: Type of ingestion run for price provenance tracking
-enum IngestionRunType {
-  /// Scraped from retailer website via executions
-  SCRAPE
-  /// From affiliate feed via affiliate_feed_runs
-  AFFILIATE_FEED
-  /// From merchant portal feed via retailer_feed_runs (legacy: dealer_feed_runs)
-  RETAILER_FEED
-  /// Manual entry or import
-  MANUAL
-}
-
-/// ADR-015: Scope types for price corrections
-/// Precedence: PRODUCT > RETAILER > MERCHANT > SOURCE > AFFILIATE > FEED_RUN
-enum PriceCorrectionScopeType {
-  /// Correction applies to a specific product
-  PRODUCT
-  /// Correction applies to all prices from a retailer
-  RETAILER
-  /// Correction applies to all prices from a merchant
-  MERCHANT
-  /// Correction applies to all prices from a source
-  SOURCE
-  /// Correction applies to all prices from an affiliate
-  AFFILIATE
-  /// Correction applies to all prices from a specific feed run
-  FEED_RUN
-}
-
-/// ADR-015: Actions for price corrections
-enum PriceCorrectionAction {
-  /// Exclude matching prices from all user-visible queries
-  IGNORE
-  /// Apply a multiplier to matching prices (visible_price = raw_price * value)
-  MULTIPLIER
-}
-
 enum ExecutionStatus {
   PENDING
   RUNNING
@@ -1544,18 +1207,6 @@ enum FeedCompression {
 
 enum FeedFormat {
   CSV
-}
-
-/// Feed variant for supporting multiple feeds per source
-/// Used with affiliate_feeds to distinguish full vs delta, regional splits, etc.
-enum FeedVariant {
-  FULL // Complete catalog refresh
-  DELTA // Incremental updates only
-  REGIONAL_US // US-specific catalog
-  REGIONAL_CA // Canada-specific catalog
-  REGIONAL_EU // EU-specific catalog
-  CATEGORY_AMMO // Ammo-only feed
-  CATEGORY_ACCESSORIES // Accessories-only feed
 }
 
 enum FeedFormatType {
@@ -1586,8 +1237,36 @@ enum FeedTransport {
   SFTP
 }
 
-// DELETED: InsightConfidence enum (benchmark subsystem removed for v1)
-// DELETED: InsightType enum (benchmark subsystem removed for v1)
+enum FeedVariant {
+  FULL
+  DELTA
+  REGIONAL_US
+  REGIONAL_CA
+  REGIONAL_EU
+  CATEGORY_AMMO
+  CATEGORY_ACCESSORIES
+}
+
+enum IdentifierType {
+  SKU
+  UPC
+  EAN
+  GTIN
+  MPN
+  ASIN
+  URL
+  URL_HASH
+  NETWORK_ITEM_ID
+  MERCHANT_SKU
+  INTERNAL_ID
+}
+
+enum IngestionRunType {
+  SCRAPE
+  AFFILIATE_FEED
+  RETAILER_FEED
+  MANUAL
+}
 
 enum LogLevel {
   INFO
@@ -1595,7 +1274,63 @@ enum LogLevel {
   ERROR
 }
 
-// DELETED: MappingConfidence enum (benchmark subsystem removed for v1)
+enum MerchantContactRole {
+  PRIMARY
+  BILLING
+  TECHNICAL
+  MARKETING
+  OTHER
+}
+
+enum MerchantPaymentMethod {
+  STRIPE
+  PURCHASE_ORDER
+}
+
+enum MerchantRetailerListingStatus {
+  LISTED
+  UNLISTED
+}
+
+enum MerchantRetailerRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum MerchantRetailerStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  INACTIVE
+}
+
+enum MerchantStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum MerchantSubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  CANCELLED
+}
+
+enum MerchantTier {
+  FOUNDING
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum MerchantUserRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
 
 enum PressureRating {
   STANDARD
@@ -1603,6 +1338,20 @@ enum PressureRating {
   PLUS_P_PLUS
   NATO
   UNKNOWN
+}
+
+enum PriceCorrectionAction {
+  IGNORE
+  MULTIPLIER
+}
+
+enum PriceCorrectionScopeType {
+  PRODUCT
+  RETAILER
+  MERCHANT
+  SOURCE
+  AFFILIATE
+  FEED_RUN
 }
 
 enum PriceType {
@@ -1621,15 +1370,64 @@ enum ProductIssueType {
   OTHER
 }
 
-enum QuarantineStatus {
-  QUARANTINED
-  RESOLVED
-  DISMISSED
+enum ProductLinkMatchType {
+  UPC
+  FINGERPRINT
+  MANUAL
+  NONE
+  ERROR
+}
+
+enum ProductLinkReasonCode {
+  INSUFFICIENT_DATA
+  INVALID_UPC
+  UPC_NOT_TRUSTED
+  AMBIGUOUS_FINGERPRINT
+  CONFLICTING_IDENTIFIERS
+  MANUAL_LOCKED
+  RELINK_BLOCKED_HYSTERESIS
+  SYSTEM_ERROR
+  NORMALIZATION_FAILED
+}
+
+enum ProductLinkStatus {
+  MATCHED
+  CREATED
+  UNMATCHED
+  NEEDS_REVIEW
+  ERROR
+  SKIPPED
+}
+
+enum ProductResolveRequestStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ProductSuggestionSourceType {
+  MERCHANT
+  AFFILIATE
+  INTERNAL
+}
+
+enum ProductSuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  MERGED
 }
 
 enum QuarantineFeedType {
   RETAILER
   AFFILIATE
+}
+
+enum QuarantineStatus {
+  QUARANTINED
+  RESOLVED
+  DISMISSED
 }
 
 enum ReportStatus {
@@ -1644,15 +1442,9 @@ enum RetailerTier {
   PREMIUM
 }
 
-/// Retailer visibility state for consumer-facing queries.
-/// Per ADR-005: Eligibility applies to Retailer visibility only.
-/// This is the authoritative source for consumer visibility filtering.
 enum RetailerVisibility {
-  /// Retailer is visible in consumer search, alerts, watchlists
   ELIGIBLE
-  /// Retailer is hidden from consumers (policy, data quality, etc.)
   INELIGIBLE
-  /// Retailer is suspended (explicit block, under review)
   SUSPENDED
 }
 
@@ -1668,29 +1460,6 @@ enum SourceKind {
   DIRECT
   AFFILIATE_FEED
   OTHER
-}
-
-/// Comprehensive identifier types for source_product_identifiers
-/// Supports all affiliate networks, retailer feeds, and standard product codes
-enum IdentifierType {
-  // Standard product codes
-  SKU // Retailer-specific stock keeping unit
-  UPC // Universal Product Code (12-digit)
-  EAN // European Article Number (13-digit)
-  GTIN // Global Trade Item Number (8, 12, 13, or 14 digit)
-  MPN // Manufacturer Part Number
-  ASIN // Amazon Standard Identification Number
-
-  // URL-based identifiers
-  URL // Canonical product URL
-  URL_HASH // Hash of normalized URL (fallback identity)
-
-  // Network-specific identifiers (use with namespace)
-  NETWORK_ITEM_ID // Affiliate network's item ID (namespace: IMPACT, AVANTLINK, etc.)
-  MERCHANT_SKU // Merchant-provided SKU (namespace: retailer ID)
-
-  // Internal identifiers
-  INTERNAL_ID // IronScout-generated identifier
 }
 
 enum SourceType {
@@ -1734,75 +1503,4 @@ enum UserStatus {
 enum UserTier {
   FREE
   PREMIUM
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Product Resolver Enums (Spec v1.2)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Match type for product_links. Determines how a source_product was linked to a canonical product.
-enum ProductLinkMatchType {
-  /// Matched via trusted UPC code
-  UPC
-  /// Matched via fingerprint scoring (brand, caliber, pack, grain, title)
-  FINGERPRINT
-  /// Manually linked by admin/operator
-  MANUAL
-  /// No match found (data insufficient or ambiguous)
-  NONE
-  /// Resolution failed with system error
-  ERROR
-}
-
-/// Status of a product_links resolution.
-enum ProductLinkStatus {
-  /// Linked to existing canonical product
-  MATCHED
-  /// Created new canonical product and linked
-  CREATED
-  /// @deprecated Use NEEDS_REVIEW instead. Kept for backward compatibility with existing data.
-  /// Will be migrated to NEEDS_REVIEW in future cleanup.
-  UNMATCHED
-  /// Awaiting human review (insufficient data, ambiguous match, or flagged)
-  /// This is the correct terminal state for "could not decide" cases.
-  NEEDS_REVIEW
-  /// Manually skipped by admin during review (deferred, not actionable, etc.)
-  /// Terminal state - removed from active review queue.
-  SKIPPED
-  /// Resolution failed with system error
-  ERROR
-}
-
-/// Reason codes for UNMATCHED or ERROR status in product_links.
-enum ProductLinkReasonCode {
-  /// Missing required fields for any match strategy
-  INSUFFICIENT_DATA
-  /// UPC present but invalid format
-  INVALID_UPC
-  /// UPC present but source is not trusted for UPC
-  UPC_NOT_TRUSTED
-  /// Fingerprint score in ambiguous range or too close to second-best
-  AMBIGUOUS_FINGERPRINT
-  /// Match candidate has conflicting immutable identifiers
-  CONFLICTING_IDENTIFIERS
-  /// Existing link is MANUAL and cannot be overridden
-  MANUAL_LOCKED
-  /// Relink blocked by hysteresis (confidence delta too small)
-  RELINK_BLOCKED_HYSTERESIS
-  /// System error during resolution (DB, timeout, etc.)
-  SYSTEM_ERROR
-  /// All normalization attempts failed
-  NORMALIZATION_FAILED
-}
-
-/// Status of a product resolve request.
-enum ProductResolveRequestStatus {
-  /// Queued, waiting to be processed
-  PENDING
-  /// Currently being processed
-  PROCESSING
-  /// Successfully resolved (see product_links for outcome)
-  COMPLETED
-  /// Failed to process (see errorMessage)
-  FAILED
 }
