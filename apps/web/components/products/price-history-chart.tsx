@@ -237,7 +237,7 @@ export function PriceHistoryChart({ productId, isPremium: _isPremium }: PriceHis
               />
               <Tooltip
                 formatter={(value) => [`$${typeof value === 'number' ? value.toFixed(2) : value}`, 'Price']}
-                labelFormatter={(label: string) => `Date: ${label}`}
+                labelFormatter={(label) => `Date: ${label}`}
                 contentStyle={{
                   backgroundColor: 'hsl(var(--popover))',
                   border: '1px solid hsl(var(--border))',

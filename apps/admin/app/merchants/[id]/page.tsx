@@ -22,7 +22,7 @@ import { RetailersSection } from './retailers-section';
 
 export const dynamic = 'force-dynamic';
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; color: string }> = {
   PENDING: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700' },
   ACTIVE: { label: 'Active', color: 'bg-green-100 text-green-700' },
   SUSPENDED: { label: 'Suspended', color: 'bg-red-100 text-red-700' },

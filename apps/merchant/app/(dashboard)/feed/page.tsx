@@ -28,7 +28,7 @@ export default async function FeedPage() {
 
   let feed: {
     id: string;
-    accessType: 'URL' | 'AUTH_URL' | 'FTP' | 'SFTP';
+    accessType: 'URL' | 'AUTH_URL' | 'FTP' | 'SFTP' | 'UPLOAD';
     formatType: 'AMMOSEEK_V1' | 'GUNENGINE_V2';
     url: string | null;
     username: string | null;
