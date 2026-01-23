@@ -6,8 +6,7 @@ import { SearchResultCard } from './search-result-card'
 import { SearchResultRow } from './search-result-row'
 import { ResultCardSkeleton } from './result-card'
 import { ResultTableHeader, ResultRowSkeleton, type GridSort } from './result-row'
-import { AdCard } from '@/components/ads/ad-card'
-import type { Product, Advertisement } from '@/lib/api'
+import type { Product } from '@/lib/api'
 import { getSavedItems } from '@/lib/api'
 import { useSession } from 'next-auth/react'
 import { useViewPreference } from '@/hooks/use-view-preference'
@@ -18,9 +17,6 @@ const logger = createLogger('search-results-grid')
 
 interface SearchResultsGridProps {
   products: Product[]
-  ads?: Advertisement[]
-  /** Mix ads every N products (card view only) */
-  adInterval?: number
 }
 
 /**
@@ -60,8 +56,6 @@ function getProductPriceData(product: Product) {
  */
 export function SearchResultsGrid({
   products,
-  ads = [],
-  adInterval = 4,
 }: SearchResultsGridProps) {
   const { data: session } = useSession()
   const isE2E = process.env.NEXT_PUBLIC_E2E_TEST_MODE === 'true'
@@ -208,19 +202,6 @@ export function SearchResultsGrid({
     }).length
   }, [products])
 
-  // Mix ads into products (card view only)
-  const mixedResults: Array<{ type: 'product' | 'ad'; data: Product | Advertisement }> = []
-  let adIndex = 0
-
-  products.forEach((product, index) => {
-    mixedResults.push({ type: 'product', data: product })
-
-    if ((index + 1) % adInterval === 0 && adIndex < ads.length) {
-      mixedResults.push({ type: 'ad', data: ads[adIndex] })
-      adIndex++
-    }
-  })
-
   const hasBestPrice = bestPriceProductId !== null
 
   return (
@@ -248,18 +229,14 @@ export function SearchResultsGrid({
       {viewMode === 'card' ? (
         // Card View - Discovery mode
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
-          {mixedResults.map((item, index) => (
-            <div key={`${item.type}-${index}`} className="h-full">
-              {item.type === 'product' ? (
-                <SearchResultCard
-                  product={item.data as Product}
-                  isTracked={trackedIds.has((item.data as Product).id)}
-                  isBestPrice={(item.data as Product).id === bestPriceProductId}
-                  onTrackChange={handleTrackChange}
-                />
-              ) : (
-                <AdCard ad={item.data as Advertisement} />
-              )}
+          {products.map((product) => (
+            <div key={product.id} className="h-full">
+              <SearchResultCard
+                product={product}
+                isTracked={trackedIds.has(product.id)}
+                isBestPrice={product.id === bestPriceProductId}
+                onTrackChange={handleTrackChange}
+              />
             </div>
           ))}
         </div>

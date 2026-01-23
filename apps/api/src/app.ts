@@ -23,7 +23,6 @@ import { requestContextMiddleware } from './middleware/request-context'
 import { requestLoggerMiddleware, errorLoggerMiddleware } from './middleware/request-logger'
 import { validateAllLensDefinitions } from './services/lens'
 import { productsRouter } from './routes/products'
-import { adsRouter } from './routes/ads'
 import { alertsRouter } from './routes/alerts'
 import { paymentsRouter } from './routes/payments'
 import { dataRouter } from './routes/data'
@@ -147,7 +146,6 @@ const maintenanceMiddleware = async (req: Request, res: Response, next: NextFunc
 app.use(maintenanceMiddleware)
 
 app.use('/api/products', productsRouter)
-app.use('/api/ads', adsRouter)
 app.use('/api/alerts', alertsRouter)
 app.use('/api/payments', paymentsRouter)
 app.use('/api/data', dataRouter)

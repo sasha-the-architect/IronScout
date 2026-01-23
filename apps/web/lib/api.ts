@@ -176,16 +176,6 @@ export interface Retailer {
   logoUrl?: string
 }
 
-export interface Advertisement {
-  id: string
-  title: string
-  description: string
-  imageUrl?: string
-  targetUrl: string
-  adType: 'DISPLAY' | 'SPONSORED_PRODUCT' | 'BANNER'
-  priority: number
-}
-
 export interface SearchParams {
   q: string
   category?: string
@@ -208,12 +198,6 @@ export interface SearchResponse {
   }
 }
 
-export interface AdsResponse {
-  ads: Advertisement[]
-  placement: string
-  category?: string
-}
-
 export async function searchProducts(params: SearchParams): Promise<SearchResponse> {
   const searchParams = new URLSearchParams()
   Object.entries(params).forEach(([key, value]) => {
@@ -223,21 +207,6 @@ export async function searchProducts(params: SearchParams): Promise<SearchRespon
   const response = await fetch(`${API_BASE_URL}/api/products/search?${searchParams}`)
   if (!response.ok) {
     throw new Error('Failed to search products')
-  }
-  return response.json()
-}
-
-export async function getAds(placement: string = 'middle', category?: string): Promise<AdsResponse> {
-  if (E2E_TEST_MODE) {
-    return { ads: [], placement, category }
-  }
-
-  const searchParams = new URLSearchParams({ position: placement })
-  if (category) searchParams.append('category', category)
-
-  const response = await fetch(`${API_BASE_URL}/api/ads/placement?${searchParams}`)
-  if (!response.ok) {
-    throw new Error('Failed to fetch ads')
   }
   return response.json()
 }

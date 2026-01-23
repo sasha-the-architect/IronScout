@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth'
-import { aiSearch, getAds, AISearchResponse, ExplicitFilters } from '@/lib/api'
+import { aiSearch, AISearchResponse, ExplicitFilters } from '@/lib/api'
 import { SearchResultsGrid } from '@/components/results'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Search, Bell, TrendingDown } from 'lucide-react'
@@ -87,20 +87,16 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
   }
 
   try {
-    const [searchData, adsData] = await Promise.all([
-      aiSearch({
-        query,
-        page,
-        limit: 20,
-        sortBy: sortBy as any,
-        token: accessToken,
-        filters: hasFilters ? explicitFilters : undefined,
-      }),
-      getAds('middle', searchParams.category)
-    ])
+    const searchData = await aiSearch({
+      query,
+      page,
+      limit: 20,
+      sortBy: sortBy as any,
+      token: accessToken,
+      filters: hasFilters ? explicitFilters : undefined,
+    })
 
     const { products, pagination, intent, searchMetadata, _meta } = searchData as AISearchResponse & { _meta?: any }
-    const { ads } = adsData
 
     if (products.length === 0) {
       return (
@@ -168,7 +164,7 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
           )}
 
           {/* Results Grid - using new ResultCard component */}
-          <SearchResultsGrid products={products} ads={ads} adInterval={4} />
+          <SearchResultsGrid products={products} />
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
