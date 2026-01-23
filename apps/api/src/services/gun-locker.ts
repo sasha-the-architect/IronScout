@@ -129,6 +129,7 @@ export interface Gun {
 
 /**
  * Get all guns in user's Gun Locker
+ * Per spec: Output MUST use canonical caliber enum values
  */
 export async function getGuns(userId: string): Promise<Gun[]> {
   const guns = await prisma.user_guns.findMany({
@@ -136,12 +137,16 @@ export async function getGuns(userId: string): Promise<Gun[]> {
     orderBy: { createdAt: 'desc' },
   })
 
-  return guns.map((g) => ({
-    id: g.id,
-    caliber: g.caliber as CaliberValue,
-    nickname: g.nickname,
-    createdAt: g.createdAt,
-  }))
+  return guns.map((g) => {
+    // Runtime normalize to ensure canonical output (handles legacy data)
+    const caliber = normalizeCaliber(g.caliber) || (g.caliber as CaliberValue)
+    return {
+      id: g.id,
+      caliber,
+      nickname: g.nickname,
+      createdAt: g.createdAt,
+    }
+  })
 }
 
 /**
@@ -210,6 +215,7 @@ export async function countGuns(userId: string): Promise<number> {
 
 /**
  * Get user's calibers (unique list) for deal personalization
+ * Per spec: Output MUST use canonical caliber enum values
  */
 export async function getUserCalibers(userId: string): Promise<CaliberValue[]> {
   const guns = await prisma.user_guns.findMany({
@@ -218,5 +224,9 @@ export async function getUserCalibers(userId: string): Promise<CaliberValue[]> {
     distinct: ['caliber'],
   })
 
-  return guns.map((g) => g.caliber as CaliberValue)
+  // Runtime normalize to ensure canonical output (handles legacy data)
+  const calibers = guns
+    .map((g) => normalizeCaliber(g.caliber) || (g.caliber as CaliberValue))
+    .filter((c, i, arr) => arr.indexOf(c) === i) // Dedupe after normalization
+  return calibers
 }

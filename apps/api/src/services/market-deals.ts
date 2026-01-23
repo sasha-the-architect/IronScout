@@ -12,6 +12,23 @@
 import { prisma } from '@ironscout/db'
 import { CANONICAL_CALIBERS, normalizeCaliber, type CaliberValue } from './gun-locker'
 
+// ============================================================================
+// CONFIGURATION
+// Per spec: These limits should be documented and configurable
+// ============================================================================
+
+/** Maximum products to evaluate for deals (query limit) */
+const MAX_PRODUCTS_TO_EVALUATE = 500
+
+/** Maximum deals to return in response */
+const MAX_DEALS_RETURNED = 10
+
+/** Minimum price drop percentage to qualify as PRICE_DROP deal */
+const PRICE_DROP_THRESHOLD_PERCENT = 15
+
+/** Minimum price points required for median calculation */
+const MIN_PRICE_POINTS_FOR_MEDIAN = 5
+
 /**
  * Market Deal data contract per spec
  * Note: caliber is non-null because we exclude unmapped calibers
@@ -89,7 +106,7 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
         AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
     )
     SELECT * FROM ranked_prices WHERE rn = 1
-    LIMIT 500
+    LIMIT 500 -- MAX_PRODUCTS_TO_EVALUATE: documented limit to prevent unbounded queries
   `
 
   if (currentPrices.length === 0) {
@@ -231,14 +248,14 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
     let contextLine = ''
 
     // Check ≥15% below 30-day median (need at least 5 price points)
-    if (median && median.priceCount >= 5) {
+    if (median && median.priceCount >= MIN_PRICE_POINTS_FOR_MEDIAN) {
       const medianPrice = parseFloat(median.medianPrice.toString())
       const dropPercent = ((medianPrice - currentPrice) / medianPrice) * 100
 
-      if (dropPercent >= 15) {
+      if (dropPercent >= PRICE_DROP_THRESHOLD_PERCENT) {
         reason = 'PRICE_DROP'
-        // Context line without percentage (to avoid user-facing score)
-        contextLine = 'Below 30-day median'
+        // Per spec: context line states the eligibility threshold (not a ranking score)
+        contextLine = `${PRICE_DROP_THRESHOLD_PERCENT}%+ below 30-day median`
       }
     }
 
@@ -292,7 +309,7 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
   const hero = deals.length > 0 ? deals[0] : null
 
   return {
-    deals: deals.slice(0, 10), // Max 10 deals
+    deals: deals.slice(0, MAX_DEALS_RETURNED),
     hero,
     lastCheckedAt: now.toISOString(),
   }

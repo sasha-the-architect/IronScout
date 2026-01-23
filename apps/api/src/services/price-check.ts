@@ -280,8 +280,16 @@ export interface PriceCheckEvent {
 /**
  * Emit a PriceCheckEvent for analytics
  *
- * STUB: Currently logs to console only
- * TODO: Implement aggregation pipeline per privacy rules
+ * ⚠️ NON-COMPLIANT STUB: Aggregation pipeline not yet implemented
+ *
+ * Per mobile_price_check_v1_spec.md Privacy Rules (ENFORCED):
+ * - NO individual-level persistence of raw enteredPrice
+ * - Aggregation only: Events must be aggregated to caliber-level statistics
+ * - Retention: Raw event logs retained ≤7 days, then purged or aggregated
+ * - No user linking: Events must not be joinable to user identity
+ *
+ * CURRENT STATE: This stub only logs aggregate-safe fields (no enteredPrice).
+ * Full compliance requires implementing the aggregation pipeline.
  *
  * @param event - The PriceCheckEvent data (without user identity)
  */
@@ -289,18 +297,22 @@ export function emitPriceCheckEvent(event: PriceCheckEvent): void {
   // PRIVACY: This function must NEVER receive or store user IDs
   // Any caller providing user identity would violate spec privacy rules
 
-  // Log for debugging (retained ≤7 days per spec)
+  // PRIVACY: Do NOT log enteredPrice - only aggregate-safe fields
+  // enteredPrice is accepted in the interface for future aggregation but NOT logged
   console.log('[PriceCheckEvent]', JSON.stringify({
     caliber: event.caliber,
-    // Note: In production, enteredPrice would be bucketed/anonymized before aggregation
     classification: event.classification,
     hasGunLocker: event.hasGunLocker,
     clickedOffer: event.clickedOffer,
     timestamp: event.timestamp.toISOString(),
+    // NOTE: enteredPrice intentionally omitted from logs per privacy rules
   }))
 
-  // TODO: Implement aggregation pipeline
-  // - Aggregate to caliber-level counts (e.g., "9mm: 150 checks, 45 LOWER, 80 TYPICAL, 25 HIGHER")
-  // - Store only aggregated statistics for long-term retention
-  // - Purge raw event logs after 7 days
+  // TODO: Implement compliant aggregation pipeline
+  // Requirements per spec:
+  // 1. Bucket enteredPrice into ranges (e.g., $0.20-0.25, $0.25-0.30) before aggregation
+  // 2. Aggregate to caliber-level counts (e.g., "9mm: 150 checks, 45 LOWER, 80 TYPICAL, 25 HIGHER")
+  // 3. Store only aggregated statistics for long-term retention
+  // 4. Purge raw event logs after 7 days
+  // 5. Ensure no join path to user identity after aggregation
 }
