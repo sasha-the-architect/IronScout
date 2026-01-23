@@ -37,41 +37,42 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__dirname, '../..')
 
 // Service definitions
+// Note: Using 127.0.0.1 instead of localhost for reliable health checks on Windows
 const SERVICES = [
   {
     name: 'api',
     port: 8000,
     devCommand: 'pnpm --filter @ironscout/api dev',
     prodCommand: 'pnpm --filter @ironscout/api start',
-    healthCheck: 'http://localhost:8000/health',
+    healthCheck: 'http://127.0.0.1:8000/health',
   },
   {
     name: 'web',
     port: 3000,
     devCommand: 'pnpm --filter @ironscout/web dev',
     prodCommand: 'pnpm --filter @ironscout/web start',
-    healthCheck: 'http://localhost:3000',
+    healthCheck: 'http://127.0.0.1:3000',
   },
   {
     name: 'www',
     port: 3004,
     devCommand: 'pnpm --filter @ironscout/www dev',
     prodCommand: null, // Static site - served by CDN in production
-    healthCheck: 'http://localhost:3004',
+    healthCheck: 'http://127.0.0.1:3004',
   },
   {
     name: 'admin',
     port: 3002,
     devCommand: 'pnpm --filter @ironscout/admin dev',
     prodCommand: 'pnpm --filter @ironscout/admin start',
-    healthCheck: 'http://localhost:3002',
+    healthCheck: 'http://127.0.0.1:3002',
   },
   {
     name: 'merchant',
     port: 3003,
     devCommand: 'pnpm --filter @ironscout/merchant dev',
     prodCommand: 'pnpm --filter @ironscout/merchant start',
-    healthCheck: 'http://localhost:3003',
+    healthCheck: 'http://127.0.0.1:3003',
   },
   {
     name: 'harvester',
@@ -85,7 +86,7 @@ const SERVICES = [
     port: 3939,
     devCommand: 'pnpm --filter @ironscout/harvester bullboard:dev',
     prodCommand: 'pnpm --filter @ironscout/harvester bullboard',
-    healthCheck: 'http://localhost:3939/health',
+    healthCheck: 'http://127.0.0.1:3939/health',
   },
 ]
 
