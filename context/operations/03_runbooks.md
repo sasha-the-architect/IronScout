@@ -173,6 +173,29 @@ Examples:
 
 ---
 
+### Runbook: Brand Alias Cache Invalidation Not Applying
+
+**Symptoms**
+- Brand alias activated in admin but not applied to products
+- Brand alias changes appear after a long delay
+
+**Immediate Actions**
+1. Check harvester logs for `Received cache invalidation` - if missing, pub/sub issue
+2. Check harvester logs for `Brand alias cache refreshed` - verify aliasCount
+3. Check Redis connectivity: `redis-cli PUBSUB CHANNELS "brand-alias:*"`
+4. Check feature flag: `RESOLVER_BRAND_ALIASES_ENABLED` must be `true`
+5. Force refresh: Restart harvester or wait for periodic refresh (60s max)
+
+**Verification**
+- New brand alias applied to products
+- Recent refresh log entry shows expected aliasCount
+
+**Follow-Up**
+- If pub/sub is down, note that periodic refresh is the fallback (60s max)
+- If Redis is down, document staleness and restore Redis
+
+---
+
 ### Runbook: API or Search Unavailable
 
 **Symptoms**
