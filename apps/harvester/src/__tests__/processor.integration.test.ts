@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { randomUUID } from 'crypto'
 import { PrismaClient } from '@ironscout/db/generated/prisma'
 
 // Skip if no test database configured
@@ -45,18 +46,22 @@ describeIntegration('Processor Integration Tests', () => {
       // Create test retailer and source
       const retailer = await prisma.retailers.create({
         data: {
+          id: randomUUID(),
           name: `Test Retailer ${Date.now()}`,
           website: `https://test-${Date.now()}.example.com`,
+          updatedAt: new Date(),
         },
       })
 
       const source = await prisma.sources.create({
         data: {
+          id: randomUUID(),
           name: `Test Source ${Date.now()}`,
           url: 'https://test.example.com/feed',
           retailerId: retailer.id,
           type: 'FEED_CSV',
           sourceKind: 'AFFILIATE_FEED',
+          updatedAt: new Date(),
         },
       })
       testSourceId = source.id
@@ -64,9 +69,11 @@ describeIntegration('Processor Integration Tests', () => {
       // Create test source product
       const sourceProduct = await prisma.source_products.create({
         data: {
+          id: randomUUID(),
           sourceId: testSourceId,
           title: 'Test Product',
           url: 'https://test.example.com/product',
+          updatedAt: new Date(),
         },
       })
       testSourceProductId = sourceProduct.id
@@ -109,6 +116,7 @@ describeIntegration('Processor Integration Tests', () => {
       // Create a test feed and run
       const feed = await prisma.affiliate_feeds.create({
         data: {
+          id: randomUUID(),
           sourceId: testSourceId,
           network: 'IMPACT',
           status: 'ENABLED',
@@ -122,11 +130,13 @@ describeIntegration('Processor Integration Tests', () => {
           format: 'CSV',
           compression: 'NONE',
           expiryHours: 48,
+          updatedAt: new Date(),
         },
       })
 
       const run = await prisma.affiliate_feed_runs.create({
         data: {
+          id: randomUUID(),
           feedId: feed.id,
           sourceId: testSourceId,
           trigger: 'MANUAL',
@@ -155,6 +165,7 @@ describeIntegration('Processor Integration Tests', () => {
       // Create test feed and run first
       const feed = await prisma.affiliate_feeds.create({
         data: {
+          id: randomUUID(),
           sourceId: testSourceId,
           network: 'IMPACT',
           status: 'ENABLED',
@@ -168,11 +179,13 @@ describeIntegration('Processor Integration Tests', () => {
           format: 'CSV',
           compression: 'NONE',
           expiryHours: 48,
+          updatedAt: new Date(),
         },
       })
 
       const run = await prisma.affiliate_feed_runs.create({
         data: {
+          id: randomUUID(),
           feedId: feed.id,
           sourceId: testSourceId,
           trigger: 'MANUAL',

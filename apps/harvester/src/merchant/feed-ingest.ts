@@ -188,7 +188,7 @@ function generateMatchKey(title: string, sku?: string): string {
 // WORKER
 // ============================================================================
 
-async function processFeedIngest(job: Job<RetailerFeedIngestJobData>) {
+export async function processFeedIngest(job: Job<RetailerFeedIngestJobData>) {
   const { retailerId, feedId, feedRunId, accessType, formatType, url, username, password, adminOverride, adminId } = job.data
 
   const startTime = Date.now()

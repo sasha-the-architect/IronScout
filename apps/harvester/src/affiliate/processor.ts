@@ -903,6 +903,7 @@ async function batchQuarantineProducts(
         },
       },
       create: {
+        id: createId(),
         feedType: 'AFFILIATE',
         feedId,
         runId,
@@ -922,6 +923,7 @@ async function batchQuarantineProducts(
         },
         blockingErrors: [{ code: 'MISSING_CALIBER', message: 'Product is missing caliber field' }],
         status: 'QUARANTINED',
+        updatedAt: now,
       },
       update: {
         runId,

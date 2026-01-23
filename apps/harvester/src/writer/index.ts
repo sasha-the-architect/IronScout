@@ -1,7 +1,7 @@
 import { prisma } from '@ironscout/db'
 import type { SourceKind } from '@ironscout/db/generated/prisma'
 import { Worker, Job } from 'bullmq'
-import { createHash } from 'crypto'
+import crypto, { createHash } from 'crypto'
 import { redisConnection } from '../config/redis'
 import { logger } from '../config/logger'
 import { alertQueue, WriteJobData, NormalizedProduct, enqueueProductResolve } from '../config/queues'
@@ -72,6 +72,7 @@ async function batchUpsertProducts(
           caseMaterial: item.caseMaterial,
           purpose: item.purpose,
           roundCount: item.roundCount,
+          updatedAt: new Date(),
         },
         update: {
           description: item.description || undefined,
@@ -83,6 +84,7 @@ async function batchUpsertProducts(
           caseMaterial: item.caseMaterial || undefined,
           purpose: item.purpose || undefined,
           roundCount: item.roundCount || undefined,
+          updatedAt: new Date(),
         },
       })
       productIdMap.set(item.productId, product.id)
@@ -143,6 +145,7 @@ async function batchUpsertSourceProducts(
         const identityKey = `URL_HASH:${computeUrlHash(item.url)}`
         const created = await tx.source_products.create({
           data: {
+            id: crypto.randomUUID(),
             sourceId,
             identityKey,
             title: item.name,
@@ -154,6 +157,7 @@ async function batchUpsertSourceProducts(
             category: item.category,
             createdByRunId: executionId,
             lastUpdatedByRunId: executionId,
+            updatedAt: new Date(),
           },
         })
         urlToSourceProductId.set(item.url, created.id)
@@ -214,6 +218,7 @@ export async function batchProcessPrices(
 
   // Collect prices to create
   const pricesToCreate: Array<{
+    id: string
     productId: string
     retailerId: string
     merchantId?: string
@@ -236,6 +241,7 @@ export async function batchProcessPrices(
     // Only create new price if different or doesn't exist
     if (!existing || existing.price !== newPrice || existing.inStock !== item.inStock) {
       pricesToCreate.push({
+        id: crypto.randomUUID(),
         productId: item.productId,
         retailerId,
         merchantId: undefined, // Derive later from merchant_retailers if needed
@@ -383,6 +389,7 @@ async function processBatch(
           const identityKey = `URL_HASH:${computeUrlHash(item.url)}`
           const created = await prisma.source_products.create({
             data: {
+              id: crypto.randomUUID(),
               sourceId,
               identityKey,
               title: item.name,
@@ -394,6 +401,7 @@ async function processBatch(
               category: item.category,
               createdByRunId: executionId,
               lastUpdatedByRunId: executionId,
+              updatedAt: new Date(),
             },
           })
           sourceProductId = created.id
@@ -416,11 +424,13 @@ async function processBatch(
             caseMaterial: item.caseMaterial,
             purpose: item.purpose,
             roundCount: item.roundCount,
+            updatedAt: new Date(),
           },
           update: {
             description: item.description || undefined,
             imageUrl: item.imageUrl || undefined,
             brand: item.brand || undefined,
+            updatedAt: new Date(),
           },
         })
 
@@ -436,6 +446,7 @@ async function processBatch(
         if (!existingPrice || oldPrice !== newPrice || existingPrice.inStock !== item.inStock) {
           await prisma.prices.create({
             data: {
+              id: crypto.randomUUID(),
               productId: item.productId,
               retailerId,
               sourceId,
@@ -551,6 +562,7 @@ export const writerWorker = new Worker<WriteJobData>(
       // Log start (summary only)
       await prisma.execution_logs.create({
         data: {
+          id: crypto.randomUUID(),
           executionId,
           level: 'INFO',
           event: 'WRITE_START',
@@ -598,6 +610,7 @@ export const writerWorker = new Worker<WriteJobData>(
       if (allErrors.length > 0) {
         await prisma.execution_logs.create({
           data: {
+            id: crypto.randomUUID(),
             executionId,
             level: 'WARN',
             event: 'WRITE_ERRORS',
@@ -640,6 +653,7 @@ export const writerWorker = new Worker<WriteJobData>(
 
       await prisma.execution_logs.create({
         data: {
+          id: crypto.randomUUID(),
           executionId,
           level: 'INFO',
           event: 'WRITE_OK',
@@ -677,6 +691,7 @@ export const writerWorker = new Worker<WriteJobData>(
 
         await prisma.execution_logs.create({
           data: {
+            id: crypto.randomUUID(),
             executionId,
             level: 'INFO',
             event: 'ALERT_QUEUED',
@@ -710,6 +725,7 @@ export const writerWorker = new Worker<WriteJobData>(
 
         await prisma.execution_logs.create({
           data: {
+            id: crypto.randomUUID(),
             executionId,
             level: 'INFO',
             event: 'RESOLVE_QUEUED',
@@ -754,6 +770,7 @@ export const writerWorker = new Worker<WriteJobData>(
 
       await prisma.execution_logs.create({
         data: {
+          id: crypto.randomUUID(),
           executionId,
           level: 'ERROR',
           event: 'WRITE_FAIL',

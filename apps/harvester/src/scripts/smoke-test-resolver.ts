@@ -118,6 +118,7 @@ async function main() {
         retailerId: retailer.id,
         sourceKind: 'DIRECT',
         enabled: false, // Don't actually crawl
+        updatedAt: new Date(),
       }
     })
     record('Source created', true, source.id)
@@ -134,6 +135,7 @@ async function main() {
         url: `https://smoke-test.example.com/product/${testId}`,
         normalizedUrl: `smoke-test.example.com/product/${testId}`,
         identityKey: `smoke:${testId}`,
+        updatedAt: new Date(),
       }
     })
     record('Source product created', true, sourceProduct.id)
@@ -156,13 +158,16 @@ async function main() {
     await prisma.source_trust_config.upsert({
       where: { sourceId: source.id },
       create: {
+        id: createId(),
         sourceId: source.id,
         upcTrusted: true,
         version: 1,
+        updatedAt: new Date(),
       },
       update: {
         upcTrusted: true,
         version: 1,
+        updatedAt: new Date(),
       }
     })
     record('Trust config created', true, 'upcTrusted=true')

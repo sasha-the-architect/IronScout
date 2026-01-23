@@ -306,6 +306,7 @@ async function processAffiliateFeedJob(job: Job<AffiliateFeedJobData>): Promise<
     // Step 2: Create run record (now holds lock, safe to create)
     run = await prisma.affiliate_feed_runs.create({
       data: {
+        id: randomUUID(),
         feedId,
         sourceId: feed.sourceId,
         trigger,
@@ -702,6 +703,7 @@ async function executePhase1(context: FeedRunContext, log: typeof moduleLog): Pr
     log.debug('Recording parse errors', { count: parseResult.errors.length })
     await prisma.affiliate_feed_run_errors.createMany({
       data: parseResult.errors.slice(0, 100).map((err) => ({
+        id: randomUUID(),
         runId: run.id,
         code: err.code,
         message: err.message,
@@ -725,6 +727,7 @@ async function executePhase1(context: FeedRunContext, log: typeof moduleLog): Pr
   if (processResult.errors.length > 0) {
     await prisma.affiliate_feed_run_errors.createMany({
       data: processResult.errors.slice(0, 100).map((err) => ({
+        id: randomUUID(),
         runId: run.id,
         code: err.code,
         message: err.message,
