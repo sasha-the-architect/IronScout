@@ -110,12 +110,14 @@ Implicit intent exists to reduce friction, not to introduce automation control.
 
 ### Allowed Language
 Use:
-- “Good deal right now”
-- “Lower than usual”
-- “Seen this low recently”
-- “Price is going down / about the same / going up”
-- “We’ll keep an eye on this”
-- “Something you’re watching changed”
+- "Good deal right now"
+- "Lower than usual"
+- "Seen this low recently"
+- "Price is going down / about the same / going up"
+- "We'll keep an eye on this"
+- "Something you're watching changed"
+
+References to “deals” indicate prices that are lower than recent historical context for the same product; they are descriptive signals, not recommendations or guarantees.
 
 Language must be:
 - Plain
@@ -126,13 +128,28 @@ Language must be:
 
 ### Prohibited Language
 Never use:
-- “AI-powered” as a primary value claim
-- “Best”, “optimal”, or “guaranteed”
+- "AI-powered" as a primary value claim
+- "Best", "optimal", or "guaranteed"
 - BUY / WAIT / SKIP verdicts
 - Scores, grades, rankings, or leaderboards
 - Explanations of system internals
 
 If copy needs explanation, it does not belong in the UI.
+
+### Personal Context Signals (Gun Locker)
+- Personal context (e.g., Gun Locker calibers) may be used to improve relevance, ordering, and labeling.
+- Personal context must never be framed as firearm registration, inventory tracking, ownership verification, or a purchase plan.
+- Personal context must not be used to claim recommendations, optimality, or guarantees.
+- Copy should emphasize "reduce noise" and "relevance," not "decisions."
+
+Allowed:
+- "Add the guns you shoot"
+- "Tell us what calibers you use"
+
+Disallowed:
+- "Register firearms"
+- "Gun inventory"
+- "Track weapons"
 
 ---
 

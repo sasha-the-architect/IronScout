@@ -64,10 +64,11 @@ This language is descriptive and expectation-safe.
 ### Restricted Language
 
 Search **must not**:
-- Lead with “AI-powered” as a value claim.
-- Claim to “find the best deals”.
+- Lead with "AI-powered" as a value claim.
+- Claim to "find the best deals".
 - Imply optimization, ranking authority, or decision-making.
 - Suggest guarantees or completeness.
+User-provided context may improve ordering and labeling, but must not suppress or hide otherwise eligible results.
 
 References to AI or automation may appear only as explanatory detail (e.g., grouping equivalent listings), not as the headline promise.
 

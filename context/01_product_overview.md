@@ -51,6 +51,16 @@ Silence is intentional.
 
 ---
 
+## Gun Locker (Optional)
+
+Gun Locker lets users optionally tell IronScout what calibers they shoot by adding guns (caliber required, nickname optional). This information is used only to improve relevance and ordering in search, dashboards, and surfaced price changes.
+
+Gun Locker is not a firearm registry, inventory system, or purchase planner. It does not store serial numbers, purchase details, or counts; it does not verify ownership; and it does not generate recommendations.
+
+Gun Locker exists to reduce noise, not to make decisions for the user.
+
+---
+
 ## What Makes IronScout Different
 
 IronScout does not try to tell users what to buy.

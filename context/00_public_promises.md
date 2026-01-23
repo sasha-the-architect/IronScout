@@ -59,6 +59,18 @@ IronScout does **not** promise:
 
 ---
 
+## Personal Context (Optional)
+
+IronScout may use optional, user-provided context (such as the calibers a user shoots) to improve relevance and ordering of search results, dashboards, and surfaced price changes.
+
+This context does not:
+- verify firearm ownership,
+- create or suppress deals,
+- generate purchase recommendations,
+- guarantee lowest prices, savings, or optimal timing.
+
+---
+
 ## AI Usage (Consumer)
 
 IronScout uses AI to:
