@@ -12,7 +12,7 @@
  * - IN/NOT_IN values must be arrays
  */
 
-import { EligibilityRule, EligibilityOperator, AggregatedProduct } from './types'
+import type { EligibilityRule, EligibilityOperator, AggregatedProduct } from './types'
 
 /**
  * Result of evaluating a single eligibility rule.

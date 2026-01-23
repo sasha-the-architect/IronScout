@@ -11,7 +11,8 @@
  * - Deterministic ordering guaranteed
  */
 
-import { OrderingRule, AggregatedProduct, getAvailabilityRank, Availability } from './types'
+import type { OrderingRule, AggregatedProduct, Availability } from './types'
+import { getAvailabilityRank } from './types'
 
 /**
  * The final tie-breaker rule, always appended.

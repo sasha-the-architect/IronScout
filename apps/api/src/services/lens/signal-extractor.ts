@@ -17,7 +17,7 @@
  */
 
 import { SearchIntent, parseSearchIntent } from '../ai-search/intent-parser'
-import { LensSignals, IntentStatus } from './types'
+import type { LensSignals, IntentStatus } from './types'
 import { loggers } from '../../config/logger'
 
 const log = loggers.ai

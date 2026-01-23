@@ -12,13 +12,8 @@ import { batchCalculatePriceSignalIndex, PriceSignalIndex } from './price-signal
 import { batchGetPricesViaProductLinks, batchGetPricesWithConfidence } from './price-resolver'
 import { BulletType, PressureRating, BULLET_TYPE_CATEGORIES } from '../../types/product-metadata'
 import { loggers } from '../../config/logger'
-import {
-  isLensEnabled,
-  applyLensPipeline,
-  InvalidLensError,
-  LensMetadata,
-  ProductWithOffers,
-} from '../lens'
+import type { LensMetadata, ProductWithOffers } from '../lens'
+import { isLensEnabled, applyLensPipeline, InvalidLensError } from '../lens'
 
 const log = loggers.ai
 

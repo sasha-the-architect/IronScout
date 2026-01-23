@@ -11,7 +11,7 @@
  * - No semantic changes without an ADR
  */
 
-import { Lens, LensId } from './types'
+import type { Lens, LensId } from './types'
 
 /**
  * Current lens spec version.

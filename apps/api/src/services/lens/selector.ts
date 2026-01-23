@@ -21,7 +21,7 @@
  * - candidates[] is lexicographically sorted
  */
 
-import {
+import type {
   Lens,
   LensId,
   LensSignals,
@@ -30,8 +30,8 @@ import {
   LensTriggerRule,
   ReasonCode,
   TriggerMatch,
-  isValidLensId,
 } from './types'
+import { isValidLensId } from './types'
 import {
   LENS_REGISTRY,
   ALL_LENS,

@@ -14,14 +14,12 @@
  * @module lens
  */
 
-// Types
-export {
+// Types (type-only exports for ESM compatibility)
+export type {
   // Core types
   LensSignal,
   LensSignals,
   LensId,
-  VALID_LENS_IDS,
-  isValidLensId,
   ReasonCode,
   LensTriggerRule,
   EligibilityOperator,
@@ -31,15 +29,20 @@ export {
   Lens,
   LensMetadata,
   Availability,
-  AVAILABILITY_RANK,
-  getAvailabilityRank,
   AggregatedProduct,
   LensSelectionResult,
   // Telemetry types
   IntentStatus,
   TriggerMatch,
   LensEvalTelemetry,
-  // Feature flag
+} from './types'
+
+// Value exports from types
+export {
+  VALID_LENS_IDS,
+  isValidLensId,
+  AVAILABILITY_RANK,
+  getAvailabilityRank,
   isLensEnabled,
 } from './types'
 
@@ -159,7 +162,8 @@ import { aggregateProducts, ProductWithOffers } from './aggregation'
 import { applyEligibility, countFilterReasons } from './eligibility'
 import { applyOrdering } from './ordering'
 import { emitLensTelemetry, createTimingTracker, createTelemetryConfig } from './telemetry'
-import { AggregatedProduct, LensMetadata, LensId, isLensEnabled } from './types'
+import type { AggregatedProduct, LensMetadata, LensId } from './types'
+import { isLensEnabled } from './types'
 
 export interface LensPipelineInput {
   /** The user's search query */

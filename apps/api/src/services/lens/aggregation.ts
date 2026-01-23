@@ -10,7 +10,8 @@
  * - pricePerRound: derived from aggregated price and canonical packSize
  */
 
-import { AggregatedProduct, Availability, AVAILABILITY_RANK } from './types'
+import type { AggregatedProduct, Availability } from './types'
+import { AVAILABILITY_RANK } from './types'
 
 /**
  * A visible offer from a retailer.

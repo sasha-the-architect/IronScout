@@ -14,7 +14,7 @@
  */
 
 import { createHash } from 'crypto'
-import { LensEvalTelemetry, LensId, ReasonCode, IntentStatus, AggregatedProduct, LensSelectionResult, OrderingRule } from './types'
+import type { LensEvalTelemetry, LensId, ReasonCode, IntentStatus, AggregatedProduct, LensSelectionResult, OrderingRule } from './types'
 import { LENS_SPEC_VERSION } from './definitions'
 import { loggers, LOG_EVENTS } from '../../config/logger'
 import { signalsToArray, SignalExtractionResult } from './signal-extractor'
