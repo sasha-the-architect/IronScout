@@ -26,6 +26,14 @@ export interface AdminSession {
  * Get the current admin session from NextAuth
  */
 export async function getAdminSession(): Promise<AdminSession | null> {
+  if (process.env.E2E_AUTH_BYPASS === 'true') {
+    return {
+      userId: process.env.E2E_ADMIN_USER_ID || 'e2e-admin',
+      email: (process.env.E2E_ADMIN_EMAIL || ADMIN_EMAILS[0] || 'e2e-admin@ironscout.local').toLowerCase(),
+      name: 'E2E Admin',
+    }
+  }
+
   try {
     const session = await auth();
 

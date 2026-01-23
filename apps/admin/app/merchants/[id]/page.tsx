@@ -49,6 +49,13 @@ export default async function MerchantDetailPage({
         phone: null,
         paymentMethod: null,
         subscriptionExpiresAt: null,
+        subscriptionStatus: 'ACTIVE',
+        subscriptionGraceDays: 0,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        autoRenew: true,
+        pixelEnabled: false,
+        createdAt: new Date(),
         merchant_users: [
           {
             id: 'e2e-owner',
