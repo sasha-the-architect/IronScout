@@ -115,3 +115,5 @@ packages/db/generated/
 # apps/web/ios/
 # apps/web/android/
 /test-results
+# Local project state
+.ironscout/
