@@ -51,6 +51,13 @@ export function createTestClient() {
 }
 
 /**
+ * Alias for createTestClient() to match shared test helper naming.
+ */
+export function createTestDb() {
+  return createTestClient()
+}
+
+/**
  * Resets the test database by running migrations fresh.
  * Call this in beforeAll() to ensure clean state.
  */
@@ -71,6 +78,13 @@ export async function resetTestDatabase(prisma) {
 
   // Ensure client is connected after reset
   await prisma.$connect()
+}
+
+/**
+ * Alias for resetTestDatabase() to match shared test helper naming.
+ */
+export async function resetDb(prisma) {
+  await resetTestDatabase(prisma)
 }
 
 /**

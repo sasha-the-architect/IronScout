@@ -11,10 +11,20 @@ import type { PrismaClient } from './generated/prisma/client.js'
 export declare function createTestClient(): PrismaClient
 
 /**
+ * Alias for createTestClient() to match shared test helper naming.
+ */
+export declare function createTestDb(): PrismaClient
+
+/**
  * Resets the test database by running migrations fresh.
  * Call this in beforeAll() to ensure clean state.
  */
 export declare function resetTestDatabase(prisma: PrismaClient): Promise<void>
+
+/**
+ * Alias for resetTestDatabase() to match shared test helper naming.
+ */
+export declare function resetDb(prisma: PrismaClient): Promise<void>
 
 /**
  * Cleans specific tables for per-test isolation.

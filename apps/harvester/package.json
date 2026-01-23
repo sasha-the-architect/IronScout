@@ -21,8 +21,8 @@
     "smoke:resolver": "tsx src/scripts/smoke-test-resolver.ts"
   },
   "dependencies": {
-    "@bull-board/api": "^6.16.2",
-    "@bull-board/express": "^6.16.2",
+    "@bull-board/api": "^6.16.4",
+    "@bull-board/express": "^6.16.4",
     "@ironscout/crypto": "workspace:*",
     "@ironscout/db": "workspace:*",
     "@ironscout/logger": "workspace:*",
@@ -30,7 +30,7 @@
     "@paralleldrive/cuid2": "^3.0.6",
     "axios": "^1.13.2",
     "basic-ftp": "^5.1.0",
-    "bullmq": "^5.66.5",
+    "bullmq": "^5.66.6",
     "cheerio": "^1.1.2",
     "csv-parse": "^6.1.0",
     "dotenv": "^17.2.3",
@@ -44,11 +44,11 @@
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.0.9",
+    "@types/node": "^25.0.10",
     "@types/ssh2": "^1.15.5",
     "@vitest/coverage-v8": "^4.0.17",
     "@vitest/ui": "^4.0.17",
-    "puppeteer": "^24.35.0",
+    "puppeteer": "^24.36.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"

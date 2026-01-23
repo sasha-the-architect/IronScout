@@ -56,12 +56,12 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
-    "@types/node": "^25.0.9",
+    "@types/node": "^25.0.10",
     "sharp": "^0.34.5",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
-  "packageManager": "pnpm@10.28.0",
+  "packageManager": "pnpm@10.28.1",
   "pnpm": {
     "overrides": {
       "@prisma/dev>hono": ">=4.11.4"
