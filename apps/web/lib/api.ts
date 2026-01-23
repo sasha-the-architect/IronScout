@@ -1337,16 +1337,20 @@ export async function getSavedItem(token: string, productId: string): Promise<Sa
 /**
  * Canonical calibers per spec - constrained enum
  */
+/**
+ * Canonical caliber values per gun_locker_v1_spec.md
+ * Values must match the API canonical enum exactly
+ */
 export const CALIBERS = [
   { value: '9mm', label: '9mm' },
-  { value: '.45_acp', label: '.45 ACP' },
-  { value: '.40_sw', label: '.40 S&W' },
-  { value: '.380_acp', label: '.380 ACP' },
-  { value: '.22_lr', label: '.22 LR' },
-  { value: '.223_556', label: '.223 / 5.56' },
-  { value: '.308_762x51', label: '.308 / 7.62x51' },
+  { value: '.45 ACP', label: '.45 ACP' },
+  { value: '.40 S&W', label: '.40 S&W' },
+  { value: '.380 ACP', label: '.380 ACP' },
+  { value: '.22 LR', label: '.22 LR' },
+  { value: '.223/5.56', label: '.223/5.56' },
+  { value: '.308/7.62x51', label: '.308/7.62x51' },
   { value: '.30-06', label: '.30-06' },
-  { value: '6.5_creedmoor', label: '6.5 Creedmoor' },
+  { value: '6.5 Creedmoor', label: '6.5 Creedmoor' },
   { value: '7.62x39', label: '7.62x39' },
   { value: '12ga', label: '12 Gauge' },
   { value: '20ga', label: '20 Gauge' },
@@ -1466,18 +1470,19 @@ export async function removeGun(token: string, gunId: string): Promise<void> {
 
 /**
  * Market Deal per dashboard_market_deals_v1_spec.md
+ * Note: caliber is non-null because unmapped calibers are excluded
+ * Note: dropPercent removed to avoid user-facing scores
  */
 export interface MarketDeal {
   productId: string
   productName: string
-  caliber: CaliberValue | null
-  pricePerRound: number
+  caliber: CaliberValue  // NOT nullable - unmapped calibers excluded
+  pricePerRound: number | null  // null if roundCount unavailable
   price: number
   retailerName: string
   retailerId: string
   url: string
   contextLine: string
-  dropPercent: number | null
   detectedAt: string
   reason: 'PRICE_DROP' | 'BACK_IN_STOCK' | 'LOWEST_90D'
 }
