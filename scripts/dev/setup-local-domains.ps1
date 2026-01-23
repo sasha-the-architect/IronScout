@@ -53,11 +53,18 @@ $certFile = Join-Path $certsDir "_wildcard.ironscout.local.pem"
 if (-not (Test-Path $certFile)) {
     Push-Location $certsDir
     try {
+        # Temporarily allow errors (mkcert writes info to stderr)
+        $ErrorActionPreference = "Continue"
+
         # Install mkcert CA if not already done
-        & mkcert -install 2>$null
+        & mkcert -install 2>&1 | Out-Null
 
         # Generate wildcard cert
-        & mkcert "*.ironscout.local" "ironscout.local"
+        & mkcert "*.ironscout.local" "ironscout.local" 2>&1 | ForEach-Object {
+            if ($_ -notmatch "^(Created|The local CA)") { Write-Host "  $_" }
+        }
+
+        $ErrorActionPreference = "Stop"
         Write-Host "  Certificates generated in .certs/" -ForegroundColor Green
     }
     finally {
