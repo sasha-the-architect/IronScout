@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express'
+import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import Stripe from 'stripe'
 import { prisma } from '@ironscout/db'
@@ -37,6 +38,7 @@ async function logStripeSubscriptionChange(
   try {
     await prisma.admin_audit_logs.create({
       data: {
+        id: randomUUID(),
         adminUserId: STRIPE_SYSTEM_USER,
         merchantId,
         action,
@@ -75,6 +77,7 @@ async function logConsumerSubscriptionChange(
   try {
     await prisma.admin_audit_logs.create({
       data: {
+        id: randomUUID(),
         adminUserId: STRIPE_SYSTEM_USER,
         action,
         resource: 'User',
@@ -202,6 +205,7 @@ async function unlistAllRetailersForMerchant(
   const auditPromises = listedRetailers.map((mr) =>
     prisma.admin_audit_logs.create({
       data: {
+        id: randomUUID(),
         adminUserId: actor,
         merchantId,
         action: 'RETAILER_AUTO_UNLISTED',
@@ -1539,6 +1543,7 @@ async function handleConsumerCheckoutCompleted(session: Stripe.Checkout.Session)
     await tx.subscriptions.upsert({
       where: { stripeId: subscriptionId },
       create: {
+        id: randomUUID(),
         userId,
         type: 'USER_PREMIUM',
         status: 'ACTIVE',

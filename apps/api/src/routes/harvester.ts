@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express'
+import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
 import { Queue } from 'bullmq'
@@ -72,6 +73,7 @@ router.post('/trigger', async (req: Request, res: Response) => {
       // Create execution record
       const execution = await prisma.executions.create({
         data: {
+          id: randomUUID(),
           sourceId: source.id,
           status: 'PENDING',
         },

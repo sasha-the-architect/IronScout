@@ -17,6 +17,7 @@
  * - Email notification sent immediately when deletion accepted
  */
 
+import { randomUUID } from 'crypto'
 import { prisma } from '@ironscout/db'
 import { sendAccountDeletionEmail } from './email'
 import { logger } from '../config/logger'
@@ -167,6 +168,7 @@ export async function initiateAccountDeletion(userId: string): Promise<{ success
     // 4. Create audit log entry
     await tx.admin_audit_logs.create({
       data: {
+        id: randomUUID(),
         adminUserId: userId, // Self-initiated
         action: 'ACCOUNT_DELETION_REQUESTED',
         resource: 'User',
@@ -234,6 +236,7 @@ export async function cancelAccountDeletion(userId: string): Promise<{ success: 
     // Create audit log
     await tx.admin_audit_logs.create({
       data: {
+        id: randomUUID(),
         adminUserId: userId,
         action: 'ACCOUNT_DELETION_CANCELLED',
         resource: 'User',
@@ -319,6 +322,7 @@ export async function finalizeAccountDeletion(userId: string): Promise<{ success
     // 7. Create final audit log
     await tx.admin_audit_logs.create({
       data: {
+        id: randomUUID(),
         adminUserId: 'SYSTEM_DELETION_JOB',
         action: 'ACCOUNT_DELETION_FINALIZED',
         resource: 'User',

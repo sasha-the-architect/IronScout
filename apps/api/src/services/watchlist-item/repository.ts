@@ -10,6 +10,7 @@
  * See: context/decisions/ADR-017-Intent-Ready-Saved-Items.md
  */
 
+import crypto from 'crypto'
 import { prisma, Prisma } from '@ironscout/db'
 import {
   WatchlistItem,
@@ -216,6 +217,7 @@ export async function create(data: {
 }): Promise<WatchlistItemRecord> {
   const record = await prisma.watchlist_items.create({
     data: {
+      id: crypto.randomUUID(),
       userId: data.userId,
       productId: data.productId,
       collectionId: data.collectionId,
@@ -226,6 +228,7 @@ export async function create(data: {
       minDropPercent: data.minDropPercent ?? 5,
       minDropAmount: data.minDropAmount ?? 5.0,
       stockAlertCooldownHours: data.stockAlertCooldownHours ?? 24,
+      updatedAt: new Date(),
     },
   })
 

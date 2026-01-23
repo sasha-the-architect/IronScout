@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express'
+import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
 import { logger } from '../config/logger'
@@ -76,7 +77,11 @@ router.post('/', async (req: Request, res: Response) => {
     const data = createSourceSchema.parse(req.body)
 
     const source = await prisma.sources.create({
-      data,
+      data: {
+        id: randomUUID(),
+        ...data,
+        updatedAt: new Date(),
+      },
     })
 
     res.status(201).json(source)

@@ -12,6 +12,7 @@
  * See: apps/api/src/services/watchlist-item/
  */
 
+import { randomUUID } from 'crypto'
 import { prisma, AlertRuleType, Prisma } from '@ironscout/db'
 import { visiblePriceWhere } from '../config/tiers'
 import { watchlistItemRepository } from './watchlist-item'
@@ -124,6 +125,7 @@ export async function saveItem(
       // No existing item - create new with defaults
       watchlistItem = await tx.watchlist_items.create({
         data: {
+          id: randomUUID(),
           userId,
           productId,
           intentType: 'SKU',
@@ -133,6 +135,7 @@ export async function saveItem(
           minDropPercent: 5,
           minDropAmount: 5.0,
           stockAlertCooldownHours: 24,
+          updatedAt: new Date(),
         },
       })
     }
@@ -147,11 +150,13 @@ export async function saveItem(
         },
       },
       create: {
+        id: randomUUID(),
         userId,
         productId,
         watchlistItemId: watchlistItem.id,
         ruleType: 'PRICE_DROP',
         isEnabled: true,
+        updatedAt: new Date(),
       },
       update: {
         // No-op - alert already exists
@@ -169,11 +174,13 @@ export async function saveItem(
         },
       },
       create: {
+        id: randomUUID(),
         userId,
         productId,
         watchlistItemId: watchlistItem.id,
         ruleType: 'BACK_IN_STOCK',
         isEnabled: true,
+        updatedAt: new Date(),
       },
       update: {
         // No-op - alert already exists

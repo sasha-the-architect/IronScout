@@ -286,7 +286,9 @@ export function emitLensTelemetry(context: LensEvalContext): void {
     const event = buildLensEvalEvent(context)
 
     // Per spec "Metrics (Required)": calculate triggerMatchCount and eligibilityExclusionCount
-    const triggerMatchCount = event.lens.triggerMatches.filter(t => t.passed).length
+    // triggerMatchCount = number of lenses that matched (had at least one trigger pass)
+    // This aligns with selection logic: 0 = NO_MATCH, 1 = AUTO_APPLIED, >1 = AMBIGUOUS
+    const triggerMatchCount = event.lens.candidates.filter(c => c.triggerScore > 0).length
     const eligibilityExclusionCount = context.candidateCount - context.eligibleCount
 
     // Log as structured event

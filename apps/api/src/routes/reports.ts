@@ -1,4 +1,5 @@
 import { Router, type Router as ExpressRouter } from 'express'
+import { randomUUID } from 'crypto'
 import { prisma } from '@ironscout/db'
 import { z } from 'zod'
 import { logger } from '../config/logger'
@@ -84,12 +85,14 @@ router.post('/', async (req, res) => {
     // Create the report
     const report = await prisma.product_reports.create({
       data: {
+        id: randomUUID(),
         productId: data.productId,
         userId: data.userId,
         priceId: data.priceId,
         issueType: data.issueType,
         description: data.description,
         status: 'PENDING',
+        updatedAt: new Date(),
       },
       include: {
         products: {

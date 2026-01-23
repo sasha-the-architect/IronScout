@@ -159,7 +159,7 @@ export async function getWatchlistPreview(
   // Get current best prices for these products
   // Per Spec v1.2 §0.0: Query through product_links for prices
   const productIds = items
-    .map((item) => item.products?.id)
+    .map((item: any) => item.products?.id)
     .filter((id): id is string => id !== null && id !== undefined)
 
   // Build price lookup (best price per product)
@@ -193,8 +193,8 @@ export async function getWatchlistPreview(
   }
 
   return items
-    .filter((item) => item.products !== null)
-    .map((item) => {
+    .filter((item: any) => item.products !== null)
+    .map((item: any) => {
       const product = item.products!
       const priceData = priceByProduct.get(product.id)
       const roundCount = product.roundCount ?? 0

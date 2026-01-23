@@ -18,6 +18,7 @@ import { Router, Request, Response } from 'express'
 import type { Router as RouterType } from 'express'
 import { prisma, isRegistrationEnabled } from '@ironscout/db'
 import bcrypt from 'bcryptjs'
+import { randomUUID } from 'crypto'
 import jwt from 'jsonwebtoken'
 import { z } from 'zod'
 import { authRateLimits } from '../middleware/auth'
@@ -154,10 +155,12 @@ router.post('/signup', authRateLimits.signup, async (req: Request, res: Response
     // Create user
     const user = await prisma.users.create({
       data: {
+        id: randomUUID(),
         email: emailLower,
         name: name || null,
         password: hashedPassword,
         tier: 'FREE',
+        updatedAt: new Date(),
       },
       select: {
         id: true,
@@ -375,6 +378,7 @@ router.post('/oauth/signin', authRateLimits.oauth, async (req: Request, res: Res
       // Link OAuth account to existing user (re-links after pending deletion)
       await prisma.account.create({
         data: {
+          id: randomUUID(),
           userId: user.id,
           type: 'oauth',
           provider,
@@ -411,13 +415,16 @@ router.post('/oauth/signin', authRateLimits.oauth, async (req: Request, res: Res
     // Create new user with OAuth account
     const newUser = await prisma.users.create({
       data: {
+        id: randomUUID(),
         email: emailLower,
         name: name || null,
         image: image || null,
         emailVerified: new Date(), // OAuth emails are verified
         tier: 'FREE',
+        updatedAt: new Date(),
         Account: {
           create: {
+            id: randomUUID(),
             type: 'oauth',
             provider,
             providerAccountId,
@@ -490,6 +497,7 @@ router.post('/oauth/link', authRateLimits.oauth, async (req: Request, res: Respo
     // Link account
     await prisma.account.create({
       data: {
+        id: randomUUID(),
         userId,
         type: 'oauth',
         provider,

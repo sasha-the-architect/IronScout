@@ -175,7 +175,7 @@ router.get('/pulse', async (req: Request, res: Response) => {
 
     // Extract unique calibers (products may be null for SEARCH intent items)
     const calibersSet = new Set<string>()
-    watchlistItems.forEach((w) => {
+    watchlistItems.forEach((w: any) => {
       if (w.products?.caliber) calibersSet.add(w.products.caliber)
     })
 
@@ -407,7 +407,7 @@ router.get('/deals', async (req: Request, res: Response) => {
       const calibersSet = new Set<string>()
 
       // Products may be null for SEARCH intent items; filter safely
-      watchlistItems.forEach((w) => {
+      watchlistItems.forEach((w: any) => {
         if (w.products?.caliber) calibersSet.add(w.products.caliber)
         if (w.products?.id) watchedProductIds.add(w.products.id)
       })
