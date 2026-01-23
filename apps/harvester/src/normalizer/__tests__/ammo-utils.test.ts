@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeCaliberString, extractGrainWeight, extractRoundCount } from '../ammo-utils'
+import {
+  normalizeCaliberString,
+  extractGrainWeight,
+  extractRoundCount,
+  deriveShotgunLoadType,
+} from '../ammo-utils'
 
 describe('extractGrainWeight', () => {
   it('extracts integer grain weight', () => {
@@ -93,5 +98,15 @@ describe('extractRoundCount', () => {
   it('rejects counts outside valid range', () => {
     expect(extractRoundCount('Test ammo 3 rounds')).toBeNull() // too small
     expect(extractRoundCount('Test ammo 15000 rounds')).toBeNull() // too large
+  })
+})
+
+describe('deriveShotgunLoadType', () => {
+  it('returns slug weight when present', () => {
+    expect(deriveShotgunLoadType('Federal 12ga 1oz slug')).toBe('1oz Slug')
+  })
+
+  it('returns slug when weight is missing', () => {
+    expect(deriveShotgunLoadType('Hornady 12 Gauge Slug - 25 Round Box')).toBe('Slug')
   })
 })

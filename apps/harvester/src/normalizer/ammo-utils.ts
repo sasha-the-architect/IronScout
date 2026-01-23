@@ -433,6 +433,10 @@ export function deriveShotgunLoadType(
   const resolvedSlugWeight = slugWeight ?? extractSlugWeight(productName)
   if (resolvedSlugWeight) return `${resolvedSlugWeight} Slug`
 
+  if (/\bslug\b/i.test(productName)) {
+    return 'Slug'
+  }
+
   const shotWeight = extractShotWeight(productName)
   if (shotWeight) {
     return /buck/i.test(productName) ? `${shotWeight} Buck` : `${shotWeight} Shot`
