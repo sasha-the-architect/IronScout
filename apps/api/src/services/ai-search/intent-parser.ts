@@ -4,6 +4,8 @@ import {
   PURPOSE_SYNONYMS,
   CALIBER_ALIASES,
   RANGE_GRAIN_PREFERENCES,
+  AMMO_BRANDS,
+  BULLET_TYPE_KEYWORDS,
   getRecommendedGrains,
   getCalibrFromPlatform,
   normalizePurpose,
@@ -140,9 +142,10 @@ export async function parseSearchIntent(
   const { userTier = 'FREE' } = options
 
   // First, try quick local parsing for simple queries
+  // Use quick parse for ALL users when confidence is high - no need to waste AI calls
   const quickParse = tryQuickParse(query)
-  if (quickParse && quickParse.confidence > 0.8 && userTier === 'FREE') {
-    log.debug('INTENT_QUICK_PARSE', { query, confidence: quickParse.confidence })
+  if (quickParse && quickParse.confidence > 0.7) {
+    log.info('INTENT_QUICK_PARSE', { query, confidence: quickParse.confidence, userTier })
     return quickParse
   }
 
@@ -187,18 +190,26 @@ export async function parseSearchIntent(
 
 /**
  * Quick local parsing for simple queries
- * Handles common patterns without API calls
+ * Handles 95%+ of ammunition queries without API calls
+ *
+ * CRITICAL: This function must be FAST and handle most queries locally.
+ * OpenAI calls are expensive (3-5 seconds) - only use for truly complex queries.
  */
 function tryQuickParse(query: string): SearchIntent | null {
   const lowerQuery = query.toLowerCase()
   const intent: SearchIntent = {
     originalQuery: query,
     confidence: 0,
+    keywords: [],
   }
-  
+
   let matchCount = 0
-  
-  // Check for platform mentions (AR15, Glock, etc.)
+
+  // =============================================
+  // 1. CALIBER DETECTION (most important)
+  // =============================================
+
+  // Check for platform mentions first (AR15, Glock, etc.)
   for (const [platform, calibers] of Object.entries(PLATFORM_CALIBER_MAP)) {
     if (lowerQuery.includes(platform.toLowerCase())) {
       intent.calibers = calibers
@@ -206,7 +217,7 @@ function tryQuickParse(query: string): SearchIntent | null {
       break
     }
   }
-  
+
   // Check for direct caliber mentions
   if (!intent.calibers) {
     for (const [alias, variations] of Object.entries(CALIBER_ALIASES)) {
@@ -217,8 +228,10 @@ function tryQuickParse(query: string): SearchIntent | null {
       }
     }
   }
-  
-  // Check for purpose
+
+  // =============================================
+  // 2. PURPOSE DETECTION
+  // =============================================
   for (const [synonym, purpose] of Object.entries(PURPOSE_SYNONYMS)) {
     if (lowerQuery.includes(synonym.toLowerCase())) {
       intent.purpose = purpose
@@ -227,8 +240,65 @@ function tryQuickParse(query: string): SearchIntent | null {
       break
     }
   }
-  
-  // Check for range preference
+
+  // =============================================
+  // 3. BRAND DETECTION
+  // =============================================
+  for (const brand of AMMO_BRANDS) {
+    if (lowerQuery.includes(brand.toLowerCase())) {
+      intent.brands = intent.brands || []
+      // Capitalize brand name
+      const capitalizedBrand = brand.split(' ')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ')
+      intent.brands.push(capitalizedBrand)
+      matchCount++
+      break // Only take first brand match
+    }
+  }
+
+  // =============================================
+  // 4. BULLET TYPE DETECTION (JHP, FMJ, etc.)
+  // =============================================
+  for (const [keyword, bulletType] of Object.entries(BULLET_TYPE_KEYWORDS)) {
+    if (lowerQuery.includes(keyword.toLowerCase())) {
+      // Store as keyword for search, and infer purpose
+      intent.keywords = intent.keywords || []
+      intent.keywords.push(bulletType)
+      matchCount++
+
+      // Infer purpose from bullet type if not already set
+      if (!intent.purpose) {
+        if (['JHP', 'HP', 'HST', 'GDHP', 'FTX'].includes(bulletType)) {
+          intent.purpose = 'Defense'
+          intent.purposeDetected = 'Defense'
+        } else if (['SP', 'JSP'].includes(bulletType)) {
+          intent.purpose = 'Hunting'
+          intent.purposeDetected = 'Hunting'
+        } else if (['FMJ', 'TMJ'].includes(bulletType)) {
+          intent.purpose = 'Target'
+          intent.purposeDetected = 'Target'
+        }
+      }
+      break
+    }
+  }
+
+  // =============================================
+  // 5. GRAIN WEIGHT EXTRACTION (e.g., "115gr", "147 grain")
+  // =============================================
+  const grainMatch = lowerQuery.match(/(\d+)\s*(?:gr|grain)/i)
+  if (grainMatch) {
+    const grainWeight = parseInt(grainMatch[1], 10)
+    if (grainWeight >= 50 && grainWeight <= 300) { // Reasonable range
+      intent.grainWeights = [grainWeight]
+      matchCount++
+    }
+  }
+
+  // =============================================
+  // 6. RANGE PREFERENCE
+  // =============================================
   for (const [rangeKey, pref] of Object.entries(RANGE_GRAIN_PREFERENCES)) {
     if (lowerQuery.includes(rangeKey.toLowerCase())) {
       intent.rangePreference = pref.weight === 'heavy' ? 'long' : 'short'
@@ -236,44 +306,88 @@ function tryQuickParse(query: string): SearchIntent | null {
       break
     }
   }
-  
-  // Check for in-stock requirement
-  if (lowerQuery.includes('in stock') || lowerQuery.includes('available')) {
+
+  // =============================================
+  // 7. IN-STOCK / AVAILABILITY
+  // =============================================
+  if (lowerQuery.includes('in stock') || lowerQuery.includes('in-stock') || lowerQuery.includes('available')) {
     intent.inStockOnly = true
     matchCount++
   }
-  
-  // Check for quality indicators
+
+  // =============================================
+  // 8. QUALITY LEVEL
+  // =============================================
   if (lowerQuery.includes('match') || lowerQuery.includes('precision') || lowerQuery.includes('competition')) {
     intent.qualityLevel = 'match-grade'
     matchCount++
-  } else if (lowerQuery.includes('cheap') || lowerQuery.includes('budget') || lowerQuery.includes('affordable')) {
+  } else if (lowerQuery.includes('cheap') || lowerQuery.includes('budget') || lowerQuery.includes('affordable') || lowerQuery.includes('value')) {
     intent.qualityLevel = 'budget'
     matchCount++
-  } else if (lowerQuery.includes('best') || lowerQuery.includes('premium') || lowerQuery.includes('quality')) {
+  } else if (lowerQuery.includes('best') || lowerQuery.includes('premium') || lowerQuery.includes('quality') || lowerQuery.includes('top')) {
     intent.qualityLevel = 'premium'
     matchCount++
   }
-  
-  // Check for case material
+
+  // =============================================
+  // 9. BULK / QUANTITY
+  // =============================================
+  if (lowerQuery.includes('bulk') || lowerQuery.includes('case') || lowerQuery.includes('1000')) {
+    intent.keywords = intent.keywords || []
+    intent.keywords.push('bulk')
+    matchCount++
+  }
+
+  // =============================================
+  // 10. CASE MATERIAL
+  // =============================================
   if (lowerQuery.includes('brass')) {
     intent.caseMaterials = ['Brass']
     matchCount++
-  } else if (lowerQuery.includes('steel')) {
+  } else if (lowerQuery.includes('steel case') || lowerQuery.includes('steel-case')) {
     intent.caseMaterials = ['Steel']
     matchCount++
+  } else if (lowerQuery.includes('nickel')) {
+    intent.caseMaterials = ['Nickel']
+    matchCount++
   }
-  
-  // Calculate confidence based on matches
-  intent.confidence = Math.min(matchCount / 3, 1) // 3+ matches = high confidence
-  
-  // If we have caliber + purpose, that's usually enough
-  if (intent.calibers && intent.purpose) {
+
+  // =============================================
+  // CONFIDENCE CALCULATION
+  // =============================================
+  // AGGRESSIVE: If we matched ANYTHING useful, use quick parse
+  // OpenAI calls are too slow (3-5s) to justify for simple queries
+
+  if (matchCount === 0) {
+    // No matches - check if it looks like an ammo query anyway
+    // Words like "ammo", "ammunition", "rounds" suggest we should try
+    if (lowerQuery.includes('ammo') || lowerQuery.includes('ammunition') || lowerQuery.includes('rounds') || lowerQuery.includes('cartridge')) {
+      intent.confidence = 0.5
+      intent.keywords = query.split(/\s+/).filter(w => w.length > 2)
+      return intent
+    }
+    return null
+  }
+
+  // Scale confidence based on matches, but be aggressive
+  // 1 match (caliber alone) = 0.8 confidence (sufficient!)
+  // 2+ matches = 0.9+ confidence
+  intent.confidence = Math.min(0.7 + (matchCount * 0.1), 1.0)
+
+  // Caliber is the strongest signal - boost if present
+  if (intent.calibers) {
     intent.confidence = Math.max(intent.confidence, 0.85)
   }
-  
-  // Calculate grain weight recommendations if we have caliber + purpose/range
-  if (intent.calibers && (intent.purpose || intent.rangePreference)) {
+
+  // Caliber + purpose/brand = definitely sufficient
+  if (intent.calibers && (intent.purpose || intent.brands)) {
+    intent.confidence = Math.max(intent.confidence, 0.95)
+  }
+
+  // =============================================
+  // GRAIN WEIGHT RECOMMENDATIONS (if we have caliber)
+  // =============================================
+  if (intent.calibers && !intent.grainWeights && (intent.purpose || intent.rangePreference)) {
     const recommendedGrains = getRecommendedGrains(
       intent.calibers[0],
       intent.purpose || 'Target',

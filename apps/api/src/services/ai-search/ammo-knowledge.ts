@@ -120,8 +120,55 @@ export const CALIBER_GRAIN_RANGES: Record<string, { light: number[], medium: num
 // Quality indicators in product names
 export const QUALITY_INDICATORS = {
   matchGrade: ['match', 'sierra', 'matchking', 'smk', 'gold medal', 'berger', 'lapua', 'hornady match', 'eld-m', 'nosler', 'bthp'],
-  budget: ['steel case', 'steel-case', 'wolf', 'tula', 'barnaul', 'brown bear'],
-  premium: ['brass', 'nickel', 'federal premium', 'hornady', 'speer gold dot', 'barnes'],
+  budget: ['steel case', 'steel-case', 'wolf', 'tula', 'barnaul', 'brown bear', 'cheap', 'budget', 'affordable', 'value'],
+  premium: ['brass', 'nickel', 'federal premium', 'hornady', 'speer gold dot', 'barnes', 'best', 'quality', 'premium'],
+}
+
+// Common ammunition brands for quick parse
+export const AMMO_BRANDS: string[] = [
+  'federal', 'hornady', 'winchester', 'remington', 'speer', 'cci', 'pmc', 'fiocchi',
+  'sig sauer', 'sig', 'blazer', 'american eagle', 'magtech', 'sellier & bellot', 's&b',
+  'aguila', 'norma', 'prvi partizan', 'ppu', 'wolf', 'tula', 'barnaul', 'brown bear',
+  'barnes', 'nosler', 'berger', 'lapua', 'sierra', 'gold dot', 'hst', 'critical defense',
+  'critical duty', 'v-max', 'eld-x', 'eld-m', 'sst', 'gmx', 'ttsx', 'tsx'
+]
+
+// Bullet type keywords for quick parse
+export const BULLET_TYPE_KEYWORDS: Record<string, string> = {
+  // Hollow points (defense)
+  'jhp': 'JHP',
+  'hollow point': 'JHP',
+  'hollowpoint': 'JHP',
+  'hp': 'HP',
+  'hst': 'HST',
+  'gold dot': 'GDHP',
+  'critical defense': 'FTX',
+  'critical duty': 'FTX',
+  'v-crown': 'JHP',
+
+  // FMJ (target)
+  'fmj': 'FMJ',
+  'full metal jacket': 'FMJ',
+  'ball': 'FMJ',
+  'tmj': 'TMJ',
+  'total metal jacket': 'TMJ',
+
+  // Soft point (hunting)
+  'soft point': 'SP',
+  'sp': 'SP',
+  'jsp': 'JSP',
+
+  // Match/precision
+  'bthp': 'BTHP',
+  'match': 'BTHP',
+  'smk': 'BTHP',
+  'matchking': 'BTHP',
+  'eld-m': 'BTHP',
+
+  // Specialty
+  'frangible': 'FRANGIBLE',
+  'tracer': 'TRACER',
+  'subsonic': 'SUBSONIC',
 }
 
 // Case material preferences by use

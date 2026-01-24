@@ -143,11 +143,16 @@ export interface OrderingRule {
 /**
  * A Lens is a deterministic, versioned policy object.
  *
+ * Design Philosophy (v1.1):
+ * - Lenses are **ordering-focused** - they optimize sort order for use cases
+ * - Eligibility filtering is optional and used sparingly
+ * - Best-effort approach: missing metadata should not hide products
+ * - Embeddings never rank - only declared ordering rules
+ *
  * Invariants:
  * - Lenses are deterministic given intent signals
- * - Eligibility is binary (no scoring)
  * - Ordering derives from declared rules only
- * - Embeddings never rank
+ * - Products with null fields sort LAST, not excluded
  */
 export interface Lens {
   /** Unique lens identifier */
@@ -158,8 +163,8 @@ export interface Lens {
   description: string
   /** Trigger rules - lens matches if ANY rule matches (OR logic) */
   triggers: LensTriggerRule[]
-  /** Eligibility rules - ALL must pass for a product to be included */
-  eligibility: EligibilityRule[]
+  /** Eligibility rules (optional) - ALL must pass for a product to be included */
+  eligibility?: EligibilityRule[]
   /** Ordering rules - applied in sequence, nulls sort LAST */
   ordering: OrderingRule[]
   /** Semantic version of the lens definition */

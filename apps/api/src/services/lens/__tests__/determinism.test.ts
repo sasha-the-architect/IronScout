@@ -2,7 +2,17 @@ import { describe, it, expect } from 'vitest'
 import { applyEligibility } from '../eligibility'
 import { applyOrdering } from '../ordering'
 import { RANGE_LENS, DEFENSIVE_LENS, ALL_LENS } from '../definitions'
-import { AggregatedProduct } from '../types'
+import { AggregatedProduct, EligibilityRule } from '../types'
+
+// Explicit eligibility rules for testing (independent of lens definitions)
+// These test the eligibility logic, not the lens configurations
+const FMJ_ELIGIBILITY: EligibilityRule[] = [
+  { field: 'bulletType', operator: 'IN', value: ['FMJ'] },
+]
+
+const HP_ELIGIBILITY: EligibilityRule[] = [
+  { field: 'bulletType', operator: 'IN', value: ['HP'] },
+]
 
 // Helper to create a test product
 function createProduct(overrides: Partial<AggregatedProduct> = {}): AggregatedProduct {
@@ -56,7 +66,7 @@ describe('Lens Determinism Tests', () => {
       const results: string[] = []
 
       for (let i = 0; i < 1000; i++) {
-        const { eligible } = applyEligibility(products, RANGE_LENS.eligibility)
+        const { eligible } = applyEligibility(products, FMJ_ELIGIBILITY)
         const ordered = applyOrdering(eligible, RANGE_LENS.ordering)
         results.push(JSON.stringify(ordered.map(p => p.productId)))
       }
@@ -67,14 +77,14 @@ describe('Lens Determinism Tests', () => {
 
     it('filters to only FMJ products', () => {
       const products = generateFixedProducts()
-      const { eligible } = applyEligibility(products, RANGE_LENS.eligibility)
+      const { eligible } = applyEligibility(products, FMJ_ELIGIBILITY)
 
       expect(eligible.every(p => p.bulletType === 'FMJ')).toBe(true)
     })
 
     it('orders by pricePerRound ASC, availability DESC, canonicalConfidence DESC', () => {
       const products = generateFixedProducts()
-      const { eligible } = applyEligibility(products, RANGE_LENS.eligibility)
+      const { eligible } = applyEligibility(products, FMJ_ELIGIBILITY)
       const ordered = applyOrdering(eligible, RANGE_LENS.ordering)
 
       // First should be lowest pricePerRound that's IN_STOCK
@@ -92,7 +102,7 @@ describe('Lens Determinism Tests', () => {
       const results: string[] = []
 
       for (let i = 0; i < 1000; i++) {
-        const { eligible } = applyEligibility(products, DEFENSIVE_LENS.eligibility)
+        const { eligible } = applyEligibility(products, HP_ELIGIBILITY)
         const ordered = applyOrdering(eligible, DEFENSIVE_LENS.ordering)
         results.push(JSON.stringify(ordered.map(p => p.productId)))
       }
@@ -103,14 +113,14 @@ describe('Lens Determinism Tests', () => {
 
     it('filters to only HP products', () => {
       const products = generateFixedProducts()
-      const { eligible } = applyEligibility(products, DEFENSIVE_LENS.eligibility)
+      const { eligible } = applyEligibility(products, HP_ELIGIBILITY)
 
       expect(eligible.every(p => p.bulletType === 'HP')).toBe(true)
     })
 
     it('orders by availability DESC, canonicalConfidence DESC, pricePerRound ASC', () => {
       const products = generateFixedProducts()
-      const { eligible } = applyEligibility(products, DEFENSIVE_LENS.eligibility)
+      const { eligible } = applyEligibility(products, HP_ELIGIBILITY)
       const ordered = applyOrdering(eligible, DEFENSIVE_LENS.ordering)
 
       // IN_STOCK should come first, ordered by confidence
@@ -126,7 +136,7 @@ describe('Lens Determinism Tests', () => {
       const results: string[] = []
 
       for (let i = 0; i < 1000; i++) {
-        const { eligible } = applyEligibility(products, ALL_LENS.eligibility)
+        const { eligible } = applyEligibility(products, ALL_LENS.eligibility ?? [])
         const ordered = applyOrdering(eligible, ALL_LENS.ordering)
         results.push(JSON.stringify(ordered.map(p => p.productId)))
       }
@@ -137,7 +147,7 @@ describe('Lens Determinism Tests', () => {
 
     it('does not filter any products', () => {
       const products = generateFixedProducts()
-      const { eligible } = applyEligibility(products, ALL_LENS.eligibility)
+      const { eligible } = applyEligibility(products, ALL_LENS.eligibility ?? [])
 
       expect(eligible.length).toBe(products.length)
     })
@@ -152,7 +162,7 @@ describe('Lens Determinism Tests', () => {
 
       for (let i = 0; i < 100; i++) {
         // RANGE lens requires FMJ
-        const { eligible } = applyEligibility(products, RANGE_LENS.eligibility)
+        const { eligible } = applyEligibility(products, FMJ_ELIGIBILITY)
         results.push(JSON.stringify(eligible))
       }
 
@@ -172,7 +182,7 @@ describe('Lens Determinism Tests', () => {
       const results: string[] = []
 
       for (let i = 0; i < 100; i++) {
-        const { eligible } = applyEligibility(products, RANGE_LENS.eligibility)
+        const { eligible } = applyEligibility(products, FMJ_ELIGIBILITY)
         results.push(JSON.stringify(eligible.map(p => p.productId)))
       }
 
@@ -191,7 +201,7 @@ describe('Lens Determinism Tests', () => {
       const results: string[] = []
 
       for (let i = 0; i < 100; i++) {
-        const { eligible } = applyEligibility(products, RANGE_LENS.eligibility)
+        const { eligible } = applyEligibility(products, FMJ_ELIGIBILITY)
         const ordered = applyOrdering(eligible, RANGE_LENS.ordering)
         results.push(JSON.stringify(ordered.map(p => p.productId)))
       }
@@ -235,7 +245,7 @@ describe('Lens Determinism Tests', () => {
       const results: string[] = []
 
       for (let i = 0; i < 1000; i++) {
-        const { eligible } = applyEligibility(products, RANGE_LENS.eligibility)
+        const { eligible } = applyEligibility(products, FMJ_ELIGIBILITY)
         const ordered = applyOrdering(eligible, RANGE_LENS.ordering)
         results.push(JSON.stringify(ordered.map(p => p.productId)))
       }

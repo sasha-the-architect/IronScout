@@ -26,7 +26,7 @@ export const LENS_SPEC_VERSION = '1.1.0'
 export const LENS_DEFINITION_VERSION = '1.0.0'
 
 /**
- * ALL Lens - Default lens with no eligibility filters.
+ * ALL Lens - Default lens for general searches.
  *
  * Ordering:
  * 1. availability DESC
@@ -39,7 +39,6 @@ export const ALL_LENS: Lens = {
   label: 'All Results',
   description: 'Shows all matching products with availability-first ordering',
   triggers: [],  // ALL never auto-applies via triggers
-  eligibility: [],  // No filters
   ordering: [
     { field: 'availability', direction: 'DESC' },
     { field: 'pricePerRound', direction: 'ASC' },
@@ -52,11 +51,11 @@ export const ALL_LENS: Lens = {
 /**
  * RANGE Lens - For range/target practice ammunition.
  *
- * Eligibility:
- * - bulletType IN ["FMJ"]
+ * Optimizes for value (price-first) - ideal for buying practice ammo in bulk.
+ * When bulletType is available, FMJ products are boosted in ordering.
  *
  * Ordering:
- * 1. pricePerRound ASC
+ * 1. pricePerRound ASC (value-first)
  * 2. availability DESC
  * 3. canonicalConfidence DESC
  * 4. productId ASC (tie-breaker)
@@ -64,14 +63,11 @@ export const ALL_LENS: Lens = {
 export const RANGE_LENS: Lens = {
   id: 'RANGE',
   label: 'Range / Training',
-  description: 'Full metal jacket ammunition for range practice, sorted by value',
+  description: 'Value-optimized ordering for range practice ammunition',
   triggers: [
     { signal: 'usage_hint', value: 'RANGE', minConfidence: 0.7 },
     { signal: 'purpose', value: 'Target', minConfidence: 0.8 },
     { signal: 'purpose', value: 'Training', minConfidence: 0.8 },
-  ],
-  eligibility: [
-    { field: 'bulletType', operator: 'IN', value: ['FMJ'] },
   ],
   ordering: [
     { field: 'pricePerRound', direction: 'ASC' },
@@ -84,11 +80,11 @@ export const RANGE_LENS: Lens = {
 /**
  * DEFENSIVE Lens - For self-defense ammunition.
  *
- * Eligibility:
- * - bulletType IN ["HP"]
+ * Optimizes for reliability (availability-first) - critical for defensive ammo.
+ * When bulletType is available, HP products are boosted in ordering.
  *
  * Ordering:
- * 1. availability DESC
+ * 1. availability DESC (reliability-first)
  * 2. canonicalConfidence DESC
  * 3. pricePerRound ASC
  * 4. productId ASC (tie-breaker)
@@ -96,13 +92,10 @@ export const RANGE_LENS: Lens = {
 export const DEFENSIVE_LENS: Lens = {
   id: 'DEFENSIVE',
   label: 'Defensive',
-  description: 'Hollow point ammunition for self-defense, availability-first',
+  description: 'Availability-optimized ordering for self-defense ammunition',
   triggers: [
     { signal: 'usage_hint', value: 'DEFENSIVE', minConfidence: 0.7 },
     { signal: 'purpose', value: 'Defense', minConfidence: 0.8 },
-  ],
-  eligibility: [
-    { field: 'bulletType', operator: 'IN', value: ['HP'] },
   ],
   ordering: [
     { field: 'availability', direction: 'DESC' },
@@ -115,11 +108,11 @@ export const DEFENSIVE_LENS: Lens = {
 /**
  * MATCH Lens - For competition/precision ammunition.
  *
- * Eligibility:
- * - bulletType IN ["OTM", "MATCH"]
+ * Optimizes for quality (confidence-first) - competition shooters want consistency.
+ * When bulletType is available, OTM/MATCH products are boosted in ordering.
  *
  * Ordering:
- * 1. canonicalConfidence DESC
+ * 1. canonicalConfidence DESC (quality-first)
  * 2. availability DESC
  * 3. pricePerRound ASC
  * 4. productId ASC (tie-breaker)
@@ -127,13 +120,10 @@ export const DEFENSIVE_LENS: Lens = {
 export const MATCH_LENS: Lens = {
   id: 'MATCH',
   label: 'Match / Precision',
-  description: 'Open tip match ammunition for competition, precision-first',
+  description: 'Quality-optimized ordering for competition ammunition',
   triggers: [
     { signal: 'usage_hint', value: 'MATCH', minConfidence: 0.7 },
     { signal: 'qualityLevel', value: 'match-grade', minConfidence: 0.8 },
-  ],
-  eligibility: [
-    { field: 'bulletType', operator: 'IN', value: ['OTM', 'MATCH'] },
   ],
   ordering: [
     { field: 'canonicalConfidence', direction: 'DESC' },
@@ -221,8 +211,8 @@ export interface LensValidationError {
 export function validateLensDefinition(lens: Lens): LensValidationError[] {
   const errors: LensValidationError[] = []
 
-  // Validate eligibility rule fields
-  for (const rule of lens.eligibility) {
+  // Validate eligibility rule fields (if any)
+  for (const rule of lens.eligibility ?? []) {
     if (!EXPECTED_FIELDS.has(rule.field)) {
       errors.push({
         lensId: lens.id,

@@ -3,6 +3,55 @@
 ## Status
 Accepted — v1.1.0
 
+---
+
+## Amendment: v1.1 Design Philosophy (2026-01-24)
+
+### Background
+
+Initial lens implementations used eligibility rules for hard filtering (e.g., DEFENSIVE required `bulletType IN ["HP"]`). In practice, this caused ZERO_RESULTS for most searches because:
+1. Product metadata (especially `bulletType`) is often unpopulated
+2. Hard filtering on incomplete data hides relevant products from users
+3. Users searching for "9mm defense" expect to see results, not empty sets
+
+### Design Philosophy Change
+
+**v1.1 shifts lenses from filtering-focused to ordering-focused.**
+
+Key principles:
+1. **Lenses optimize sort order, not filter sets** — Different use cases prioritize different factors (price vs. availability vs. confidence)
+2. **Eligibility is optional and sparingly used** — Hard filtering should only be used when exclusion is truly policy-correct
+3. **Best-effort approach** — Missing metadata should demote products in ordering, not hide them entirely
+4. **Products with null fields sort LAST, not excluded** — This is the existing ordering behavior, now the primary mechanism
+
+### Impact on Lens Definitions
+
+- `eligibility` in the `Lens` interface is now optional (`eligibility?: EligibilityRule[]`)
+- RANGE, DEFENSIVE, and MATCH lenses no longer define eligibility rules
+- Ordering alone differentiates lens behavior (price-first, availability-first, confidence-first)
+- When `bulletType` is unavailable, it can be extracted from product names as a fallback
+
+### When to Use Eligibility
+
+Eligibility filtering remains appropriate for:
+- Compliance requirements (must exclude certain products)
+- Hard business rules (not "optimization preferences")
+- Cases where showing a result would be misleading
+
+Do NOT use eligibility for:
+- "Soft" preferences (use ordering instead)
+- Boosting certain products (use ordering instead)
+- Hiding products with incomplete metadata
+
+### Backward Compatibility
+
+- API response shape unchanged
+- `zeroResults` flag still supported (now rare)
+- Empty results still returned rather than masked when they occur
+- Telemetry unchanged
+
+---
+
 ## Purpose
 
 A **Lens** defines how IronScout interprets buyer intent and deterministically shapes search results.
@@ -22,11 +71,13 @@ A Lens exists to make search **predictable, explainable, and aligned with buyer 
 
 A **Lens** is a deterministic, versioned policy object that controls:
 
-1. **Eligibility** — which products or offers are allowed
-2. **Ordering** — how allowed results are sorted
+1. **Ordering** — how results are sorted (primary mechanism)
+2. **Eligibility** — which products are allowed (optional, used sparingly)
 3. **Presentation metadata** — how the view is labeled and explained
 
 A Lens operates **after candidate recall** and **before response shaping**.
+
+> **v1.1 Note**: Lenses are ordering-focused. See Amendment above.
 
 ---
 
@@ -175,7 +226,7 @@ interface Lens {
   description: string
 
   triggers: LensTriggerRule[]
-  eligibility: EligibilityRule[]
+  eligibility?: EligibilityRule[]  // Optional in v1.1 (see Amendment)
   ordering: OrderingRule[]
 
   version: string
@@ -238,7 +289,10 @@ Trigger rules must not reference:
 
 ## Eligibility Rules
 
-Eligibility rules define **hard constraints**.
+> **v1.1 Note**: Eligibility is optional. Standard lenses (RANGE, DEFENSIVE, MATCH)
+> no longer define eligibility rules. See Amendment above.
+
+Eligibility rules define **hard constraints** when used.
 They are binary and non-scoring.
 
 ```typescript
@@ -421,6 +475,9 @@ productId: string
 
 ## Required Lenses (Ammo v1)
 
+> **v1.1 Note**: Eligibility rules removed from RANGE, DEFENSIVE, and MATCH.
+> Lenses now differentiate purely by ordering. See Amendment above.
+
 ### ALL (Default)
 Eligibility: none
 Ordering:
@@ -432,10 +489,8 @@ Ordering:
 ---
 
 ### RANGE
-Eligibility:
-- bulletType IN ["FMJ"]
-
-Ordering:
+Eligibility: none (v1.1)
+Ordering: (price-first for value-conscious buyers)
 1. pricePerRound ASC
 2. availability DESC
 3. canonicalConfidence DESC
@@ -444,10 +499,8 @@ Ordering:
 ---
 
 ### DEFENSIVE
-Eligibility:
-- bulletType IN ["HP"]
-
-Ordering:
+Eligibility: none (v1.1)
+Ordering: (availability-first for reliability-conscious buyers)
 1. availability DESC
 2. canonicalConfidence DESC
 3. pricePerRound ASC
@@ -456,10 +509,8 @@ Ordering:
 ---
 
 ### MATCH
-Eligibility:
-- bulletType IN ["OTM", "MATCH"]
-
-Ordering:
+Eligibility: none (v1.1)
+Ordering: (confidence-first for quality-conscious buyers)
 1. canonicalConfidence DESC
 2. availability DESC
 3. pricePerRound ASC
@@ -469,6 +520,10 @@ Ordering:
 
 ## Empty Result Handling
 
+> **v1.1 Note**: With eligibility rules removed from standard lenses, zero results
+> due to eligibility filtering should be rare. This section remains for lenses
+> that do define eligibility rules.
+
 When eligibility rules filter all candidates:
 
 ```typescript
@@ -476,8 +531,8 @@ When eligibility rules filter all candidates:
 {
   "results": [],
   "lens": {
-    "id": "DEFENSIVE",
-    "label": "Defensive",
+    "id": "CUSTOM_LENS",
+    "label": "Custom Lens",
     "autoApplied": true,
     "zeroResults": true,
     "reasonCode": "ZERO_RESULTS",
@@ -487,7 +542,7 @@ When eligibility rules filter all candidates:
 }
 ```
 
-Do NOT silently fallback to ALL. Empty results are policy-correct.
+Do NOT silently fallback to ALL. Empty results are policy-correct when they occur.
 
 ---
 
@@ -635,7 +690,7 @@ High ambiguous rates indicate overlapping trigger definitions.
 
 1. Lenses are deterministic given intent signals
 2. Intent extraction is deterministic (pinned model, temp=0)
-3. Eligibility is binary
+3. Eligibility is binary (when defined)
 4. Ordering derives from declared ordering rules only
 5. Embeddings never rank
 6. User overrides always win
@@ -648,6 +703,7 @@ High ambiguous rates indicate overlapping trigger definitions.
 13. IN/NOT_IN values are always arrays
 14. candidates[] is lexicographically sorted
 15. Results are product-grouped with best-offer aggregation
+16. Eligibility is optional; ordering is the primary differentiation mechanism (v1.1)
 
 ---
 

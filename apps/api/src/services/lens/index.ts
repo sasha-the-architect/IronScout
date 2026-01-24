@@ -213,9 +213,9 @@ export async function applyLensPipeline(input: LensPipelineInput): Promise<LensP
   const aggregated = aggregateProducts(input.products)
   timing.end('offers')
 
-  // 4. Apply eligibility filter
+  // 4. Apply eligibility filter (if any rules defined)
   timing.start('rank')
-  const { eligible, filterReasons } = applyEligibility(aggregated, selection.lens.eligibility)
+  const { eligible, filterReasons } = applyEligibility(aggregated, selection.lens.eligibility ?? [])
 
   // 5. Apply ordering
   const ordered = applyOrdering(eligible, selection.lens.ordering)

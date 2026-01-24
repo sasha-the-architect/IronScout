@@ -183,6 +183,70 @@ function normalizeBulletType(bulletType: string | null | undefined): string | nu
 }
 
 /**
+ * Extract bullet type from product name if not explicitly set.
+ * Parses common bullet type abbreviations from product names.
+ *
+ * Examples:
+ * - "Federal 9mm 124gr FMJ" → "FMJ"
+ * - "Hornady Critical Defense 9mm 115gr" → "FTX" (implied by brand/line)
+ * - "Speer Gold Dot 9mm 124gr JHP" → "JHP"
+ *
+ * @param name - Product name to parse
+ * @returns Extracted bullet type or null
+ */
+function extractBulletTypeFromName(name: string | null | undefined): string | null {
+  if (!name) return null
+
+  const upperName = name.toUpperCase()
+
+  // Order matters - more specific patterns first
+  const bulletTypePatterns: [RegExp, string][] = [
+    // Hollow points (defense)
+    [/\bJHP\b/, 'JHP'],           // Jacketed Hollow Point
+    [/\bBJHP\b/, 'JHP'],          // Bonded JHP
+    [/\bHST\b/, 'JHP'],           // Federal HST (hollow point)
+    [/\bGDHP\b/, 'JHP'],          // Gold Dot Hollow Point
+    [/\bXTP\b/, 'JHP'],           // Hornady XTP
+    [/\bV-CROWN\b/, 'JHP'],       // Sig V-Crown
+    [/\bFTX\b/, 'JHP'],           // Hornady FTX (Critical Defense)
+    [/\bHOLLOW\s*POINT\b/, 'HP'], // Generic Hollow Point
+    [/\bHP\b/, 'HP'],             // Hollow Point abbreviation
+
+    // Full metal jacket (range/target)
+    [/\bFMJ\b/, 'FMJ'],           // Full Metal Jacket
+    [/\bTMJ\b/, 'FMJ'],           // Total Metal Jacket (similar to FMJ)
+    [/\bMC\b/, 'FMJ'],            // Metal Case (Remington term for FMJ)
+    [/\bBALL\b/, 'FMJ'],          // Military ball ammo
+
+    // Soft point (hunting)
+    [/\bJSP\b/, 'SP'],            // Jacketed Soft Point
+    [/\bSP\b/, 'SP'],             // Soft Point
+    [/\bSST\b/, 'SP'],            // Hornady SST (hunting)
+
+    // Match/precision
+    [/\bOTM\b/, 'OTM'],           // Open Tip Match
+    [/\bBTHP\b/, 'OTM'],          // Boat Tail Hollow Point (match)
+    [/\bSMK\b/, 'OTM'],           // Sierra MatchKing
+    [/\bELD[- ]?M\b/, 'OTM'],     // Hornady ELD Match
+    [/\bMATCH\b/, 'OTM'],         // Generic match
+
+    // Specialty
+    [/\bFRANGIBLE\b/, 'FRANGIBLE'],
+    [/\bTRACER\b/, 'TRACER'],
+    [/\bAP\b/, 'AP'],             // Armor Piercing
+    [/\bAPI\b/, 'AP'],            // Armor Piercing Incendiary
+  ]
+
+  for (const [pattern, bulletType] of bulletTypePatterns) {
+    if (pattern.test(upperName)) {
+      return bulletType
+    }
+  }
+
+  return null
+}
+
+/**
  * Normalize casing material for lens evaluation.
  * Common casings: BRASS, STEEL, NICKEL, ALUMINUM
  */
@@ -211,11 +275,16 @@ export function aggregateProduct(product: ProductWithOffers): AggregatedProduct 
   // Use linkConfidence (from product_links.confidence) if available, fall back to dataConfidence
   const rawConfidence = product.linkConfidence ?? product.dataConfidence
 
+  // Extract bulletType from name if not explicitly set on product
+  const bulletType = product.bulletType
+    ? normalizeBulletType(product.bulletType)
+    : extractBulletTypeFromName(product.name)
+
   return {
     // Product-level fields with normalization
     // Per search-lens-v1.md: product field normalization MUST occur before lens evaluation
     productId: product.id,
-    bulletType: normalizeBulletType(product.bulletType),
+    bulletType,
     grain: product.grainWeight ?? null,
     casing: normalizeCasing(product.caseMaterial),
     packSize,
