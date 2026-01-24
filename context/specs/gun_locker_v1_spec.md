@@ -41,14 +41,19 @@ Multiple guns may share a caliber.
 ### Canonical Calibers (v1)
 
 ```
-9mm, .45 ACP, .40 S&W, .380 ACP, .22 LR, .223/5.56, .308/7.62x51,
-.30-06, 6.5 Creedmoor, 7.62x39, 12ga, 20ga
+9mm, .38 Special, .357 Magnum, .25 ACP, .32 ACP, 10mm Auto, .45 ACP, .45 Colt,
+.40 S&W, .380 ACP, .22 LR, .22 WMR, .17 HMR, .223/5.56, .308/7.62x51,
+.30-06, .300 AAC Blackout, 6.5 Creedmoor, 7.62x39, .243 Winchester,
+.270 Winchester, .30-30 Winchester, 12ga, 20ga, 16ga, .410 Bore
 ```
 
 **Alias mapping required:**
 - "9x19mm", "9mm Luger", "9mm Parabellum" → 9mm
 - "5.56 NATO", "5.56x45mm" → .223/5.56
 - "7.62x51mm", "7.62 NATO" → .308/7.62x51
+- ".22 Magnum"  .22 WMR
+- ".45 Long Colt"  .45 Colt
+- ".30-30"  .30-30 Winchester
 
 **UI must use dropdown selection, not free text input.**
 

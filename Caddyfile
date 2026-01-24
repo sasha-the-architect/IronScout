@@ -20,19 +20,19 @@
 # Marketing site (www)
 www.local.ironscout.ai {
 	tls internal
-	reverse_proxy localhost:3004
+	reverse_proxy 127.0.0.1:3004
 }
 
 # Main web application
 app.local.ironscout.ai {
 	tls internal
-	reverse_proxy localhost:3000
+	reverse_proxy 127.0.0.1:3000
 }
 
 # API server
 api.local.ironscout.ai {
 	tls internal
-	reverse_proxy localhost:8000 {
+	reverse_proxy 127.0.0.1:8000 {
 		# Pass original host for CORS
 		header_up Host {host}
 		header_up X-Real-IP {remote_host}
@@ -44,11 +44,11 @@ api.local.ironscout.ai {
 # Admin portal
 admin.local.ironscout.ai {
 	tls internal
-	reverse_proxy localhost:3002
+	reverse_proxy 127.0.0.1:3002
 }
 
 # Merchant portal
 merchant.local.ironscout.ai {
 	tls internal
-	reverse_proxy localhost:3003
+	reverse_proxy 127.0.0.1:3003
 }

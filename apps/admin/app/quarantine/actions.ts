@@ -11,6 +11,7 @@ import { prisma } from '@ironscout/db';
 import { revalidatePath } from 'next/cache';
 import { getAdminSession, logAdminAction } from '@/lib/auth';
 import { loggers } from '@/lib/logger';
+import { enqueueQuarantineReprocess } from '@/lib/queue';
 
 const log = loggers.admin;
 
@@ -33,9 +34,12 @@ export interface BulkReprocessResult {
 /**
  * Reprocess all quarantined records matching the filter.
  *
- * This marks records for reprocessing by resetting their status metadata.
- * The actual reprocessing happens on the next feed run or can be triggered
- * via the harvester CLI.
+ * Enqueues records to the quarantine-reprocess queue for the harvester to process.
+ * The harvester will:
+ * - Validate records against current rules
+ * - Create source_products and prices for valid records
+ * - Enqueue for product resolver
+ * - Update quarantine status to RESOLVED or keep QUARANTINED
  *
  * For safety:
  * - Requires admin session
@@ -82,28 +86,26 @@ export async function reprocessAllQuarantined(
       };
     }
 
-    // Get IDs of records to process (respecting limit)
+    // Get records to process (respecting limit)
     const records = await prisma.quarantined_records.findMany({
       where,
-      select: { id: true, feedId: true },
+      select: { id: true, feedId: true, feedType: true },
       take: limit,
       orderBy: { createdAt: 'asc' }, // Oldest first
     });
 
-    const recordIds = records.map((r) => r.id);
     const affectedFeedIds = [...new Set(records.map((r) => r.feedId))];
 
-    // Update records to mark them for reprocessing
-    // We add a reprocessRequestedAt timestamp to track bulk reprocess requests
-    const updated = await prisma.quarantined_records.updateMany({
-      where: {
-        id: { in: recordIds },
-        status: 'QUARANTINED', // Double-check status for race condition protection
-      },
-      data: {
-        updatedAt: new Date(), // Touch updatedAt to indicate pending reprocess
-      },
-    });
+    // Enqueue records for reprocessing via BullMQ
+    const recordsToEnqueue = records.map((r) => ({
+      id: r.id,
+      feedType: r.feedType as 'AFFILIATE' | 'RETAILER',
+    }));
+
+    const { batchId, enqueuedCount } = await enqueueQuarantineReprocess(
+      recordsToEnqueue,
+      session.email
+    );
 
     // Log the bulk action
     await logAdminAction(session.userId, 'QUARANTINE_BULK_REPROCESS', {
@@ -111,18 +113,20 @@ export async function reprocessAllQuarantined(
       resourceId: 'bulk',
       newValue: {
         feedType: feedType || 'ALL',
-        requestedCount: recordIds.length,
-        actualCount: updated.count,
+        requestedCount: records.length,
+        enqueuedCount,
+        batchId,
         affectedFeedIds,
         limitApplied: totalCount > limit,
         totalAvailable: totalCount,
       },
     });
 
-    log.info('Bulk reprocess initiated', {
+    log.info('Bulk reprocess enqueued', {
       feedType: feedType || 'ALL',
-      requestedCount: recordIds.length,
-      actualCount: updated.count,
+      requestedCount: records.length,
+      enqueuedCount,
+      batchId,
       affectedFeedIds,
       limitApplied: totalCount > limit,
       totalAvailable: totalCount,
@@ -137,8 +141,8 @@ export async function reprocessAllQuarantined(
 
     return {
       success: true,
-      processed: updated.count,
-      message: `Marked ${updated.count} records for reprocessing${limitMessage}. Records will be resolved on next feed import or harvester run.`,
+      processed: enqueuedCount,
+      message: `Enqueued ${enqueuedCount} records for reprocessing${limitMessage}. Check harvester logs for progress.`,
     };
   } catch (error) {
     log.error('Failed to bulk reprocess quarantine', { feedType }, error);

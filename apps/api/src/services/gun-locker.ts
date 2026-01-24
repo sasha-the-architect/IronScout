@@ -14,17 +14,31 @@ import { randomUUID } from 'crypto'
  */
 export const CANONICAL_CALIBERS = [
   '9mm',
+  '.38 Special',
+  '.357 Magnum',
+  '.25 ACP',
+  '.32 ACP',
+  '10mm Auto',
   '.45 ACP',
+  '.45 Colt',
   '.40 S&W',
   '.380 ACP',
   '.22 LR',
+  '.22 WMR',
+  '.17 HMR',
   '.223/5.56',
   '.308/7.62x51',
   '.30-06',
+  '.300 AAC Blackout',
   '6.5 Creedmoor',
   '7.62x39',
+  '.243 Winchester',
+  '.270 Winchester',
+  '.30-30 Winchester',
   '12ga',
   '20ga',
+  '16ga',
+  '.410 Bore',
 ] as const
 
 export type CaliberValue = typeof CANONICAL_CALIBERS[number]
@@ -39,19 +53,41 @@ const CALIBER_ALIASES: Record<string, CaliberValue> = {
   '9x19': '9mm',
   '9mm luger': '9mm',
   '9mm parabellum': '9mm',
+  // .38 Special aliases
+  '.38 spl': '.38 Special',
+  '38 spl': '.38 Special',
+  '38 special': '.38 Special',
+  // .357 Magnum aliases
+  '.357 mag': '.357 Magnum',
+  '357 mag': '.357 Magnum',
+  '357 magnum': '.357 Magnum',
+  // .25 ACP aliases
+  '25 acp': '.25 ACP',
+  '.25acp': '.25 ACP',
+  // .32 ACP aliases
+  '32 acp': '.32 ACP',
+  '.32acp': '.32 ACP',
+  // 10mm Auto aliases
+  '10mm': '10mm Auto',
+  '10mm auto': '10mm Auto',
   // .223/5.56 aliases
   '5.56 nato': '.223/5.56',
   '5.56x45mm': '.223/5.56',
   '5.56x45': '.223/5.56',
+  '5.56x45 nato': '.223/5.56',
+  '5.56x45mm nato': '.223/5.56',
   '5.56mm': '.223/5.56',
   '5.56': '.223/5.56',
   '.223 rem': '.223/5.56',
   '.223 remington': '.223/5.56',
   '223 rem': '.223/5.56',
+  '223 remington': '.223/5.56',
   // .308/7.62x51 aliases
   '7.62x51mm': '.308/7.62x51',
   '7.62x51': '.308/7.62x51',
   '7.62 nato': '.308/7.62x51',
+  '7.62x51 nato': '.308/7.62x51',
+  '7.62x51mm nato': '.308/7.62x51',
   '.308 win': '.308/7.62x51',
   '.308 winchester': '.308/7.62x51',
   '308 win': '.308/7.62x51',
@@ -59,6 +95,11 @@ const CALIBER_ALIASES: Record<string, CaliberValue> = {
   '.45 auto': '.45 ACP',
   '45 acp': '.45 ACP',
   '.45acp': '.45 ACP',
+  // .45 Colt aliases
+  '45 colt': '.45 Colt',
+  '.45 colt': '.45 Colt',
+  '45 long colt': '.45 Colt',
+  '.45 long colt': '.45 Colt',
   // .40 S&W aliases
   '40 s&w': '.40 S&W',
   '.40sw': '.40 S&W',
@@ -72,6 +113,16 @@ const CALIBER_ALIASES: Record<string, CaliberValue> = {
   '.22lr': '.22 LR',
   '22lr': '.22 LR',
   '.22 long rifle': '.22 LR',
+  // .22 WMR aliases
+  '22 wmr': '.22 WMR',
+  '.22 wmr': '.22 WMR',
+  '22 mag': '.22 WMR',
+  '.22 mag': '.22 WMR',
+  '22 magnum': '.22 WMR',
+  '.22 magnum': '.22 WMR',
+  // .17 HMR aliases
+  '17 hmr': '.17 HMR',
+  '.17 hmr': '.17 HMR',
   // 6.5 Creedmoor aliases
   '6.5mm creedmoor': '6.5 Creedmoor',
   '6.5 cm': '6.5 Creedmoor',
@@ -81,6 +132,26 @@ const CALIBER_ALIASES: Record<string, CaliberValue> = {
   '30-06': '.30-06',
   '.30-06 springfield': '.30-06',
   '.30-06 sprg': '.30-06',
+  // .300 AAC Blackout aliases
+  '300 blackout': '.300 AAC Blackout',
+  '.300 blackout': '.300 AAC Blackout',
+  '300 aac': '.300 AAC Blackout',
+  '.300 aac': '.300 AAC Blackout',
+  '300 aac blackout': '.300 AAC Blackout',
+  // .243 Winchester aliases
+  '.243 win': '.243 Winchester',
+  '243 win': '.243 Winchester',
+  '243 winchester': '.243 Winchester',
+  // .270 Winchester aliases
+  '.270 win': '.270 Winchester',
+  '270 win': '.270 Winchester',
+  '270 winchester': '.270 Winchester',
+  // .30-30 Winchester aliases
+  '30-30': '.30-30 Winchester',
+  '.30-30': '.30-30 Winchester',
+  '30-30 win': '.30-30 Winchester',
+  '.30-30 win': '.30-30 Winchester',
+  '.30-30 winchester': '.30-30 Winchester',
   // Shotgun aliases
   '12 gauge': '12ga',
   '12 ga': '12ga',
@@ -88,6 +159,12 @@ const CALIBER_ALIASES: Record<string, CaliberValue> = {
   '20 gauge': '20ga',
   '20 ga': '20ga',
   '20g': '20ga',
+  '16 gauge': '16ga',
+  '16 ga': '16ga',
+  '16g': '16ga',
+  '.410 bore': '.410 Bore',
+  '410 bore': '.410 Bore',
+  '410': '.410 Bore',
 }
 
 /**

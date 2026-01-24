@@ -126,3 +126,87 @@ export async function hasActiveJob(feedId: string): Promise<boolean> {
     throw new Error(`Redis connection failed: ${err.message}`);
   }
 }
+
+// ============================================================================
+// QUARANTINE REPROCESS QUEUE
+// ============================================================================
+
+export interface QuarantineReprocessJobData {
+  quarantineRecordId: string;
+  feedType: 'AFFILIATE' | 'RETAILER';
+  triggeredBy: string;
+  batchId: string;
+}
+
+let quarantineReprocessQueue: Queue<QuarantineReprocessJobData> | null = null;
+
+function getQuarantineReprocessQueue(): Queue<QuarantineReprocessJobData> {
+  if (!quarantineReprocessQueue) {
+    quarantineReprocessQueue = new Queue<QuarantineReprocessJobData>('quarantine-reprocess', {
+      connection: redisConnection,
+    });
+  }
+  return quarantineReprocessQueue;
+}
+
+/**
+ * Generate a unique batch ID for grouping reprocess jobs
+ */
+function generateBatchId(): string {
+  return `batch-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Enqueue quarantine records for reprocessing
+ * @param records - Array of quarantine record IDs and their feed types
+ * @param triggeredBy - Email of admin user who triggered the reprocess
+ * @returns Batch ID and count of enqueued jobs
+ */
+export async function enqueueQuarantineReprocess(
+  records: Array<{ id: string; feedType: 'AFFILIATE' | 'RETAILER' }>,
+  triggeredBy: string
+): Promise<{ batchId: string; enqueuedCount: number }> {
+  if (records.length === 0) {
+    return { batchId: '', enqueuedCount: 0 };
+  }
+
+  const batchId = generateBatchId();
+  const queue = getQuarantineReprocessQueue();
+
+  console.log(`[Quarantine Reprocess] Enqueuing ${records.length} records for reprocessing`, {
+    batchId,
+    triggeredBy,
+    feedTypes: {
+      affiliate: records.filter(r => r.feedType === 'AFFILIATE').length,
+      retailer: records.filter(r => r.feedType === 'RETAILER').length,
+    },
+  });
+
+  try {
+    const jobs = records.map((record) => ({
+      name: 'REPROCESS_QUARANTINE',
+      data: {
+        quarantineRecordId: record.id,
+        feedType: record.feedType,
+        triggeredBy,
+        batchId,
+      } satisfies QuarantineReprocessJobData,
+      opts: {
+        jobId: `QUARANTINE_REPROCESS_${record.id}`,
+      },
+    }));
+
+    await queue.addBulk(jobs);
+
+    console.log(`[Quarantine Reprocess] Successfully enqueued ${records.length} jobs`, { batchId });
+    return { batchId, enqueuedCount: records.length };
+  } catch (error) {
+    const err = error as Error & { code?: string };
+    console.error('[Quarantine Reprocess] Failed to enqueue jobs', {
+      message: err.message,
+      code: err.code,
+      batchId,
+    });
+    throw new Error(`Failed to enqueue reprocess jobs: ${err.message}`);
+  }
+}

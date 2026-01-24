@@ -26,6 +26,7 @@ export const logger = {
   affiliate: rootLogger.child('affiliate'),
   resolver: rootLogger.child('resolver'),
   embedding: rootLogger.child('embedding'),
+  quarantine: rootLogger.child('quarantine'),
 }
 
 // Export root logger for custom child creation

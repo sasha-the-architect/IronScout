@@ -1312,17 +1312,31 @@ export async function getSavedItem(token: string, productId: string): Promise<Sa
  */
 export const CALIBERS = [
   { value: '9mm', label: '9mm' },
+  { value: '.38 Special', label: '.38 Special' },
+  { value: '.357 Magnum', label: '.357 Magnum' },
+  { value: '.25 ACP', label: '.25 ACP' },
+  { value: '.32 ACP', label: '.32 ACP' },
+  { value: '10mm Auto', label: '10mm Auto' },
   { value: '.45 ACP', label: '.45 ACP' },
+  { value: '.45 Colt', label: '.45 Colt' },
   { value: '.40 S&W', label: '.40 S&W' },
   { value: '.380 ACP', label: '.380 ACP' },
   { value: '.22 LR', label: '.22 LR' },
-  { value: '.223/5.56', label: '.223/5.56' },
-  { value: '.308/7.62x51', label: '.308/7.62x51' },
+  { value: '.22 WMR', label: '.22 WMR (.22 Magnum)' },
+  { value: '.17 HMR', label: '.17 HMR' },
+  { value: '.223/5.56', label: '.223 Remington / 5.56 NATO' },
+  { value: '.308/7.62x51', label: '.308 Winchester / 7.62x51 NATO' },
   { value: '.30-06', label: '.30-06' },
+  { value: '.300 AAC Blackout', label: '.300 AAC Blackout' },
   { value: '6.5 Creedmoor', label: '6.5 Creedmoor' },
   { value: '7.62x39', label: '7.62x39' },
+  { value: '.243 Winchester', label: '.243 Winchester' },
+  { value: '.270 Winchester', label: '.270 Winchester' },
+  { value: '.30-30 Winchester', label: '.30-30 Winchester' },
   { value: '12ga', label: '12 Gauge' },
   { value: '20ga', label: '20 Gauge' },
+  { value: '16ga', label: '16 Gauge' },
+  { value: '.410 Bore', label: '.410 Bore' },
 ] as const
 
 export type CaliberValue = typeof CALIBERS[number]['value']

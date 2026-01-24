@@ -53,6 +53,13 @@ import {
   startEmbeddingWorker,
   stopEmbeddingWorker,
 } from './embedding/worker'
+
+// Quarantine Reprocess Worker
+import {
+  startQuarantineReprocessWorker,
+  stopQuarantineReprocessWorker,
+} from './quarantine/worker'
+
 import type { Worker } from 'bullmq'
 
 // Create affiliate workers (lazy initialization)
@@ -64,6 +71,9 @@ let resolverWorker: Worker | null = null
 
 // Embedding generation worker (lazy initialization)
 let embeddingWorker: Worker | null = null
+
+// Quarantine reprocess worker (lazy initialization)
+let quarantineReprocessWorker: Worker | null = null
 
 /**
  * Scheduler enabled flags (set during startup from database/env)
@@ -239,6 +249,10 @@ async function startup() {
   log.info('Starting embedding generation worker')
   embeddingWorker = await startEmbeddingWorker({ concurrency: 3 })
 
+  // Start quarantine reprocess worker (always on - processes admin-triggered reprocessing)
+  log.info('Starting quarantine reprocess worker')
+  quarantineReprocessWorker = await startQuarantineReprocessWorker({ concurrency: 10 })
+
   // Start stuck PROCESSING sweeper (recovers jobs that crash mid-processing)
   log.info('Starting product resolver sweeper')
   startProcessingSweeper()
@@ -307,6 +321,8 @@ const shutdown = async (signal: string) => {
       })(),
       // Embedding generation worker
       stopEmbeddingWorker(),
+      // Quarantine reprocess worker
+      stopQuarantineReprocessWorker(),
     ])
     log.info('All workers closed')
 

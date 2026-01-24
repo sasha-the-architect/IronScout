@@ -22,6 +22,8 @@ export const QUEUE_NAMES = {
   PRODUCT_RESOLVE: 'product-resolve',
   // Embedding Generation queue
   EMBEDDING_GENERATE: 'embedding-generate',
+  // Quarantine Reprocess queue (Admin-triggered bulk reprocessing)
+  QUARANTINE_REPROCESS: 'quarantine-reprocess',
 } as const
 
 // Job data interfaces
@@ -505,6 +507,77 @@ export async function enqueueEmbeddingGenerate(
   }
 }
 
+// ============================================================================
+// QUARANTINE REPROCESS QUEUE
+// ============================================================================
+
+/**
+ * Quarantine Reprocess job data
+ * Admin-triggered reprocessing of quarantined records
+ */
+export interface QuarantineReprocessJobData {
+  /** ID of the quarantined record to reprocess */
+  quarantineRecordId: string
+  /** Feed type for routing to correct processor */
+  feedType: 'AFFILIATE' | 'RETAILER'
+  /** Admin user who triggered the reprocess (for audit) */
+  triggeredBy: string
+  /** Batch ID for grouping related reprocess jobs */
+  batchId: string
+}
+
+/**
+ * Quarantine Reprocess queue
+ * - Processes quarantined records that admin has marked for reprocessing
+ * - Validates records against current logic
+ * - Creates source_products and enqueues for resolver if valid
+ * - Updates quarantine status based on outcome
+ */
+export const quarantineReprocessQueue = new Queue<QuarantineReprocessJobData>(
+  QUEUE_NAMES.QUARANTINE_REPROCESS,
+  {
+    connection: redisConnection,
+    defaultJobOptions: {
+      attempts: 2,
+      backoff: {
+        type: 'fixed',
+        delay: 5000,
+      },
+      ...getJobOptions('quarantine-reprocess'),
+    },
+  }
+)
+
+/**
+ * Enqueue quarantine records for reprocessing
+ *
+ * @param recordIds - Array of quarantined record IDs to reprocess
+ * @param triggeredBy - Admin user email who triggered the reprocess
+ * @returns Batch ID for tracking
+ */
+export async function enqueueQuarantineReprocess(
+  records: Array<{ id: string; feedType: 'AFFILIATE' | 'RETAILER' }>,
+  triggeredBy: string
+): Promise<string> {
+  const batchId = createId()
+
+  const jobs = records.map((record) => ({
+    name: 'REPROCESS_QUARANTINE',
+    data: {
+      quarantineRecordId: record.id,
+      feedType: record.feedType,
+      triggeredBy,
+      batchId,
+    } satisfies QuarantineReprocessJobData,
+    opts: {
+      jobId: `QUARANTINE_REPROCESS_${record.id}`,
+    },
+  }))
+
+  await quarantineReprocessQueue.addBulk(jobs)
+  return batchId
+}
+
 // Export all queues
 export const queues = {
   crawl: crawlQueue,
@@ -523,5 +596,7 @@ export const queues = {
   productResolve: productResolveQueue,
   // Embedding Generation queue
   embeddingGenerate: embeddingGenerateQueue,
+  // Quarantine Reprocess queue
+  quarantineReprocess: quarantineReprocessQueue,
 }
 

@@ -75,7 +75,10 @@ app.use(requestContextMiddleware)
 app.use(requestLoggerMiddleware)
 
 // CORS configuration to support multiple domains
+// CORS_ORIGINS env var takes precedence (comma-separated list)
+const corsOriginsFromEnv = process.env.CORS_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) || []
 const allowedOrigins = [
+  ...corsOriginsFromEnv,
   'http://localhost:3000',
   'http://localhost:3002', // Admin app
   'http://localhost:3003', // Merchant app
@@ -89,6 +92,10 @@ const allowedOrigins = [
   process.env.MERCHANT_URL,
 ].filter(Boolean)
 
+// Log allowed origins at startup (deduplicated for clarity)
+const uniqueOrigins = [...new Set(allowedOrigins)]
+log.info('CORS allowed origins configured', { origins: uniqueOrigins })
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -97,6 +104,7 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true)
     } else {
+      log.warn('CORS blocked request from unknown origin', { origin, allowedOrigins: uniqueOrigins })
       callback(new Error('Not allowed by CORS'))
     }
   },
