@@ -44,7 +44,7 @@ Multiple guns may share a caliber.
 9mm, .38 Special, .357 Magnum, .25 ACP, .32 ACP, 10mm Auto, .45 ACP, .45 Colt,
 .40 S&W, .380 ACP, .22 LR, .22 WMR, .17 HMR, .223/5.56, .308/7.62x51,
 .30-06, .300 AAC Blackout, 6.5 Creedmoor, 7.62x39, .243 Winchester,
-.270 Winchester, .30-30 Winchester, 12ga, 20ga, 16ga, .410 Bore
+.270 Winchester, .30-30 Winchester, 12ga, 20ga, 16ga, .410 Bore, Other
 ```
 
 **Alias mapping required:**
@@ -54,6 +54,7 @@ Multiple guns may share a caliber.
 - ".22 Magnum"  .22 WMR
 - ".45 Long Colt"  .45 Colt
 - ".30-30"  .30-30 Winchester
+- "Other", "Unknown"  Other
 
 **UI must use dropdown selection, not free text input.**
 

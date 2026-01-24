@@ -1337,6 +1337,7 @@ export const CALIBERS = [
   { value: '20ga', label: '20 Gauge' },
   { value: '16ga', label: '16 Gauge' },
   { value: '.410 Bore', label: '.410 Bore' },
+  { value: 'Other', label: 'Other' },
 ] as const
 
 export type CaliberValue = typeof CALIBERS[number]['value']

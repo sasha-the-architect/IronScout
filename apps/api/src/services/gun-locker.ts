@@ -39,6 +39,7 @@ export const CANONICAL_CALIBERS = [
   '20ga',
   '16ga',
   '.410 Bore',
+  'Other',
 ] as const
 
 export type CaliberValue = typeof CANONICAL_CALIBERS[number]
@@ -165,6 +166,9 @@ const CALIBER_ALIASES: Record<string, CaliberValue> = {
   '.410 bore': '.410 Bore',
   '410 bore': '.410 Bore',
   '410': '.410 Bore',
+  // Other/unknown
+  'other': 'Other',
+  'unknown': 'Other',
 }
 
 /**
