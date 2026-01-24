@@ -42,6 +42,7 @@ const SCHEMA: Record<string, string[]> = {
   source_products: [
     'id',
     'sourceId',
+    'identityKey',  // Added for dedupe and reprocessing
     'title',
     'url',
     'imageUrl',

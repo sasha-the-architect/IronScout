@@ -1157,6 +1157,7 @@ async function batchUpsertSourceProducts(
   if (toInsert.length > 0) {
     // Generate IDs client-side using cuid pattern (matches Prisma default)
     const insertIds = toInsert.map(() => createId())
+    const insertIdentityKeys = toInsert.map((i) => i.product.identityKey)
     const insertTitles = toInsert.map((i) => i.product.product.name)
     const insertUrls = toInsert.map((i) => i.product.product.url)
     const insertImageUrls = toInsert.map((i) => i.product.product.imageUrl ?? null)
@@ -1172,13 +1173,14 @@ async function batchUpsertSourceProducts(
     // Note: brand/description/category are persisted for resolver fingerprinting
     await prisma.$executeRaw`
       INSERT INTO source_products (
-        "id", "sourceId", "title", "url", "imageUrl", "brand", "description", "category",
+        "id", "sourceId", "identityKey", "title", "url", "imageUrl", "brand", "description", "category",
         "caliber", "grainWeight", "roundCount", "normalizedUrl",
         "createdByRunId", "lastUpdatedByRunId", "createdAt", "updatedAt"
       )
       SELECT
         unnest(${insertIds}::text[]),
         ${sourceId},
+        unnest(${insertIdentityKeys}::text[]),
         unnest(${insertTitles}::text[]),
         unnest(${insertUrls}::text[]),
         unnest(${insertImageUrls}::text[]),

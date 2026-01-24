@@ -39,20 +39,8 @@ const PROJECT_ROOT = resolve(__dirname, '../..')
 
 // Service definitions
 // Note: Using 127.0.0.1 instead of localhost for reliable health checks on Windows
+// Caddy is started LAST so all apps are ready before the reverse proxy starts
 const SERVICES = [
-  {
-    name: 'caddy',
-    port: 443,
-    // Use full path on Windows since Chocolatey may not be in Git Bash PATH
-    devCommand: process.platform === 'win32'
-      ? 'C:\\ProgramData\\chocolatey\\bin\\caddy.exe run'
-      : 'caddy run',
-    prodCommand: process.platform === 'win32'
-      ? 'C:\\ProgramData\\chocolatey\\bin\\caddy.exe run'
-      : 'caddy run',
-    healthCheck: null, // Caddy doesn't have a simple health endpoint
-    optional: false, // Required for local HTTPS domains
-  },
   {
     name: 'api',
     port: 8000,
@@ -101,6 +89,19 @@ const SERVICES = [
     devCommand: 'pnpm --filter @ironscout/harvester bullboard:dev',
     prodCommand: 'pnpm --filter @ironscout/harvester bullboard',
     healthCheck: 'http://127.0.0.1:3939/health',
+  },
+  {
+    name: 'caddy',
+    port: 443,
+    // Use full path on Windows since Chocolatey may not be in Git Bash PATH
+    devCommand: process.platform === 'win32'
+      ? 'C:\\ProgramData\\chocolatey\\bin\\caddy.exe run'
+      : 'caddy run',
+    prodCommand: process.platform === 'win32'
+      ? 'C:\\ProgramData\\chocolatey\\bin\\caddy.exe run'
+      : 'caddy run',
+    healthCheck: null, // Caddy doesn't have a simple health endpoint
+    optional: false, // Required for local HTTPS domains
   },
 ]
 

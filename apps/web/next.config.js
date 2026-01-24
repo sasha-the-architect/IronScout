@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Allow dev requests from local HTTPS domains (via Caddy)
+  allowedDevOrigins: [
+    'https://app.local.ironscout.ai',
+    'https://api.local.ironscout.ai',
+  ],
   // Externalize packages that shouldn't be bundled for server-side
   serverExternalPackages: ['@prisma/client', '@prisma/adapter-pg', 'pg'],
   images: {

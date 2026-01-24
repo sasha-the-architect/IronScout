@@ -11,7 +11,7 @@ import { prisma } from '@ironscout/db';
 import { revalidatePath } from 'next/cache';
 import { getAdminSession, logAdminAction } from '@/lib/auth';
 import { loggers } from '@/lib/logger';
-import { enqueueQuarantineReprocess } from '@/lib/queue';
+import { enqueueQuarantineReprocess, enqueueProductResolve } from '@/lib/queue';
 
 const log = loggers.admin;
 
@@ -336,4 +336,164 @@ export async function getQuarantineCounts(): Promise<QuarantineCounts> {
     },
     byReasonCode,
   };
+}
+
+// =============================================================================
+// NEEDS_REVIEW Reprocessing (Product Links)
+// =============================================================================
+
+// Current resolver version - should match harvester's RESOLVER_VERSION
+const RESOLVER_VERSION = 'v1.2';
+
+export interface NeedsReviewReprocessOptions {
+  limit?: number; // Safety limit, default 500
+}
+
+export interface NeedsReviewReprocessResult {
+  success: boolean;
+  error?: string;
+  processed?: number;
+  message?: string;
+}
+
+/** Statuses that can be reprocessed */
+const REPROCESSABLE_STATUSES = ['NEEDS_REVIEW', 'UNMATCHED'] as const;
+
+/**
+ * Reprocess all product_links with NEEDS_REVIEW or UNMATCHED status.
+ *
+ * Enqueues the associated source_products to the product-resolve queue
+ * for re-resolution. Use this after matcher/resolver logic updates.
+ *
+ * For safety:
+ * - Requires admin session
+ * - Has a configurable limit (default 500)
+ * - Logs all bulk operations
+ */
+export async function reprocessAllNeedsReview(
+  options: NeedsReviewReprocessOptions = {}
+): Promise<NeedsReviewReprocessResult> {
+  const session = await getAdminSession();
+  if (!session) {
+    log.warn('Unauthorized NEEDS_REVIEW reprocess action attempted');
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  const { limit = 500 } = options;
+
+  try {
+    // Count total reprocessable links
+    const totalCount = await prisma.product_links.count({
+      where: { status: { in: [...REPROCESSABLE_STATUSES] } },
+    });
+
+    if (totalCount === 0) {
+      log.info('NEEDS_REVIEW reprocess: no records to process', {
+        actor: session.email,
+      });
+      return {
+        success: true,
+        processed: 0,
+        message: 'No NEEDS_REVIEW or UNMATCHED product links found.',
+      };
+    }
+
+    // Get product_links with reprocessable status and their source_products
+    const links = await prisma.product_links.findMany({
+      where: { status: { in: [...REPROCESSABLE_STATUSES] } },
+      select: {
+        id: true,
+        sourceProductId: true,
+        source_products: {
+          select: {
+            id: true,
+            sourceId: true,
+            identityKey: true,
+          },
+        },
+      },
+      take: limit,
+      orderBy: { createdAt: 'asc' }, // Oldest first
+    });
+
+    // Note: We don't change the status here - the resolver will handle it.
+    // When a source_product is re-resolved, the resolver will update/replace the product_link.
+
+    // Extract unique source products (identityKey is optional - resolver doesn't require it)
+    const sourceProductsMap = new Map<string, { id: string; sourceId: string; identityKey: string }>();
+    for (const link of links) {
+      if (link.source_products) {
+        sourceProductsMap.set(link.source_products.id, {
+          id: link.source_products.id,
+          sourceId: link.source_products.sourceId,
+          identityKey: link.source_products.identityKey || '',
+        });
+      }
+    }
+    const sourceProducts = Array.from(sourceProductsMap.values());
+
+    // Enqueue for resolution
+    const { batchId, enqueuedCount } = await enqueueProductResolve(
+      sourceProducts,
+      session.email,
+      RESOLVER_VERSION
+    );
+
+    // Log the bulk action
+    await logAdminAction(session.userId, 'NEEDS_REVIEW_BULK_REPROCESS', {
+      resource: 'product_links',
+      resourceId: 'bulk',
+      newValue: {
+        linksCount: links.length,
+        sourceProductsCount: sourceProducts.length,
+        enqueuedCount,
+        batchId,
+        limitApplied: totalCount > limit,
+        totalAvailable: totalCount,
+      },
+    });
+
+    log.info('NEEDS_REVIEW bulk reprocess enqueued', {
+      linksCount: links.length,
+      sourceProductsCount: sourceProducts.length,
+      enqueuedCount,
+      batchId,
+      limitApplied: totalCount > limit,
+      totalAvailable: totalCount,
+      actor: session.email,
+    });
+
+    revalidatePath('/quarantine');
+
+    const limitMessage = totalCount > limit
+      ? ` (limited to ${limit}, ${totalCount - limit} remaining)`
+      : '';
+
+    return {
+      success: true,
+      processed: enqueuedCount,
+      message: `Enqueued ${enqueuedCount} source products for re-resolution from ${links.length} NEEDS_REVIEW links${limitMessage}. Check harvester logs for progress.`,
+    };
+  } catch (error) {
+    log.error('Failed to bulk reprocess NEEDS_REVIEW', {}, error);
+
+    await logAdminAction(session.userId, 'NEEDS_REVIEW_BULK_REPROCESS_FAILED', {
+      resource: 'product_links',
+      resourceId: 'bulk',
+      newValue: {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
+
+    return { success: false, error: 'Failed to reprocess NEEDS_REVIEW items' };
+  }
+}
+
+/**
+ * Get count of reprocessable items (NEEDS_REVIEW + UNMATCHED) for UI
+ */
+export async function getNeedsReviewCount(): Promise<number> {
+  return prisma.product_links.count({
+    where: { status: { in: [...REPROCESSABLE_STATUSES] } },
+  });
 }

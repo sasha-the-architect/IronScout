@@ -552,13 +552,12 @@ function buildWhereClause(intent: SearchIntent, explicitFilters: ExplicitFilters
     addCondition(where, { grainWeight: { in: intent.grainWeights } })
   }
   
-  // Case material filter
-  const caseMaterials = explicitFilters.caseMaterial ? [explicitFilters.caseMaterial] : intent.caseMaterials
-  if (caseMaterials && caseMaterials.length > 0) {
+  // Case material filter - only apply if user explicitly specified
+  // AI intent may return default case materials which would filter out products
+  // that don't have this field populated
+  if (explicitFilters.caseMaterial) {
     addCondition(where, {
-      OR: caseMaterials.map(mat => ({
-        caseMaterial: { contains: mat, mode: 'insensitive' }
-      }))
+      caseMaterial: { contains: explicitFilters.caseMaterial, mode: 'insensitive' }
     })
   }
   
@@ -773,13 +772,12 @@ async function vectorEnhancedSearch(
     params.push(`%${purpose}%`)
   }
   
-  // Case material filter
-  const caseMaterials = explicitFilters.caseMaterial ? [explicitFilters.caseMaterial] : intent.caseMaterials
-  if (caseMaterials?.length) {
-    conditions.push(`"caseMaterial" ILIKE ANY($${params.length + 1})`)
-    params.push(caseMaterials.map(c => `%${c}%`))
+  // Case material filter - only apply if user explicitly specified
+  if (explicitFilters.caseMaterial) {
+    conditions.push(`"caseMaterial" ILIKE $${params.length + 1}`)
+    params.push(`%${explicitFilters.caseMaterial}%`)
   }
-  
+
   // Brand filter
   const brands = explicitFilters.brand ? [explicitFilters.brand] : intent.brands
   if (brands?.length) {

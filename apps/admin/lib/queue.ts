@@ -192,7 +192,8 @@ export async function enqueueQuarantineReprocess(
         batchId,
       } satisfies QuarantineReprocessJobData,
       opts: {
-        jobId: `QUARANTINE_REPROCESS_${record.id}`,
+        // Include batchId in jobId so reprocessing can run multiple times
+        jobId: `QUARANTINE_REPROCESS_${batchId}_${record.id}`,
       },
     }));
 
@@ -208,5 +209,92 @@ export async function enqueueQuarantineReprocess(
       batchId,
     });
     throw new Error(`Failed to enqueue reprocess jobs: ${err.message}`);
+  }
+}
+
+// ============================================================================
+// PRODUCT RESOLVE QUEUE (for NEEDS_REVIEW reprocessing)
+// ============================================================================
+
+// Must match harvester's ProductResolveJobData exactly
+export interface ProductResolveJobData {
+  sourceProductId: string;
+  trigger: 'INGEST' | 'RECONCILE' | 'MANUAL';
+  resolverVersion: string;
+  affiliateFeedRunId?: string;
+}
+
+let productResolveQueue: Queue<ProductResolveJobData> | null = null;
+
+function getProductResolveQueue(): Queue<ProductResolveJobData> {
+  if (!productResolveQueue) {
+    productResolveQueue = new Queue<ProductResolveJobData>('product-resolve', {
+      connection: redisConnection,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+      },
+    });
+  }
+  return productResolveQueue;
+}
+
+/**
+ * Enqueue source products for re-resolution (for NEEDS_REVIEW items)
+ * @param sourceProducts - Array of source products to re-resolve
+ * @param triggeredBy - Email of admin user who triggered the reprocess
+ * @param resolverVersion - Version of resolver to use
+ * @returns Batch ID and count of enqueued jobs
+ */
+export async function enqueueProductResolve(
+  sourceProducts: Array<{ id: string; sourceId: string; identityKey: string }>,
+  triggeredBy: string,
+  resolverVersion: string
+): Promise<{ batchId: string; enqueuedCount: number }> {
+  if (sourceProducts.length === 0) {
+    return { batchId: '', enqueuedCount: 0 };
+  }
+
+  const batchId = `needs-review-${generateBatchId()}`;
+  const queue = getProductResolveQueue();
+
+  console.log(`[Product Resolve] Enqueuing ${sourceProducts.length} products for re-resolution`, {
+    batchId,
+    triggeredBy,
+    resolverVersion,
+  });
+
+  try {
+    // Use MANUAL trigger for admin-initiated reprocessing
+    // Include batchId in affiliateFeedRunId for log correlation
+    const jobs = sourceProducts.map((sp) => ({
+      name: 'RESOLVE_SOURCE_PRODUCT',
+      data: {
+        sourceProductId: sp.id,
+        trigger: 'MANUAL' as const,
+        resolverVersion,
+        affiliateFeedRunId: batchId, // Use for log correlation
+      } satisfies ProductResolveJobData,
+      opts: {
+        // Use standard job ID format for deduplication
+        jobId: `RESOLVE_SOURCE_PRODUCT_${sp.id}`,
+      },
+    }));
+
+    await queue.addBulk(jobs);
+
+    console.log(`[Product Resolve] Successfully enqueued ${sourceProducts.length} jobs`, { batchId });
+    return { batchId, enqueuedCount: sourceProducts.length };
+  } catch (error) {
+    const err = error as Error & { code?: string };
+    console.error('[Product Resolve] Failed to enqueue jobs', {
+      message: err.message,
+      code: err.code,
+      batchId,
+    });
+    throw new Error(`Failed to enqueue resolve jobs: ${err.message}`);
   }
 }

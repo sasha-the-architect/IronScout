@@ -28,11 +28,18 @@ import { logger } from '../config/logger'
 
 const log = logger.quarantine
 
-// Metrics
+// Metrics (per worker lifetime)
 let processedCount = 0
 let resolvedCount = 0
 let stillQuarantinedCount = 0
 let errorCount = 0
+
+// Batch tracking for progress logging
+let currentBatchId: string | null = null
+let batchProcessedCount = 0
+let batchResolvedCount = 0
+let batchStillQuarantinedCount = 0
+const PROGRESS_LOG_INTERVAL = 10 // Log progress every N jobs
 
 /**
  * Quarantine Reprocess Worker instance
@@ -287,7 +294,7 @@ async function processReprocessJob(job: Job<QuarantineReprocessJobData>): Promis
 }> {
   const { quarantineRecordId, feedType, triggeredBy, batchId } = job.data
 
-  log.debug('QUARANTINE_REPROCESS_JOB_START', {
+  log.info('QUARANTINE_REPROCESS_JOB_START', {
     jobId: job.id,
     recordId: quarantineRecordId,
     feedType,
@@ -353,6 +360,7 @@ export async function startQuarantineReprocessWorker(options?: {
 }): Promise<Worker<QuarantineReprocessJobData>> {
   const concurrency = options?.concurrency ?? 10
 
+  console.log(`[Quarantine] Starting worker on queue "${QUEUE_NAMES.QUARANTINE_REPROCESS}" with concurrency=${concurrency}`)
   log.info('QUARANTINE_REPROCESS_WORKER_START', {
     event_name: 'QUARANTINE_REPROCESS_WORKER_START',
     concurrency,
@@ -371,15 +379,63 @@ export async function startQuarantineReprocessWorker(options?: {
   )
 
   // Event handlers
+  quarantineReprocessWorker.on('active', (job: Job<QuarantineReprocessJobData>) => {
+    console.log(`[Quarantine] Job picked up: ${job.id} feedType=${job.data.feedType} batchId=${job.data.batchId}`)
+    log.info('QUARANTINE_REPROCESS_JOB_ACTIVE', {
+      event_name: 'QUARANTINE_REPROCESS_JOB_ACTIVE',
+      jobId: job.id,
+      recordId: job.data.quarantineRecordId,
+      feedType: job.data.feedType,
+      batchId: job.data.batchId,
+    })
+  })
+
   quarantineReprocessWorker.on('completed', (job: Job<QuarantineReprocessJobData>, result: any) => {
     processedCount++
+    batchProcessedCount++
+
     if (result?.resolved) {
       resolvedCount++
+      batchResolvedCount++
     } else {
       stillQuarantinedCount++
+      batchStillQuarantinedCount++
     }
 
-    log.debug('QUARANTINE_REPROCESS_JOB_COMPLETED', {
+    // Track batch changes
+    const jobBatchId = job.data.batchId
+    if (currentBatchId !== jobBatchId) {
+      // New batch started - reset batch counters
+      if (currentBatchId !== null) {
+        // Log summary for previous batch
+        log.warn('QUARANTINE_REPROCESS_BATCH_COMPLETE', {
+          batchId: currentBatchId,
+          processed: batchProcessedCount - 1, // Exclude current job
+          resolved: batchResolvedCount - (result?.resolved ? 1 : 0),
+          stillQuarantined: batchStillQuarantinedCount - (result?.resolved ? 0 : 1),
+        })
+      }
+      currentBatchId = jobBatchId
+      batchProcessedCount = 1
+      batchResolvedCount = result?.resolved ? 1 : 0
+      batchStillQuarantinedCount = result?.resolved ? 0 : 1
+      log.warn('QUARANTINE_REPROCESS_BATCH_START', {
+        batchId: jobBatchId,
+        triggeredBy: job.data.triggeredBy,
+      })
+    }
+
+    // Log progress periodically (every N jobs) at WARN level so it's visible
+    if (batchProcessedCount % PROGRESS_LOG_INTERVAL === 0) {
+      log.warn('QUARANTINE_REPROCESS_PROGRESS', {
+        batchId: jobBatchId,
+        processed: batchProcessedCount,
+        resolved: batchResolvedCount,
+        stillQuarantined: batchStillQuarantinedCount,
+      })
+    }
+
+    log.info('QUARANTINE_REPROCESS_JOB_COMPLETED', {
       jobId: job.id,
       recordId: job.data.quarantineRecordId,
       resolved: result?.resolved,
@@ -395,6 +451,27 @@ export async function startQuarantineReprocessWorker(options?: {
       batchId: job?.data?.batchId,
       error: error.message,
     }, error)
+  })
+
+  // Log when queue is drained (all jobs processed)
+  quarantineReprocessWorker.on('drained', () => {
+    if (currentBatchId !== null && batchProcessedCount > 0) {
+      log.warn('QUARANTINE_REPROCESS_BATCH_DRAINED', {
+        batchId: currentBatchId,
+        totalProcessed: batchProcessedCount,
+        resolved: batchResolvedCount,
+        stillQuarantined: batchStillQuarantinedCount,
+        lifetimeProcessed: processedCount,
+        lifetimeResolved: resolvedCount,
+        lifetimeStillQuarantined: stillQuarantinedCount,
+        lifetimeErrors: errorCount,
+      })
+      // Reset batch tracking for next batch
+      currentBatchId = null
+      batchProcessedCount = 0
+      batchResolvedCount = 0
+      batchStillQuarantinedCount = 0
+    }
   })
 
   return quarantineReprocessWorker

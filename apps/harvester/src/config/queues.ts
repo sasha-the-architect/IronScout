@@ -570,7 +570,8 @@ export async function enqueueQuarantineReprocess(
       batchId,
     } satisfies QuarantineReprocessJobData,
     opts: {
-      jobId: `QUARANTINE_REPROCESS_${record.id}`,
+      // Include batchId in jobId so reprocessing can run multiple times
+      jobId: `QUARANTINE_REPROCESS_${batchId}_${record.id}`,
     },
   }))
 

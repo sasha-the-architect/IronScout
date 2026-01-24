@@ -1,6 +1,10 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // Allow dev requests from local HTTPS domains (via Caddy)
+  allowedDevOrigins: [
+    'https://www.local.ironscout.ai',
+  ],
   // Static export for maximum performance
   output: 'export',
   

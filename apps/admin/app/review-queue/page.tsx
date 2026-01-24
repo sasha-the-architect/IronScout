@@ -12,6 +12,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { ReviewQueueFilters } from './review-queue-filters';
+import { ReprocessButton } from './reprocess-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -139,6 +140,7 @@ export default async function ReviewQueuePage({
             Products awaiting manual review and linking
           </p>
         </div>
+        <ReprocessButton needsReviewCount={needsReviewCount + unmatchedCount} />
       </div>
 
       {/* Stats Cards */}

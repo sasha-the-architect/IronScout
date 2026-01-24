@@ -40,6 +40,13 @@ let processedCount = 0
 let errorCount = 0
 let lastProcessedAt: Date | null = null
 
+// Batch tracking for MANUAL trigger (admin reprocessing)
+let manualBatchId: string | null = null
+let manualBatchProcessedCount = 0
+let manualBatchMatchedCount = 0
+let manualBatchNeedsReviewCount = 0
+const MANUAL_PROGRESS_LOG_INTERVAL = 10
+
 /**
  * Product Resolver Worker instance
  * Created lazily by startProductResolverWorker()
@@ -64,6 +71,7 @@ export async function startProductResolverWorker(options?: {
     metrics: brandAliasCache.getMetrics(),
   })
 
+  console.log(`[Resolver] Starting worker on queue "${QUEUE_NAMES.PRODUCT_RESOLVE}" with concurrency=${concurrency}`)
   log.info('RESOLVER_WORKER_START', {
     event_name: 'RESOLVER_WORKER_START',
     concurrency,
@@ -85,14 +93,70 @@ export async function startProductResolverWorker(options?: {
   )
 
   // Event handlers for observability
-  productResolverWorker.on('completed', (job: Job<ProductResolveJobData>) => {
+  productResolverWorker.on('active', (job: Job<ProductResolveJobData>) => {
+    console.log(`[Resolver] Job picked up: ${job.id} trigger=${job.data.trigger} sourceProductId=${job.data.sourceProductId}`)
+    log.info('RESOLVER_JOB_ACTIVE', {
+      event_name: 'RESOLVER_JOB_ACTIVE',
+      jobId: job.id,
+      sourceProductId: job.data.sourceProductId,
+      trigger: job.data.trigger,
+      batchId: job.data.affiliateFeedRunId,
+    })
+  })
+
+  productResolverWorker.on('completed', (job: Job<ProductResolveJobData>, result: any) => {
     processedCount++
     lastProcessedAt = new Date()
-    log.debug('RESOLVER_JOB_COMPLETED', {
+
+    // Track batch progress for MANUAL trigger (admin reprocessing)
+    if (job.data.trigger === 'MANUAL' && job.data.affiliateFeedRunId) {
+      const batchId = job.data.affiliateFeedRunId
+
+      // New batch started
+      if (manualBatchId !== batchId) {
+        if (manualBatchId !== null && manualBatchProcessedCount > 0) {
+          // Log summary for previous batch
+          log.warn('RESOLVER_MANUAL_BATCH_COMPLETE', {
+            batchId: manualBatchId,
+            processed: manualBatchProcessedCount,
+            matched: manualBatchMatchedCount,
+            stillNeedsReview: manualBatchNeedsReviewCount,
+          })
+        }
+        manualBatchId = batchId
+        manualBatchProcessedCount = 0
+        manualBatchMatchedCount = 0
+        manualBatchNeedsReviewCount = 0
+        log.warn('RESOLVER_MANUAL_BATCH_START', {
+          batchId,
+          trigger: 'MANUAL',
+        })
+      }
+
+      manualBatchProcessedCount++
+      if (result?.status === 'MATCHED' || result?.status === 'CREATED') {
+        manualBatchMatchedCount++
+      } else if (result?.status === 'NEEDS_REVIEW') {
+        manualBatchNeedsReviewCount++
+      }
+
+      // Log progress periodically at WARN level so it's visible
+      if (manualBatchProcessedCount % MANUAL_PROGRESS_LOG_INTERVAL === 0) {
+        log.warn('RESOLVER_MANUAL_BATCH_PROGRESS', {
+          batchId,
+          processed: manualBatchProcessedCount,
+          matched: manualBatchMatchedCount,
+          stillNeedsReview: manualBatchNeedsReviewCount,
+        })
+      }
+    }
+
+    log.info('RESOLVER_JOB_COMPLETED', {
       event_name: 'RESOLVER_JOB_COMPLETED',
       jobId: job.id,
       sourceProductId: job.data.sourceProductId,
       trigger: job.data.trigger,
+      status: result?.status,
       processedCount,
     })
   })
@@ -127,6 +191,25 @@ export async function startProductResolverWorker(options?: {
       jobId,
       reason: 'Job processing took too long or worker crashed',
     })
+  })
+
+  // Log when queue is drained (batch complete for MANUAL reprocessing)
+  productResolverWorker.on('drained', () => {
+    if (manualBatchId !== null && manualBatchProcessedCount > 0) {
+      log.warn('RESOLVER_MANUAL_BATCH_DRAINED', {
+        batchId: manualBatchId,
+        totalProcessed: manualBatchProcessedCount,
+        matched: manualBatchMatchedCount,
+        stillNeedsReview: manualBatchNeedsReviewCount,
+        lifetimeProcessed: processedCount,
+        lifetimeErrors: errorCount,
+      })
+      // Reset batch tracking
+      manualBatchId = null
+      manualBatchProcessedCount = 0
+      manualBatchMatchedCount = 0
+      manualBatchNeedsReviewCount = 0
+    }
   })
 
   return productResolverWorker
