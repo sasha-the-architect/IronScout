@@ -43,3 +43,9 @@ export * from './ammo-knowledge'
 
 // Embedding service
 export * from './embedding-service'
+
+// Caching utilities for monitoring and debugging
+export {
+  clearSearchCaches,
+  getCacheStats
+} from './cache'

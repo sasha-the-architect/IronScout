@@ -30,14 +30,14 @@ export interface ExplicitFilters {
   maxGrain?: number
   inStock?: boolean
   brand?: string
-  
+
   // =============================================
   // Premium Filters (NEW - Phase 2)
   // =============================================
   bulletType?: BulletType
   pressureRating?: PressureRating
   isSubsonic?: boolean
-  
+
   // Performance characteristic filters
   shortBarrelOptimized?: boolean
   suppressorSafe?: boolean
@@ -45,7 +45,7 @@ export interface ExplicitFilters {
   lowRecoil?: boolean
   matchGrade?: boolean
   controlledExpansion?: boolean
-  
+
   // Velocity range (Premium)
   minVelocity?: number
   maxVelocity?: number
@@ -72,6 +72,15 @@ export interface AISearchResult {
     processingTimeMs: number
     userTier: 'FREE' | 'PREMIUM'
     premiumFeaturesUsed?: string[]
+    /** Detailed timing breakdown for debugging */
+    timing?: {
+      intentParseMs: number
+      dbQueryMs: number
+      priceResolveMs: number
+      rankingMs: number
+      lensMs?: number
+      embeddingMs?: number
+    }
   }
   /** Lens metadata (only present when ENABLE_LENS_V1=true) */
   lens?: LensMetadata
@@ -109,6 +118,13 @@ export async function aiSearch(
   options: AISearchOptions = {}
 ): Promise<AISearchResult> {
   const startTime = Date.now()
+  const timing: AISearchResult['searchMetadata']['timing'] = {
+    intentParseMs: 0,
+    dbQueryMs: 0,
+    priceResolveMs: 0,
+    rankingMs: 0,
+  }
+
   const {
     page = 1,
     limit = 20,
@@ -124,17 +140,20 @@ export async function aiSearch(
   const isPremium = true
   const premiumFeaturesUsed: string[] = []
   let lensMetadata: LensMetadata | undefined
-  
-  log.debug('Starting search', {
+
+  log.info('SEARCH_START', {
+    requestId,
     query,
     page,
     limit,
     sortBy,
     userTier,
     explicitFilters,
-    hasFilters: Object.keys(explicitFilters).length > 0
+    hasFilters: Object.keys(explicitFilters).length > 0,
+    lensId,
+    vectorSearchEnabled: useVectorSearch,
   })
-  
+
   // Track Premium filter usage
   if (explicitFilters.bulletType) premiumFeaturesUsed.push('bulletType filter')
   if (explicitFilters.pressureRating) premiumFeaturesUsed.push('pressureRating filter')
@@ -142,16 +161,49 @@ export async function aiSearch(
   if (explicitFilters.shortBarrelOptimized) premiumFeaturesUsed.push('shortBarrel filter')
   if (explicitFilters.suppressorSafe) premiumFeaturesUsed.push('suppressorSafe filter')
   if (sortBy === 'price_context') premiumFeaturesUsed.push('price_context sort')
-  
+
   // 1. Parse the natural language query into structured intent
+  const intentStart = Date.now()
   const parseOptions: ParseOptions = { userTier }
   const intent = await parseSearchIntent(query, parseOptions)
-  
+  timing.intentParseMs = Date.now() - intentStart
+
+  log.info('SEARCH_INTENT_PARSED', {
+    requestId,
+    durationMs: timing.intentParseMs,
+    calibers: intent.calibers,
+    purpose: intent.purpose,
+    grainWeights: intent.grainWeights,
+    caseMaterials: intent.caseMaterials,
+    brands: intent.brands,
+    qualityLevel: intent.qualityLevel,
+    confidence: intent.confidence,
+    keywords: intent.keywords,
+  })
+
   // 2. Merge explicit filters with AI intent (explicit takes priority)
   const mergedIntent = mergeFiltersWithIntent(intent, explicitFilters)
-  
+
+  log.info('SEARCH_FILTERS_MERGED', {
+    requestId,
+    merged: {
+      calibers: mergedIntent.calibers,
+      purpose: mergedIntent.purpose,
+      grainWeights: mergedIntent.grainWeights,
+      caseMaterials: mergedIntent.caseMaterials,
+      brands: mergedIntent.brands,
+    },
+    explicitFilters,
+  })
+
   // 3. Build Prisma where clause from merged intent (including Premium filters)
   const where = buildWhereClause(mergedIntent, explicitFilters, isPremium)
+
+  log.info('SEARCH_WHERE_CLAUSE', {
+    requestId,
+    where: JSON.stringify(where),
+    whereKeyCount: Object.keys(where).length,
+  })
 
   // 4. Build price/stock conditions
   // Note: These are applied AFTER fetching products since prices come via product_links
@@ -165,39 +217,68 @@ export async function aiSearch(
   let total: number
   const hasExplicitFilters = Object.keys(explicitFilters).length > 0
 
+  const dbStart = Date.now()
+
   if (useVectorSearch && (sortBy === 'relevance' || sortBy === 'price_context') && !hasExplicitFilters) {
     try {
       // Try vector-enhanced search (only when no explicit filters)
+      const embeddingStart = Date.now()
       products = await vectorEnhancedSearch(query, mergedIntent, explicitFilters, { skip, limit: limit * 2 }, isPremium)
+      timing.embeddingMs = Date.now() - embeddingStart
       vectorSearchUsed = true
       // For vector search, count using base where clause
       // Note: Can't filter on embedding field since it's Unsupported("vector") in Prisma
       total = await prisma.products.count({ where })
-      log.debug('Vector search returned', { productsCount: products.length, total })
+
+      log.info('SEARCH_VECTOR_COMPLETE', {
+        requestId,
+        productsCount: products.length,
+        total,
+        embeddingMs: timing.embeddingMs,
+      })
 
       // Fall back to standard search if vector search returns no results
       // This handles cases where products don't have embeddings yet
       if (products.length === 0 && total > 0) {
-        log.info('Vector search empty but products exist, falling back to standard search', { total })
+        log.warn('SEARCH_VECTOR_FALLBACK', {
+          requestId,
+          reason: 'vector_empty_but_products_exist',
+          total,
+        })
         products = await standardSearch(where, skip, limit * 2, isPremium)
         vectorSearchUsed = false
       }
     } catch (error) {
-      log.warn('Vector search failed, falling back to standard search', { error })
+      log.warn('SEARCH_VECTOR_ERROR', {
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+      })
       products = await standardSearch(where, skip, limit * 2, isPremium)
       total = await prisma.products.count({ where })
     }
   } else {
     // Use standard Prisma search with explicit filters
-    log.debug('Using standard search', { hasExplicitFilters })
+    log.info('SEARCH_STANDARD_START', {
+      requestId,
+      hasExplicitFilters,
+      sortBy,
+    })
     products = await standardSearch(where, skip, limit * 2, isPremium)
     total = await prisma.products.count({ where })
-    log.debug('Standard search returned', { productsCount: products.length, total })
+
+    log.info('SEARCH_STANDARD_COMPLETE', {
+      requestId,
+      productsCount: products.length,
+      total,
+    })
   }
+
+  timing.dbQueryMs = Date.now() - dbStart
 
   // Apply price/stock filters to fetched prices
   // (Prices are fetched via product_links, so filter here instead of in Prisma where)
   if (Object.keys(priceConditions).length > 0) {
+    const beforePriceFilter = products.length
     products = products.map((p: any) => {
       if (!p.prices) return p
       let filteredPrices = p.prices
@@ -216,6 +297,13 @@ export async function aiSearch(
       }
       return { ...p, prices: filteredPrices }
     })
+
+    log.info('SEARCH_PRICE_FILTER_APPLIED', {
+      requestId,
+      priceConditions,
+      beforeCount: beforePriceFilter,
+      afterCount: products.length,
+    })
   }
 
   // Filter out products with no visible prices
@@ -227,24 +315,31 @@ export async function aiSearch(
     products = products.filter((p: any) => p.prices && p.prices.length > 0)
 
     if (products.length !== originalCount) {
-      log.debug('Filtered products without visible prices', {
+      log.info('SEARCH_ZERO_PRICE_FILTER', {
+        requestId,
         before: originalCount,
-        after: products.length
+        after: products.length,
+        filteredOut: originalCount - products.length,
       })
       // Adjust total estimate based on ratio of products with prices
       const ratio = products.length / (originalCount || 1)
       total = Math.max(products.length, Math.floor(total * ratio))
     }
   } else {
-    log.debug('Lens enabled - keeping products without visible prices', {
+    log.info('SEARCH_LENS_KEEPING_ZERO_PRICE', {
+      requestId,
       totalProducts: originalCount,
-      withPrices: products.filter((p: any) => p.prices && p.prices.length > 0).length
+      withPrices: products.filter((p: any) => p.prices && p.prices.length > 0).length,
     })
   }
 
   // Ensure total is at least the number of products returned on this page
   if (page === 1 && products.length > total) {
-    log.warn('Count mismatch - adjusting', { productsLength: products.length, total })
+    log.warn('SEARCH_COUNT_MISMATCH', {
+      requestId,
+      productsLength: products.length,
+      total,
+    })
     total = products.length
   }
 
@@ -252,7 +347,12 @@ export async function aiSearch(
   // LENS PIPELINE (when ENABLE_LENS_V1=true)
   // =============================================
   if (isLensEnabled()) {
-    log.debug('Lens pipeline enabled', { lensId, productCount: products.length })
+    const lensStart = Date.now()
+    log.info('SEARCH_LENS_START', {
+      requestId,
+      lensId,
+      productCount: products.length,
+    })
 
     try {
       // Per search-lens-v1.md: canonicalConfidence source = ProductResolver.matchScore
@@ -290,13 +390,16 @@ export async function aiSearch(
 
       // Continue with lens-filtered products
       products = lensProducts as any[]
+      timing.lensMs = Date.now() - lensStart
 
-      log.debug('Lens pipeline completed', {
+      log.info('SEARCH_LENS_COMPLETE', {
+        requestId,
         lensId: lensMetadata.id,
         autoApplied: lensMetadata.autoApplied,
         reasonCode: lensMetadata.reasonCode,
         resultCount: products.length,
         zeroResults: lensResult.zeroResults,
+        durationMs: timing.lensMs,
       })
     } catch (error) {
       // Handle InvalidLensError by re-throwing (will be caught by route handler)
@@ -305,20 +408,27 @@ export async function aiSearch(
       }
 
       // Log other errors but don't fail the search
-      log.error('Lens pipeline error, falling back to standard ranking', { error })
+      log.error('SEARCH_LENS_ERROR', {
+        requestId,
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
   }
 
   // 7. Apply tier-appropriate ranking
   // CRITICAL: When lens pipeline is active, lens ordering MUST be preserved.
   // Per search-lens-v1.md: "Ordering derives from declared ordering rules only"
+  const rankingStart = Date.now()
   let rankedProducts: any[]
   const lensOrderingActive = lensMetadata !== undefined
 
   if (lensOrderingActive) {
     // Lens pipeline already applied deterministic ordering - preserve it
     rankedProducts = products
-    log.debug('Preserving lens ordering, skipping premium ranking')
+    log.info('SEARCH_RANKING_LENS_PRESERVED', {
+      requestId,
+      productCount: products.length,
+    })
   } else if (isPremium && (sortBy === 'relevance' || sortBy === 'price_context')) {
     // PREMIUM: Apply performance-aware ranking with price context
     premiumFeaturesUsed.push('premium_ranking')
@@ -341,12 +451,26 @@ export async function aiSearch(
     }
 
     rankedProducts = premiumRanked
+    log.info('SEARCH_RANKING_PREMIUM_APPLIED', {
+      requestId,
+      productCount: premiumRanked.length,
+    })
   } else if (!isPremium && sortBy === 'relevance' && mergedIntent.confidence > 0.5 && !vectorSearchUsed) {
     // FREE: Basic re-ranking
     rankedProducts = reRankProducts(products, mergedIntent)
+    log.info('SEARCH_RANKING_FREE_APPLIED', {
+      requestId,
+      productCount: rankedProducts.length,
+    })
   } else {
     rankedProducts = products
+    log.info('SEARCH_RANKING_NONE', {
+      requestId,
+      productCount: products.length,
+    })
   }
+
+  timing.rankingMs = Date.now() - rankingStart
 
   // 8. Apply price sorting if requested
   // CRITICAL: Skip when lens ordering is active - lens determines order
@@ -358,13 +482,14 @@ export async function aiSearch(
       return sortBy === 'price_asc' ? comparison : -comparison
     })
   }
-  
+
   // 9. Trim to requested limit
   rankedProducts = rankedProducts.slice(0, limit)
 
   // 10. Calculate price context for ALL users (verdict for everyone, depth for premium)
   // For premium users with premiumRanking, use existing priceSignal
   // For all others, calculate it now
+  const priceResolveStart = Date.now()
   const productsNeedingPriceSignal = rankedProducts.filter(
     (p: any) => !p.premiumRanking?.priceSignal
   )
@@ -373,6 +498,7 @@ export async function aiSearch(
   if (productsNeedingPriceSignal.length > 0) {
     priceSignalMap = await batchCalculatePriceSignalIndex(productsNeedingPriceSignal)
   }
+  timing.priceResolveMs = Date.now() - priceResolveStart
 
   // Merge price signals into products
   rankedProducts = rankedProducts.map((p: any) => {
@@ -392,6 +518,18 @@ export async function aiSearch(
   const facets = await buildFacets(where, isPremium)
 
   const processingTimeMs = Date.now() - startTime
+
+  log.info('SEARCH_COMPLETE', {
+    requestId,
+    query,
+    totalResults: total,
+    returnedResults: formattedProducts.length,
+    processingTimeMs,
+    timing,
+    vectorSearchUsed,
+    lensApplied: lensMetadata?.id,
+    premiumFeaturesUsed,
+  })
 
   // V1: All users get full intent with explanations
   return {
@@ -425,6 +563,7 @@ export async function aiSearch(
       vectorSearchUsed,
       processingTimeMs,
       userTier: 'PREMIUM', // V1: All users get premium
+      timing,
       ...(premiumFeaturesUsed.length > 0 ? { premiumFeaturesUsed } : {})
     },
     // Include lens metadata when lens pipeline is enabled
@@ -438,7 +577,7 @@ export async function aiSearch(
  */
 function mergeFiltersWithIntent(intent: SearchIntent, filters: ExplicitFilters): SearchIntent {
   const merged = { ...intent }
-  
+
   // Track if caliber was explicitly changed from AI interpretation
   const caliberExplicitlyChanged = filters.caliber &&
     !intent.calibers?.some(c => c.toLowerCase().includes(filters.caliber!.toLowerCase()))
@@ -453,17 +592,17 @@ function mergeFiltersWithIntent(intent: SearchIntent, filters: ExplicitFilters):
       merged.grainWeights = undefined
     }
   }
-  
+
   // Explicit purpose overrides AI-detected purpose
   if (filters.purpose) {
     merged.purpose = filters.purpose
   }
-  
+
   // Explicit case material overrides AI-detected
   if (filters.caseMaterial) {
     merged.caseMaterials = [filters.caseMaterial]
   }
-  
+
   // Explicit grain range overrides AI-detected
   if (filters.minGrain != null || filters.maxGrain != null) {
     merged.grainWeights = undefined
@@ -481,12 +620,12 @@ function mergeFiltersWithIntent(intent: SearchIntent, filters: ExplicitFilters):
   if (filters.inStock != null) {
     merged.inStockOnly = filters.inStock
   }
-  
+
   // Explicit brand
   if (filters.brand) {
     merged.brands = [filters.brand]
   }
-  
+
   // Premium filters - update premiumIntent if present
   if (merged.premiumIntent) {
     if (filters.bulletType) {
@@ -496,48 +635,57 @@ function mergeFiltersWithIntent(intent: SearchIntent, filters: ExplicitFilters):
       merged.premiumIntent.suppressorUse = true
     }
   }
-  
-  log.debug('Merged intent', {
-    calibers: merged.calibers,
-    purpose: merged.purpose,
-    grainWeights: merged.grainWeights,
-    caliberExplicitlyChanged
-  })
-  
+
   return merged
 }
 
 /**
  * Build Prisma where clause from search intent and explicit filters
+ *
+ * IMPORTANT: AI intent values (purpose, brands, grainWeights, caseMaterials) are NOT
+ * used as hard filters. They are only used for scoring/ranking. Only explicit user
+ * filters are applied as hard database filters to avoid zero-result searches.
  */
 function buildWhereClause(intent: SearchIntent, explicitFilters: ExplicitFilters, isPremium: boolean): any {
   const where: any = {}
   const orConditions: any[] = []
 
-  // Caliber filter (explicit takes priority)
+  log.debug('SEARCH_BUILD_WHERE_START', {
+    intentCalibers: intent.calibers,
+    intentPurpose: intent.purpose,
+    intentBrands: intent.brands,
+    explicitFilters,
+  })
+
+  // Caliber filter - ALWAYS apply if present (caliber is fundamental to search)
   // Use caliberNorm for filtering (normalized form, always populated by resolver)
   const calibers = explicitFilters.caliber ? [explicitFilters.caliber] : intent.calibers
   if (calibers && calibers.length > 0) {
     where.OR = calibers.map(cal => ({
       caliberNorm: { contains: cal, mode: 'insensitive' }
     }))
+    log.debug('SEARCH_FILTER_CALIBER', { calibers, source: explicitFilters.caliber ? 'explicit' : 'intent' })
   }
-  
-  // Purpose filter (explicit takes priority)
-  const purpose = explicitFilters.purpose || intent.purpose
-  if (purpose) {
+
+  // Purpose filter - ONLY apply if user explicitly specified
+  // AI intent purpose is used for scoring, not hard filtering
+  if (explicitFilters.purpose) {
     if (where.OR) {
       where.AND = [
         { OR: where.OR },
-        { purpose: { contains: purpose, mode: 'insensitive' } }
+        { purpose: { contains: explicitFilters.purpose, mode: 'insensitive' } }
       ]
       delete where.OR
     } else {
-      where.purpose = { contains: purpose, mode: 'insensitive' }
+      where.purpose = { contains: explicitFilters.purpose, mode: 'insensitive' }
     }
+    log.debug('SEARCH_FILTER_PURPOSE', { purpose: explicitFilters.purpose })
   }
-  
-  // Grain weight filter
+  // NOTE: AI intent purpose is used for scoring/ranking, not hard filtering
+
+  // Grain weight filter - only apply if user explicitly specified min/max
+  // AI intent may return default grain weights which would filter out products
+  // that don't match those exact values. Use grain weights for scoring instead.
   // Use != null to handle both null and undefined (Prisma operators cannot accept null)
   if (explicitFilters.minGrain != null || explicitFilters.maxGrain != null) {
     const grainCondition: any = {}
@@ -548,10 +696,10 @@ function buildWhereClause(intent: SearchIntent, explicitFilters: ExplicitFilters
       grainCondition.lte = explicitFilters.maxGrain
     }
     addCondition(where, { grainWeight: grainCondition })
-  } else if (intent.grainWeights && intent.grainWeights.length > 0) {
-    addCondition(where, { grainWeight: { in: intent.grainWeights } })
+    log.debug('SEARCH_FILTER_GRAIN', { grainCondition })
   }
-  
+  // NOTE: AI intent grainWeights are used for scoring/ranking, not hard filtering
+
   // Case material filter - only apply if user explicitly specified
   // AI intent may return default case materials which would filter out products
   // that don't have this field populated
@@ -559,38 +707,43 @@ function buildWhereClause(intent: SearchIntent, explicitFilters: ExplicitFilters
     addCondition(where, {
       caseMaterial: { contains: explicitFilters.caseMaterial, mode: 'insensitive' }
     })
+    log.debug('SEARCH_FILTER_CASEMATERIAL', { caseMaterial: explicitFilters.caseMaterial })
   }
-  
-  // Brand filter
-  const brands = explicitFilters.brand ? [explicitFilters.brand] : intent.brands
-  if (brands && brands.length > 0) {
+  // NOTE: AI intent caseMaterials are used for scoring/ranking, not hard filtering
+
+  // Brand filter - ONLY apply if user explicitly specified
+  // AI intent brands are used for scoring, not hard filtering
+  if (explicitFilters.brand) {
     addCondition(where, {
-      OR: brands.map(b => ({
-        brand: { contains: b, mode: 'insensitive' }
-      }))
+      brand: { contains: explicitFilters.brand, mode: 'insensitive' }
     })
+    log.debug('SEARCH_FILTER_BRAND', { brand: explicitFilters.brand })
   }
-  
+  // NOTE: AI intent brands are used for scoring/ranking, not hard filtering
+
   // =============================================
   // Premium Filters (NEW - Phase 2)
   // =============================================
-  
+
   if (isPremium) {
     // Bullet type filter
     if (explicitFilters.bulletType) {
       addCondition(where, { bulletType: explicitFilters.bulletType })
+      log.debug('SEARCH_FILTER_BULLETTYPE', { bulletType: explicitFilters.bulletType })
     }
-    
+
     // Pressure rating filter
     if (explicitFilters.pressureRating) {
       addCondition(where, { pressureRating: explicitFilters.pressureRating })
+      log.debug('SEARCH_FILTER_PRESSURERATING', { pressureRating: explicitFilters.pressureRating })
     }
-    
+
     // Subsonic filter
     if (explicitFilters.isSubsonic !== undefined) {
       addCondition(where, { isSubsonic: explicitFilters.isSubsonic })
+      log.debug('SEARCH_FILTER_SUBSONIC', { isSubsonic: explicitFilters.isSubsonic })
     }
-    
+
     // Performance characteristic filters
     if (explicitFilters.shortBarrelOptimized) {
       addCondition(where, { shortBarrelOptimized: true })
@@ -610,7 +763,7 @@ function buildWhereClause(intent: SearchIntent, explicitFilters: ExplicitFilters
     if (explicitFilters.controlledExpansion) {
       addCondition(where, { controlledExpansion: true })
     }
-    
+
     // Velocity range filter
     // Use != null to handle both null and undefined (Prisma operators cannot accept null)
     if (explicitFilters.minVelocity != null || explicitFilters.maxVelocity != null) {
@@ -624,11 +777,11 @@ function buildWhereClause(intent: SearchIntent, explicitFilters: ExplicitFilters
       addCondition(where, { muzzleVelocityFps: velocityCondition })
     }
   }
-  
+
   // If no structured filters matched, fall back to text search
   if (Object.keys(where).length === 0 && intent.originalQuery) {
     const keywords = intent.keywords || intent.originalQuery.split(/\s+/).filter(w => w.length > 2)
-    
+
     if (keywords.length > 0) {
       keywords.forEach(keyword => {
         orConditions.push(
@@ -637,13 +790,17 @@ function buildWhereClause(intent: SearchIntent, explicitFilters: ExplicitFilters
           { brand: { contains: keyword, mode: 'insensitive' } }
         )
       })
-      
+
       where.OR = orConditions
+      log.debug('SEARCH_FILTER_KEYWORDS', { keywords })
     }
   }
-  
-  log.debug('Built where clause', { where })
-  
+
+  log.debug('SEARCH_BUILD_WHERE_COMPLETE', {
+    whereClause: JSON.stringify(where),
+    filterCount: Object.keys(where).length,
+  })
+
   return where
 }
 
@@ -668,6 +825,8 @@ function addCondition(where: any, condition: any): void {
  * This is the canonical query path for price grouping.
  */
 async function standardSearch(where: any, skip: number, take: number, includePremiumFields: boolean): Promise<any[]> {
+  const queryStart = Date.now()
+
   const baseSelect = {
     id: true,
     name: true,
@@ -710,13 +869,24 @@ async function standardSearch(where: any, skip: number, take: number, includePre
     orderBy: { createdAt: 'desc' },
   })
 
+  const dbDuration = Date.now() - queryStart
+
   if (products.length === 0) {
+    log.debug('SEARCH_STANDARD_NO_PRODUCTS', { where: JSON.stringify(where), dbDurationMs: dbDuration })
     return []
   }
 
   // Batch fetch prices via product_links
+  const priceStart = Date.now()
   const productIds = products.map((p: { id: string }) => p.id)
   const pricesMap = await batchGetPricesViaProductLinks(productIds)
+  const priceDuration = Date.now() - priceStart
+
+  log.debug('SEARCH_STANDARD_PRICES_FETCHED', {
+    productCount: products.length,
+    dbDurationMs: dbDuration,
+    priceDurationMs: priceDuration,
+  })
 
   return products.map((p: { id: string }) => ({
     ...p,
@@ -735,7 +905,7 @@ async function vectorEnhancedSearch(
   isPremium: boolean
 ): Promise<any[]> {
   const { skip, limit } = options
-  
+
   // Build the search text
   const searchText = [
     query,
@@ -748,12 +918,19 @@ async function vectorEnhancedSearch(
       intent.premiumIntent.preferredBulletTypes?.join(' ') || ''
     ] : [])
   ].filter(Boolean).join(' ')
-  
+
+  log.debug('SEARCH_VECTOR_EMBEDDING_START', { searchText })
+
   // Generate query embedding
+  const embeddingStart = Date.now()
   const queryEmbedding = await generateEmbedding(searchText)
+  const embeddingDuration = Date.now() - embeddingStart
   const embeddingStr = `[${queryEmbedding.join(',')}]`
-  
+
+  log.debug('SEARCH_VECTOR_EMBEDDING_COMPLETE', { durationMs: embeddingDuration })
+
   // Build filter conditions for SQL
+  // IMPORTANT: Only apply caliber as hard filter, other AI intent values are for scoring
   const conditions: string[] = ['embedding IS NOT NULL']
   const params: any[] = []
 
@@ -764,28 +941,26 @@ async function vectorEnhancedSearch(
     conditions.push(`"caliberNorm" ILIKE ANY($${params.length + 1})`)
     params.push(caliberPatterns)
   }
-  
-  // Purpose filter
-  const purpose = explicitFilters.purpose || intent.purpose
-  if (purpose) {
+
+  // Purpose filter - ONLY if explicitly specified
+  if (explicitFilters.purpose) {
     conditions.push(`purpose ILIKE $${params.length + 1}`)
-    params.push(`%${purpose}%`)
+    params.push(`%${explicitFilters.purpose}%`)
   }
-  
+
   // Case material filter - only apply if user explicitly specified
   if (explicitFilters.caseMaterial) {
     conditions.push(`"caseMaterial" ILIKE $${params.length + 1}`)
     params.push(`%${explicitFilters.caseMaterial}%`)
   }
 
-  // Brand filter
-  const brands = explicitFilters.brand ? [explicitFilters.brand] : intent.brands
-  if (brands?.length) {
-    conditions.push(`brand ILIKE ANY($${params.length + 1})`)
-    params.push(brands.map(b => `%${b}%`))
+  // Brand filter - ONLY if explicitly specified
+  if (explicitFilters.brand) {
+    conditions.push(`brand ILIKE $${params.length + 1}`)
+    params.push(`%${explicitFilters.brand}%`)
   }
-  
-  // Grain weight range
+
+  // Grain weight range - only if explicitly specified
   if (explicitFilters.minGrain !== undefined) {
     conditions.push(`"grainWeight" >= $${params.length + 1}`)
     params.push(explicitFilters.minGrain)
@@ -794,12 +969,15 @@ async function vectorEnhancedSearch(
     conditions.push(`"grainWeight" <= $${params.length + 1}`)
     params.push(explicitFilters.maxGrain)
   }
-  
+
   const whereClause = conditions.join(' AND ')
-  
+
+  log.debug('SEARCH_VECTOR_SQL', { whereClause, paramCount: params.length })
+
   // Execute vector search
+  const vectorStart = Date.now()
   const productIds = await prisma.$queryRawUnsafe<Array<{ id: string; similarity: number }>>(`
-    SELECT 
+    SELECT
       id,
       1 - (embedding <=> '${embeddingStr}'::vector) as similarity
     FROM products
@@ -808,11 +986,17 @@ async function vectorEnhancedSearch(
     LIMIT ${limit + skip}
     OFFSET ${skip}
   `, ...params)
-  
+  const vectorDuration = Date.now() - vectorStart
+
+  log.debug('SEARCH_VECTOR_QUERY_COMPLETE', {
+    resultCount: productIds.length,
+    durationMs: vectorDuration,
+  })
+
   if (productIds.length === 0) {
     return []
   }
-  
+
   // Fetch full product details
   const baseSelect = {
     id: true,
@@ -905,12 +1089,13 @@ function buildPriceConditions(intent: SearchIntent, explicitFilters: ExplicitFil
 
 /**
  * Re-rank products based on AI intent analysis (FREE tier)
+ * Uses AI intent values for SCORING, not filtering
  */
 function reRankProducts(products: any[], intent: SearchIntent): any[] {
   return products.map(product => {
     let score = 0
-    
-    // Score by grain weight match
+
+    // Score by grain weight match (AI intent used for scoring, not filtering)
     if (intent.grainWeights && intent.grainWeights.length > 0 && product.grainWeight) {
       if (intent.grainWeights.includes(product.grainWeight)) {
         score += 30
@@ -923,11 +1108,11 @@ function reRankProducts(products: any[], intent: SearchIntent): any[] {
         else if (diff <= 10) score += 10
       }
     }
-    
+
     // Score by quality level
     if (intent.qualityLevel) {
       const productName = (product.name || '').toLowerCase()
-      
+
       if (intent.qualityLevel === 'match-grade') {
         if (QUALITY_INDICATORS.matchGrade.some(q => productName.includes(q))) {
           score += 25
@@ -946,8 +1131,8 @@ function reRankProducts(products: any[], intent: SearchIntent): any[] {
         }
       }
     }
-    
-    // Score by case material preference
+
+    // Score by case material preference (AI intent used for scoring, not filtering)
     if (intent.caseMaterials && product.caseMaterial) {
       if (intent.caseMaterials.includes(product.caseMaterial)) {
         score += 15
@@ -958,26 +1143,33 @@ function reRankProducts(products: any[], intent: SearchIntent): any[] {
         score += 10
       }
     }
-    
-    // Score by brand match
+
+    // Score by brand match (AI intent used for scoring, not filtering)
     if (intent.brands && product.brand) {
       if (intent.brands.some(b => b.toLowerCase() === product.brand.toLowerCase())) {
         score += 20
       }
     }
-    
+
+    // Score by purpose match (AI intent used for scoring, not filtering)
+    if (intent.purpose && product.purpose) {
+      if (product.purpose.toLowerCase().includes(intent.purpose.toLowerCase())) {
+        score += 15
+      }
+    }
+
     // Score by in-stock availability
     const hasInStock = product.prices.some((p: any) => p.inStock)
     if (hasInStock) {
       score += 10
     }
-    
+
     // Score by retailer tier
     const hasPremiumRetailer = product.prices.some((p: any) => p.retailers?.tier === 'PREMIUM')
     if (hasPremiumRetailer) {
       score += 5
     }
-    
+
     return { ...product, _relevanceScore: score }
   }).sort((a, b) => b._relevanceScore - a._relevanceScore)
 }
@@ -1041,17 +1233,17 @@ function formatProduct(product: any, isPremium: boolean): any {
       }
     }))
   }
-  
+
   // Add Premium fields if available
   if (isPremium) {
     const premiumFields: any = {}
-    
+
     // Structured ballistic fields
     if (product.bulletType) premiumFields.bulletType = product.bulletType
     if (product.pressureRating) premiumFields.pressureRating = product.pressureRating
     if (product.muzzleVelocityFps) premiumFields.muzzleVelocityFps = product.muzzleVelocityFps
     if (product.isSubsonic !== null) premiumFields.isSubsonic = product.isSubsonic
-    
+
     // Performance characteristics
     if (product.shortBarrelOptimized) premiumFields.shortBarrelOptimized = product.shortBarrelOptimized
     if (product.suppressorSafe) premiumFields.suppressorSafe = product.suppressorSafe
@@ -1060,11 +1252,11 @@ function formatProduct(product: any, isPremium: boolean): any {
     if (product.controlledExpansion) premiumFields.controlledExpansion = product.controlledExpansion
     if (product.matchGrade) premiumFields.matchGrade = product.matchGrade
     if (product.factoryNew !== null) premiumFields.factoryNew = product.factoryNew
-    
+
     // Data quality
     if (product.dataSource) premiumFields.dataSource = product.dataSource
     if (product.dataConfidence) premiumFields.dataConfidence = parseFloat(product.dataConfidence.toString())
-    
+
     // Premium ranking data
     if (product.premiumRanking) {
       premiumFields.premiumRanking = {
@@ -1081,12 +1273,12 @@ function formatProduct(product: any, isPremium: boolean): any {
         } : undefined
       }
     }
-    
+
     if (Object.keys(premiumFields).length > 0) {
       return { ...base, premium: premiumFields }
     }
   }
-  
+
   return base
 }
 
@@ -1102,19 +1294,19 @@ async function buildFacets(where: any, isPremium: boolean): Promise<Record<strin
     brand: true,
     category: true,
   }
-  
+
   // Add Premium facet fields
   if (isPremium) {
     selectFields.bulletType = true
     selectFields.pressureRating = true
     selectFields.isSubsonic = true
   }
-  
+
   const allProducts = await prisma.products.findMany({
     where,
     select: selectFields
   })
-  
+
   const countValues = (field: string) => {
     const counts = new Map<string, number>()
     allProducts.forEach((p: any) => {
@@ -1128,7 +1320,7 @@ async function buildFacets(where: any, isPremium: boolean): Promise<Record<strin
       Array.from(counts.entries()).sort((a, b) => b[1] - a[1])
     )
   }
-  
+
   const facets: Record<string, Record<string, number>> = {
     calibers: countValues('caliber'),
     grainWeights: countValues('grainWeight'),
@@ -1137,12 +1329,12 @@ async function buildFacets(where: any, isPremium: boolean): Promise<Record<strin
     brands: countValues('brand'),
     categories: countValues('category')
   }
-  
+
   // Add Premium facets
   if (isPremium) {
     facets.bulletTypes = countValues('bulletType')
     facets.pressureRatings = countValues('pressureRating')
-    
+
     // Boolean facet for subsonic
     const subsonicCount = allProducts.filter((p: any) => p.isSubsonic === true).length
     const nonSubsonicCount = allProducts.filter((p: any) => p.isSubsonic === false).length
@@ -1153,7 +1345,7 @@ async function buildFacets(where: any, isPremium: boolean): Promise<Record<strin
       }
     }
   }
-  
+
   return facets
 }
 
@@ -1163,7 +1355,7 @@ async function buildFacets(where: any, isPremium: boolean): Promise<Record<strin
 export async function getSearchSuggestions(partialQuery: string): Promise<string[]> {
   const suggestions: string[] = []
   const lowerQuery = partialQuery.toLowerCase()
-  
+
   // Suggest based on common platforms
   const platforms = ['AR-15', 'AR-10', 'AK-47', 'Glock', '1911', 'Shotgun']
   platforms.forEach(p => {
@@ -1173,7 +1365,7 @@ export async function getSearchSuggestions(partialQuery: string): Promise<string
       suggestions.push(`${p} defense ammo`)
     }
   })
-  
+
   // Suggest based on common calibers
   const calibers = ['9mm', '.223', '5.56', '.308', '.45 ACP', '12 gauge']
   calibers.forEach(c => {
@@ -1184,20 +1376,37 @@ export async function getSearchSuggestions(partialQuery: string): Promise<string
       suggestions.push(`${c} bulk`)
     }
   })
-  
+
   // Suggest based on purposes
   if ('target'.includes(lowerQuery) || 'practice'.includes(lowerQuery)) {
     suggestions.push('target practice ammo')
     suggestions.push('range ammo')
     suggestions.push('bulk target ammo')
   }
-  
+
   if ('defense'.includes(lowerQuery) || 'self'.includes(lowerQuery)) {
     suggestions.push('self defense ammo')
     suggestions.push('home defense ammo')
     suggestions.push('hollow point')
   }
-  
+
   // Remove duplicates and limit
   return [...new Set(suggestions)].slice(0, 8)
+}
+
+// =============================================
+// Exported for Testing
+// =============================================
+
+/**
+ * Export internal functions for unit testing.
+ * These are implementation details and should not be used outside tests.
+ */
+export const _testExports = {
+  mergeFiltersWithIntent,
+  buildWhereClause,
+  buildPriceConditions,
+  reRankProducts,
+  formatProduct,
+  addCondition,
 }

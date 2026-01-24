@@ -37,6 +37,11 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__dirname, '../..')
 
+// Caddy CA certificate for internal HTTPS (needed for server-side fetch in Next.js apps)
+const CADDY_CA_CERT = process.platform === 'win32'
+  ? resolve(process.env.APPDATA || '', 'Caddy', 'pki', 'authorities', 'local', 'root.crt')
+  : resolve(process.env.HOME || '', '.local/share/caddy/pki/authorities/local/root.crt')
+
 // Service definitions
 // Note: Using 127.0.0.1 instead of localhost for reliable health checks on Windows
 // Caddy is started LAST so all apps are ready before the reverse proxy starts
@@ -209,7 +214,8 @@ function startServiceInTerminal(service, devMode) {
   }
 
   // Use Windows 'start' command to open a new terminal
-  const startCmd = `start "${title}" cmd /k "title ${title} & cd /d ${PROJECT_ROOT} && ${command}"`
+  // Set NODE_EXTRA_CA_CERTS for server-side HTTPS fetch in Next.js apps
+  const startCmd = `start "${title}" cmd /k "title ${title} & cd /d ${PROJECT_ROOT} && set NODE_EXTRA_CA_CERTS=${CADDY_CA_CERT} && ${command}"`
 
   const child = spawn(startCmd, [], {
     cwd: PROJECT_ROOT,
@@ -251,7 +257,7 @@ function startService(service, devMode, logsDir, useTerminals = false) {
     cwd: PROJECT_ROOT,
     shell: true,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env },
+    env: { ...process.env, NODE_EXTRA_CA_CERTS: CADDY_CA_CERT },
   })
 
   child.stdout.pipe(logStream)

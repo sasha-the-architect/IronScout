@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { prisma, buildProductText } from '@ironscout/db'
 import { loggers } from '../../config/logger'
+import { getCachedEmbedding, cacheEmbedding } from './cache'
 
 // Re-export buildProductText for backward compatibility
 export { buildProductText } from '@ironscout/db'
@@ -26,18 +27,36 @@ export function isEmbeddingServiceAvailable(): boolean {
 
 /**
  * Generate embedding for a single text
+ * Uses caching to avoid repeated API calls for the same text
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (!openai) {
     throw new Error('OpenAI client not initialized (OPENAI_API_KEY not set)')
   }
 
+  // Check cache first
+  const cachedEmbedding = await getCachedEmbedding(text)
+  if (cachedEmbedding) {
+    log.debug('EMBEDDING_CACHE_HIT', { textLength: text.length })
+    return cachedEmbedding
+  }
+
+  // Generate new embedding
+  const startTime = Date.now()
   const response = await openai.embeddings.create({
     model: EMBEDDING_MODEL,
     input: text,
   })
+  const duration = Date.now() - startTime
 
-  return response.data[0].embedding
+  const embedding = response.data[0].embedding
+
+  log.debug('EMBEDDING_GENERATED', { textLength: text.length, durationMs: duration })
+
+  // Cache for future requests
+  await cacheEmbedding(text, embedding)
+
+  return embedding
 }
 
 /**

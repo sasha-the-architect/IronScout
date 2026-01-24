@@ -10,6 +10,7 @@ import {
   getCaliberVariations,
 } from './ammo-knowledge'
 import { loggers } from '../../config/logger'
+import { getCachedIntent, cacheIntent } from './cache'
 
 const log = loggers.ai
 
@@ -128,19 +129,20 @@ export interface ParseOptions {
 
 /**
  * Parse a natural language search query into structured intent
- * 
+ *
  * @param query - User's search query
  * @param options - Parse options including user tier
  */
 export async function parseSearchIntent(
-  query: string, 
+  query: string,
   options: ParseOptions = {}
 ): Promise<SearchIntent> {
   const { userTier = 'FREE' } = options
-  
+
   // First, try quick local parsing for simple queries
   const quickParse = tryQuickParse(query)
   if (quickParse && quickParse.confidence > 0.8 && userTier === 'FREE') {
+    log.debug('INTENT_QUICK_PARSE', { query, confidence: quickParse.confidence })
     return quickParse
   }
 
@@ -154,9 +156,24 @@ export async function parseSearchIntent(
     }
   }
 
+  // Check cache for previously parsed intent
+  const cachedIntent = await getCachedIntent(query, userTier)
+  if (cachedIntent) {
+    log.info('INTENT_CACHE_HIT', { query, userTier })
+    return cachedIntent
+  }
+
   // For complex queries or Premium users, use OpenAI
   try {
+    const startTime = Date.now()
     const intent = await parseWithAI(query, userTier)
+    const duration = Date.now() - startTime
+
+    log.info('INTENT_AI_PARSE', { query, userTier, durationMs: duration })
+
+    // Cache the result for future requests
+    await cacheIntent(query, userTier, intent)
+
     return intent
   } catch (error) {
     log.error('AI parsing failed, falling back to local parse', { error }, error as Error)
