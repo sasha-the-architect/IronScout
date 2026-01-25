@@ -1,28 +1,19 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import { Bookmark, ArrowUpRight } from 'lucide-react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
+import { Bookmark, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { trackAffiliateClick, trackTrackToggle } from '@/lib/analytics'
+import { trackTrackToggle } from '@/lib/analytics'
 import { toast } from 'sonner'
-import type { ResultCardV2Props, RetailerPrice } from './types'
-import {
-  formatPrice,
-  formatShippingInfoShort,
-  truncate,
-  sortRetailers,
-} from './types'
-
-/** Maximum inline retailer rows before overflow */
-const MAX_INLINE_RETAILERS = 3
+import type { ResultCardV2Props } from './types'
+import { formatPrice } from './types'
 
 /**
  * Get casing badge style - Brass gets warm accent, Steel gets neutral
@@ -39,13 +30,17 @@ function getCasingStyle(casing: string): string {
 }
 
 /**
- * ResultCardV2 - Multi-retailer comparison card
+ * ResultCardV2 - Price Summary Card
  *
- * Per search-results-ux-spec.md:
- * - Inline retailer rows (max 3)
- * - Overflow triggers panel
- * - No isBestPrice, no badges, no timestamps
- * - Factual only, no recommendation language
+ * Per UX feedback: Cards collapsed to "price summary" model for scanability.
+ * Shows: Product name, best price/rd, price range, retailer count.
+ * Retailer rows appear only after click (drawer/detail view).
+ *
+ * Invariants:
+ * - No inline retailer rows (those live in RetailerPanel)
+ * - No per-retailer stock state inline
+ * - No recommendation language
+ * - Click anywhere opens comparison drawer
  */
 export function ResultCardV2({
   id,
@@ -67,51 +62,58 @@ export function ResultCardV2({
     setWatchingOptimistic(isWatched)
   }, [isWatched])
 
-  // Sort retailers by price (lowest first)
-  const sortedRetailers = sortRetailers(retailers, 'price_asc')
-  const inlineRetailers = sortedRetailers.slice(0, MAX_INLINE_RETAILERS)
-  const overflowCount = retailers.length - MAX_INLINE_RETAILERS
-  const hasOverflow = overflowCount > 0
-
-  // Check stock status
-  const anyInStock = retailers.some((r) => r.inStock)
-  const allOutOfStock = retailers.length > 0 && !anyInStock
-
-  const handleWatchToggle = useCallback(() => {
-    const nextState = !watchingOptimistic
-    setWatchingOptimistic(nextState)
-    trackTrackToggle(id, nextState)
-
-    if (nextState) {
-      toast.success('Added to watchlist', {
-        description: "We'll notify you when the price drops.",
-        action: {
-          label: 'View Watchlist',
-          onClick: () => (window.location.href = '/dashboard/saved'),
-        },
-        duration: 4000,
-      })
-    } else {
-      toast.success('Removed from watchlist', { duration: 2000 })
+  // Compute price summary from retailers
+  const priceSummary = useMemo(() => {
+    if (retailers.length === 0) {
+      return null
     }
 
-    onWatchToggle(id)
-  }, [id, watchingOptimistic, onWatchToggle])
+    const prices = retailers.map((r) => r.pricePerRound)
+    const minPrice = Math.min(...prices)
+    const maxPrice = Math.max(...prices)
+    const anyInStock = retailers.some((r) => r.inStock)
 
-  const handleCompareClick = useCallback(() => {
+    return {
+      bestPrice: minPrice,
+      minPrice,
+      maxPrice,
+      hasRange: maxPrice - minPrice > 0.001, // More than $0.001 difference
+      retailerCount: retailers.length,
+      anyInStock,
+    }
+  }, [retailers])
+
+  const handleWatchToggle = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation() // Don't trigger card click
+      const nextState = !watchingOptimistic
+      setWatchingOptimistic(nextState)
+      trackTrackToggle(id, nextState)
+
+      if (nextState) {
+        toast.success('Added to watchlist', {
+          description: "We'll notify you when the price drops.",
+          action: {
+            label: 'View Watchlist',
+            onClick: () => (window.location.href = '/dashboard/saved'),
+          },
+          duration: 4000,
+        })
+      } else {
+        toast.success('Removed from watchlist', { duration: 2000 })
+      }
+
+      onWatchToggle(id)
+    },
+    [id, watchingOptimistic, onWatchToggle]
+  )
+
+  const handleCardClick = useCallback(() => {
     onCompareClick(id)
   }, [id, onCompareClick])
 
-  const handleRetailerClick = useCallback(
-    (retailer: RetailerPrice) => {
-      trackAffiliateClick(id, retailer.retailerName, retailer.pricePerRound, 'card')
-      window.open(retailer.url, '_blank', 'noopener,noreferrer')
-    },
-    [id]
-  )
-
   // Empty state (no retailers)
-  if (retailers.length === 0) {
+  if (!priceSummary) {
     return (
       <Card className="overflow-hidden h-full flex flex-col border border-border bg-card">
         <CardContent className="p-4 flex flex-col flex-1">
@@ -132,30 +134,33 @@ export function ResultCardV2({
               <p className="text-sm text-muted-foreground/70 mt-1">Check back later</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            className="w-full h-10"
+          <button
             onClick={handleWatchToggle}
             disabled={watchingOptimistic}
+            className={cn(
+              'w-full h-10 rounded-md border text-sm font-medium transition-colors',
+              watchingOptimistic
+                ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                : 'border-border hover:bg-muted'
+            )}
           >
             {watchingOptimistic ? 'Watching' : 'Watch for availability'}
-          </Button>
+          </button>
         </CardContent>
       </Card>
     )
   }
 
-  // Determine CTA text and behavior
-  const singleRetailer = retailers.length === 1
-  const ctaText = singleRetailer
-    ? `View at ${truncate(retailers[0].retailerName, 20)}`
-    : `Compare ${retailers.length} prices`
+  const { bestPrice, minPrice, maxPrice, hasRange, retailerCount, anyInStock } = priceSummary
 
   return (
     <Card
+      onClick={handleCardClick}
       className={cn(
-        'overflow-hidden h-full flex flex-col border bg-card',
-        allOutOfStock ? 'opacity-70' : 'border-border hover:border-primary/30'
+        'overflow-hidden h-full flex flex-col border bg-card cursor-pointer transition-all',
+        anyInStock
+          ? 'border-border hover:border-primary/40 hover:shadow-sm'
+          : 'opacity-70 border-border'
       )}
     >
       <CardContent className="p-4 flex flex-col flex-1">
@@ -171,40 +176,33 @@ export function ResultCardV2({
           caseMaterial={caseMaterial}
         />
 
-        {/* Retailer Comparison Block */}
-        <div className="mt-3 space-y-1.5">
-          {inlineRetailers.map((retailer) => (
-            <InlineRetailerRow
-              key={retailer.retailerId}
-              retailer={retailer}
-              onClick={() => handleRetailerClick(retailer)}
-            />
-          ))}
+        {/* Price Summary Block */}
+        <div className="mt-4 flex-1">
+          {/* Best Price - Primary */}
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-bold font-mono text-foreground">
+              {formatPrice(bestPrice)}
+            </span>
+            <span className="text-sm text-muted-foreground">/rd</span>
+          </div>
 
-          {/* Overflow link */}
-          {hasOverflow && (
-            <button
-              onClick={handleCompareClick}
-              className="w-full text-left text-sm text-primary hover:underline underline-offset-4 py-1"
-            >
-              {overflowCount <= 2 ? `+${overflowCount} more` : `Compare all ${retailers.length}`}
-            </button>
+          {/* Price Range - Secondary (only if range exists) */}
+          {hasRange && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {formatPrice(minPrice)} – {formatPrice(maxPrice)}
+            </p>
           )}
         </div>
 
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* CTA */}
-        <div className="mt-4">
-          <Button
-            variant="outline"
-            className="w-full h-10"
-            onClick={singleRetailer ? () => handleRetailerClick(retailers[0]) : handleCompareClick}
-          >
-            <span className="truncate">{ctaText}</span>
-            <ArrowUpRight className="ml-2 h-4 w-4 shrink-0" />
-          </Button>
+        {/* Footer: Retailer count + compare hint */}
+        <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">
+            {retailerCount} {retailerCount === 1 ? 'retailer' : 'retailers'}
+          </span>
+          <span className="text-sm text-primary flex items-center gap-0.5">
+            Compare
+            <ChevronRight className="h-4 w-4" />
+          </span>
         </div>
       </CardContent>
     </Card>
@@ -219,7 +217,7 @@ function WatchButton({
   onClick,
 }: {
   isWatched: boolean
-  onClick: () => void
+  onClick: (e: React.MouseEvent) => void
 }) {
   return (
     <TooltipProvider delayDuration={200}>
@@ -302,86 +300,38 @@ function ProductHeader({
 }
 
 /**
- * Inline retailer row - compact display within card
- */
-function InlineRetailerRow({
-  retailer,
-  onClick,
-}: {
-  retailer: RetailerPrice
-  onClick: () => void
-}) {
-  const shippingText = formatShippingInfoShort(retailer.shippingInfo)
-
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'w-full text-left p-2 rounded border border-border/50 hover:border-border hover:bg-muted/30 transition-colors',
-        !retailer.inStock && 'opacity-60'
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-medium text-sm text-foreground truncate">
-          {truncate(retailer.retailerName, 20)}
-        </span>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="font-mono font-bold text-sm">
-            {formatPrice(retailer.pricePerRound)}/rd
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {formatPrice(retailer.totalPrice)}
-          </span>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 mt-0.5 text-xs">
-        <span
-          className={cn(
-            'font-medium',
-            retailer.inStock
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : 'text-red-500 dark:text-red-400'
-          )}
-        >
-          {retailer.inStock ? 'In Stock' : 'Out of Stock'}
-        </span>
-        {shippingText && (
-          <>
-            <span className="text-muted-foreground/50">·</span>
-            <span className="text-muted-foreground">{shippingText}</span>
-          </>
-        )}
-      </div>
-    </button>
-  )
-}
-
-/**
  * ResultCardV2Skeleton - Loading placeholder
+ *
+ * Matches the price summary card layout:
+ * - Title + attributes
+ * - Price block
+ * - Footer with retailer count
  */
 export function ResultCardV2Skeleton() {
   return (
     <Card className="bg-card border-border overflow-hidden h-full flex flex-col">
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="p-4 flex flex-col flex-1">
         {/* Title skeleton */}
         <div className="h-5 w-3/4 bg-muted rounded animate-pulse" />
 
         {/* Attribute badges skeleton */}
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 mt-2">
           <div className="h-5 w-12 bg-muted rounded animate-pulse" />
           <div className="h-5 w-10 bg-muted rounded animate-pulse" />
           <div className="h-5 w-14 bg-muted rounded animate-pulse" />
         </div>
 
-        {/* Retailer rows skeleton */}
-        <div className="space-y-1.5 mt-3">
-          <div className="h-14 w-full bg-muted/50 rounded animate-pulse" />
-          <div className="h-14 w-full bg-muted/50 rounded animate-pulse" />
-          <div className="h-14 w-full bg-muted/50 rounded animate-pulse" />
+        {/* Price block skeleton */}
+        <div className="mt-4 flex-1">
+          <div className="h-8 w-24 bg-muted rounded animate-pulse" />
+          <div className="h-4 w-32 bg-muted/50 rounded animate-pulse mt-2" />
         </div>
 
-        {/* CTA skeleton */}
-        <div className="h-10 w-full bg-muted rounded animate-pulse mt-auto" />
+        {/* Footer skeleton */}
+        <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
+          <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+          <div className="h-4 w-16 bg-muted rounded animate-pulse" />
+        </div>
       </CardContent>
     </Card>
   )
