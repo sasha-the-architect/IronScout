@@ -1297,8 +1297,12 @@ model firearm_ammo_preferences {
   deleteReason AmmoPreferenceDeleteReason?
 
   // Relations
+  // Per spec: Soft-delete semantics for firearm/user deletion
+  // userId CASCADE: Account deletion removes all data
+  // firearmId NO ACTION: App handles via cascadeFirearmDeletion() for audit trail
+  // ammoSkuId CASCADE: Products should never be hard-deleted per spec
   users      users      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  user_guns  user_guns  @relation(fields: [firearmId], references: [id], onDelete: Cascade)
+  user_guns  user_guns  @relation(fields: [firearmId], references: [id], onDelete: NoAction)
   products   products   @relation(fields: [ammoSkuId], references: [id], onDelete: Cascade)
 
   // Partial unique: only one active mapping per user+firearm+sku+useCase

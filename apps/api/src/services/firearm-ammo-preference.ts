@@ -193,16 +193,32 @@ export async function getPreferencesForFirearm(
         },
       },
     },
-    orderBy: { updatedAt: 'desc' },
+    orderBy: [
+      { updatedAt: 'desc' },
+      { ammoSkuId: 'asc' }, // Tie-breaker for deterministic ordering per spec
+    ],
   })
 
   // Map and resolve supersession
   const mapped = await Promise.all(preferences.map(mapToAmmoPreference))
 
+  // A4: Dedupe after supersession resolution - multiple deprecated SKUs may resolve to same canonical
+  // Per spec: "If both deprecated and canonical SKUs are mapped, render canonical only"
+  const deduped: AmmoPreference[] = []
+  const seenKeys = new Set<string>()
+  for (const pref of mapped) {
+    const key = `${pref.firearmId}:${pref.ammoSkuId}:${pref.useCase}`
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key)
+      deduped.push(pref)
+    }
+    // Skip duplicates - first one wins (most recently updated due to orderBy)
+  }
+
   // Group by use case in fixed order
   const groups: AmmoPreferenceGroup[] = []
   for (const useCase of USE_CASE_ORDER) {
-    const prefs = mapped.filter((p) => p.useCase === useCase)
+    const prefs = deduped.filter((p) => p.useCase === useCase)
     if (prefs.length > 0) {
       groups.push({ useCase, preferences: prefs })
     }
@@ -282,6 +298,19 @@ export async function addPreference(
 
   if (!ammoSku) {
     throw new Error('Ammo SKU not found')
+  }
+
+  // A6: Caliber compatibility validation (fail-closed per ADR-009)
+  // Per spec: "Firearm-Scoped Search: Apply caliber compatibility filter"
+  if (firearm.caliber && ammoSku.caliber && firearm.caliber !== ammoSku.caliber) {
+    console.warn('[AmmoPreference] Caliber mismatch blocked', {
+      userId,
+      firearmId,
+      firearmCaliber: firearm.caliber,
+      ammoCaliber: ammoSku.caliber,
+      ammoSkuId,
+    })
+    throw new Error(`Caliber mismatch: firearm is ${firearm.caliber}, ammo is ${ammoSku.caliber}`)
   }
 
   // Resolve to canonical if superseded

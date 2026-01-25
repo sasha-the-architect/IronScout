@@ -7,6 +7,7 @@
 
 import { prisma } from '@ironscout/db'
 import { randomUUID } from 'crypto'
+import { cascadeFirearmDeletion } from './firearm-ammo-preference'
 
 /**
  * Canonical caliber values per gun_locker_v1_spec.md
@@ -280,6 +281,7 @@ export async function addGun(
 
 /**
  * Remove a gun from user's Gun Locker
+ * Per spec: Soft-delete ammo preferences before hard-deleting firearm
  * @throws Error if gun not found or doesn't belong to user
  */
 export async function removeGun(userId: string, gunId: string): Promise<void> {
@@ -294,6 +296,10 @@ export async function removeGun(userId: string, gunId: string): Promise<void> {
   if (gun.userId !== userId) {
     throw new Error('Gun not found') // Don't leak that it exists for another user
   }
+
+  // Cascade soft-delete ammo preferences before hard-deleting firearm
+  // Per firearm_preferred_ammo_mapping_spec_v3.md: FIREARM_DELETED reason
+  await cascadeFirearmDeletion(userId, gunId)
 
   await prisma.user_guns.delete({
     where: { id: gunId },

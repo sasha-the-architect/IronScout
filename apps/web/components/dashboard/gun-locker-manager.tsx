@@ -651,7 +651,7 @@ export function GunLockerManager() {
                                 }}
                               >
                                 <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                                Compare
+                                Compare prices
                               </Button>
                               {/* Use case selector */}
                               <Popover>
