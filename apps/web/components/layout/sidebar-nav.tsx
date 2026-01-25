@@ -13,6 +13,7 @@ import {
   X,
   LogOut,
   Crosshair,
+  ScanLine,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
@@ -25,7 +26,12 @@ interface SidebarNavProps {
 // V1 Navigation items - no premium gating
 const navItems = [
   {
-    title: 'Dashboard',
+    title: 'Search',
+    href: '/dashboard/search',
+    icon: Search,
+  },
+  {
+    title: 'My Loadout',
     href: '/dashboard',
     icon: LayoutDashboard,
     exact: true,
@@ -39,6 +45,11 @@ const navItems = [
     title: 'Gun Locker',
     href: '/dashboard/gun-locker',
     icon: Crosshair,
+  },
+  {
+    title: 'Mobile Price Scanner',
+    href: '/price-check',
+    icon: ScanLine,
   },
   {
     title: 'Settings',
@@ -81,16 +92,6 @@ export function SidebarNav({ userName }: SidebarNavProps) {
             <p className="text-sm font-medium truncate">{userName || 'User'}</p>
           </div>
         </div>
-      </div>
-
-      {/* Primary Action - Search is the entry point */}
-      <div className="px-3 py-3">
-        <Link href="/dashboard/search" onClick={() => setIsMobileOpen(false)}>
-          <Button className="w-full bg-primary hover:bg-primary/90" size="sm">
-            <Search className="h-4 w-4 mr-2" />
-            Search
-          </Button>
-        </Link>
       </div>
 
       {/* Navigation */}
