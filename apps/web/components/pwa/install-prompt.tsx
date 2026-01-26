@@ -4,8 +4,13 @@ import { useState, useEffect } from 'react'
 import { X, Download, Smartphone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createLogger } from '@/lib/logger'
+import { BRAND_NAME } from '@/lib/brand'
 
 const logger = createLogger('components:pwa:install-prompt')
+
+const PWA_DISMISS_KEY = 'pwa-prompt-dismissed'
+const PWA_DISMISS_PERMANENT = 'permanent'
+const PWA_DISMISS_COOLDOWN_DAYS = 7
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -30,12 +35,17 @@ export function PWAInstallPrompt() {
     setIsIOS(ios)
 
     // Check if we've already dismissed
-    const dismissed = localStorage.getItem('pwa-prompt-dismissed')
-    const dismissedTime = dismissed ? parseInt(dismissed) : 0
-    const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24)
-    
-    // Show again after 7 days
-    if (dismissed && daysSinceDismissed < 7) return
+    const dismissed = localStorage.getItem(PWA_DISMISS_KEY)
+
+    // Permanently dismissed - never show again
+    if (dismissed === PWA_DISMISS_PERMANENT) return
+
+    // Temporarily dismissed - check cooldown
+    if (dismissed) {
+      const dismissedTime = parseInt(dismissed)
+      const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24)
+      if (daysSinceDismissed < PWA_DISMISS_COOLDOWN_DAYS) return
+    }
 
     // Listen for the beforeinstallprompt event (Chrome, Edge, etc.)
     const handler = (e: Event) => {
@@ -75,9 +85,14 @@ export function PWAInstallPrompt() {
     setShowPrompt(false)
   }
 
-  const handleDismiss = () => {
+  const handleDismiss = (permanent = false) => {
     setShowPrompt(false)
-    localStorage.setItem('pwa-prompt-dismissed', Date.now().toString())
+    if (permanent) {
+      localStorage.setItem(PWA_DISMISS_KEY, PWA_DISMISS_PERMANENT)
+      logger.info('User permanently dismissed the install prompt')
+    } else {
+      localStorage.setItem(PWA_DISMISS_KEY, Date.now().toString())
+    }
   }
 
   // Don't render if already installed or shouldn't show
@@ -92,7 +107,7 @@ export function PWAInstallPrompt() {
             <Smartphone className="h-6 w-6 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm">Install IronScout</h3>
+            <h3 className="font-semibold text-sm">Install {BRAND_NAME}</h3>
             <p className="text-xs text-muted-foreground mt-1">
               Tap the share button <span className="inline-block px-1">
                 <svg className="inline h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -103,13 +118,16 @@ export function PWAInstallPrompt() {
               </span> then &quot;Add to Home Screen&quot;
             </p>
           </div>
-          <button 
-            onClick={handleDismiss}
-            className="flex-shrink-0 p-1 hover:bg-muted rounded"
-            aria-label="Dismiss"
-          >
-            <X className="h-4 w-4 text-muted-foreground" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleDismiss(true)}
+              className="flex-shrink-0 p-1 hover:bg-muted rounded text-xs text-muted-foreground"
+              aria-label="Don't show again"
+              title="Don't show again"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -123,7 +141,7 @@ export function PWAInstallPrompt() {
           <Download className="h-6 w-6 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm">Install IronScout</h3>
+          <h3 className="font-semibold text-sm">Install {BRAND_NAME}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Add to your home screen for quick access
           </p>
@@ -132,7 +150,7 @@ export function PWAInstallPrompt() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleDismiss}
+            onClick={() => handleDismiss(false)}
             className="text-xs"
           >
             Not now

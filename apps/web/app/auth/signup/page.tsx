@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import Link from 'next/link'
+import { BRAND_NAME } from '@/lib/brand'
 
 export default function SignUpPage() {
   const router = useRouter()
@@ -74,7 +75,7 @@ export default function SignUpPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Create an Account</CardTitle>
-          <CardDescription>Sign up to get started with IronScout.ai</CardDescription>
+          <CardDescription>Sign up to get started with {BRAND_NAME}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {errorMessage && (

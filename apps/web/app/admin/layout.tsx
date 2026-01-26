@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { BRAND_NAME } from '@/lib/brand'
 
 // Admin emails from environment variable
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
@@ -40,7 +41,7 @@ export default async function AdminLayout({
                   height={24}
                   className="flex-shrink-0"
                 />
-                <span className="text-xl font-bold text-gray-900">IronScout.ai Admin</span>
+                <span className="text-xl font-bold text-gray-900">{BRAND_NAME} Admin</span>
               </Link>
               <nav className="hidden md:flex space-x-4">
                 <Link

@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import { signOut } from 'next-auth/react'
+import { BRAND_NAME } from '@/lib/brand'
 
 interface SidebarNavProps {
   userName?: string
@@ -27,7 +28,7 @@ interface SidebarNavProps {
 const navItems = [
   {
     title: 'Search',
-    href: '/dashboard/search',
+    href: '/search',
     icon: Search,
   },
   {
@@ -81,7 +82,7 @@ export function SidebarNav({ userName }: SidebarNavProps) {
             height={24}
             className="flex-shrink-0"
           />
-          <span className="text-lg font-bold">IronScout</span>
+          <span className="text-lg font-bold">{BRAND_NAME}</span>
         </Link>
       </div>
 

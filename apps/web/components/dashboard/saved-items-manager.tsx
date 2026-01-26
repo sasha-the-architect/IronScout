@@ -103,7 +103,7 @@ export function SavedItemsManager() {
                 No items in your watchlist yet. Search for products and add them to track prices.
               </p>
               <Button className="mt-4" asChild>
-                <a href="/dashboard/search">Search Products</a>
+                <a href="/search">Search Products</a>
               </Button>
             </div>
           ) : (

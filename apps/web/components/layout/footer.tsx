@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import { BRAND, BRAND_NAME } from '@/lib/brand'
 
-const WWW_URL = 'https://www.ironscout.ai'
+const WWW_URL = BRAND.website
 
 export function Footer() {
   return (
@@ -18,10 +19,10 @@ export function Footer() {
                 height={24}
                 className="flex-shrink-0"
               />
-              <span className="text-xl font-bold">IronScout.ai</span>
+              <span className="text-xl font-bold">{BRAND_NAME}</span>
             </Link>
             <p className="text-sm text-muted-foreground">
-              Intent-aware ammunition search and price comparison.
+              {BRAND.description}
             </p>
           </div>
 
@@ -103,7 +104,7 @@ export function Footer() {
         </div>
 
         <div className="border-t mt-12 pt-8 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} IronScout.ai. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} {BRAND.domain}. All rights reserved.</p>
         </div>
       </div>
     </footer>

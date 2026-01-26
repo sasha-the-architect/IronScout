@@ -75,7 +75,7 @@ export function MarketPulse({ onCaliberClick }: MarketPulseProps) {
 
             {/* Search CTA - always visible */}
             <div className="mt-3 pt-3 border-t border-border">
-              <Link href="/dashboard/search">
+              <Link href="/search">
                 <Button variant="ghost" size="sm" className="w-full justify-start text-xs h-9 text-muted-foreground hover:text-foreground">
                   <Plus className="h-3.5 w-3.5 mr-2" />
                   Search more calibers

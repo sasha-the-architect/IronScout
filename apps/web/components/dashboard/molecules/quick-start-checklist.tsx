@@ -41,7 +41,7 @@ export function QuickStartChecklist({
       label: 'Search for products',
       description: 'Browse ammo by caliber or brand',
       completed: true, // Always completed if they're on dashboard
-      href: '/dashboard/search',
+      href: '/search',
       icon: Search,
     },
     {
@@ -49,7 +49,7 @@ export function QuickStartChecklist({
       label: 'Save your first item',
       description: 'Save from search results to get alerts',
       completed: savedCount > 0,
-      href: '/dashboard/search',
+      href: '/search',
       icon: Bookmark,
     },
     {

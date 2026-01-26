@@ -419,14 +419,16 @@ export function GunLockerManager() {
         onChange={handleFileSelect}
       />
 
-      {/* Add Gun Button */}
+      {/* Add Gun Button - only show when user has guns (empty state has its own CTA) */}
+      {guns.length > 0 && (
+        <Button onClick={() => setIsAddDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Gun
+        </Button>
+      )}
+
+      {/* Add Gun Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogTrigger asChild>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Gun
-          </Button>
-        </DialogTrigger>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add a Gun</DialogTitle>

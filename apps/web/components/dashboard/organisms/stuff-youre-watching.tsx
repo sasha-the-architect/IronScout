@@ -167,7 +167,7 @@ function WatchingRow({ item }: WatchingRowProps) {
         {/* Retailer CTA */}
         {retailer && (
           <Link
-            href={`/dashboard/search?q=${encodeURIComponent(item.product.name)}`}
+            href={`/search?q=${encodeURIComponent(item.product.name)}`}
             className="hidden md:flex"
           >
             <Button variant="ghost" size="sm" className="text-xs h-7 px-2">
@@ -235,7 +235,7 @@ function EmptyWatchingState() {
               Save items and IronScout will watch prices and availability for you.
             </p>
           </div>
-          <Link href="/dashboard/search">
+          <Link href="/search">
             <Button size="sm">
               <Search className="mr-2 h-4 w-4" />
               Find something to watch

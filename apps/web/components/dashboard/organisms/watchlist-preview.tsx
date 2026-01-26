@@ -93,13 +93,13 @@ export function SavedItemsPreview({ maxItems = 5 }: { maxItems?: number }) {
 
                 {/* CTAs */}
                 <div className="space-y-2">
-                  <Link href="/dashboard/search" className="block">
+                  <Link href="/search" className="block">
                     <Button className="w-full" size="sm">
                       <Search className="mr-2 h-4 w-4" />
                       Add First Item
                     </Button>
                   </Link>
-                  <Link href="/dashboard/search?popular=true" className="block">
+                  <Link href="/search?popular=true" className="block">
                     <Button variant="ghost" size="sm" className="w-full text-xs">
                       Browse Popular Calibers
                     </Button>

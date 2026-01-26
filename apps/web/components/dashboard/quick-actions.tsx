@@ -7,13 +7,13 @@ const actions = [
     title: 'Search Products',
     description: 'Compare current ammo prices',
     icon: Search,
-    href: '/dashboard/search'
+    href: '/search'
   },
   {
     title: 'Create Alert',
     description: 'Set up a new price alert',
     icon: Plus,
-    href: '/dashboard/search'
+    href: '/search'
   },
   {
     title: 'Saved Items',
