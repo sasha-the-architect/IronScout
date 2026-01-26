@@ -288,3 +288,5 @@ If any phase causes issues:
 - Renaming `market-deals.ts` if used by search (separate ADR discussion)
 - Renaming any database tables or API response types
 - Changes to the loadout service (it's already clean)
+# Status: Archived
+Historical cleanup notes. Not authoritative.

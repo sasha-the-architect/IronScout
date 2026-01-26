@@ -94,12 +94,12 @@ Outcomes are based on observable data, not claims of intelligence.
 
 ## The Dashboard
 
-The Dashboard is the product’s decision surface.
+The Dashboard is a **status-oriented monitoring surface** (ADR-020).
 
-It answers one question:
-> “Is there something worth buying right now?”
+It answers:
+> "What is the current state of what I'm tracking, and what has changed recently?"
 
-On most days, the answer is “not yet.”
+On most days, the answer is "no meaningful change yet."
 
 That restraint is deliberate.
 

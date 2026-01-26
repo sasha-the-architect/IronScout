@@ -43,18 +43,18 @@ Saved Searches exist to support monitoring, not interaction.
 
 ## Dashboard
 
-The primary action surface of IronScout.
+A status-oriented monitoring surface (ADR-020).
 
-The Dashboard answers one question:
-> “Is there something worth buying right now?”
+The Dashboard answers:
+> "What is the current state of what I'm tracking, and what has changed recently?"
 
 The absence of recommendations is an intentional and valid state.
 
 ---
 
-## Hero Recommendation
+## Spotlight Signal
 
-A single, optional item surfaced on the Dashboard when a confident signal exists.
+A single, optional factual signal surfaced on the Dashboard when a qualifying event exists.
 
 Hero recommendations:
 - Are rare by design

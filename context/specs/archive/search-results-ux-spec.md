@@ -538,3 +538,5 @@ If product exists but has no retailer prices:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2025-01-24 | Initial specification |
+# Status: Superseded
+Consolidated into `context/specs/search-results-v2.md`. Do not use.

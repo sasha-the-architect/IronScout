@@ -3,8 +3,6 @@ import { Outfit, JetBrains_Mono } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
 import { Providers } from './providers'
-import { Header } from '@/components/layout/header'
-import { Footer } from '@/components/layout/footer'
 import { Toaster } from 'sonner'
 
 // Outfit: Modern geometric sans with personality - sharp but approachable
@@ -122,13 +120,7 @@ export default function RootLayout({
       </head>
       <body className="font-display antialiased">
         <Providers>
-          <div className="min-h-screen flex flex-col safe-area-inset">
-            <Header />
-            <main className="flex-1">
-              {children}
-            </main>
-            <Footer />
-          </div>
+          {children}
           <Toaster richColors position="top-right" />
         </Providers>
       </body>

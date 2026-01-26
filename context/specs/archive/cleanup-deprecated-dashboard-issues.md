@@ -198,3 +198,5 @@ Issue 1 → Issue 2 → Issue 3 → Issue 4 → Issue 5 → Issue 7
 | 7 | 15 min | None |
 
 **Total:** ~1.5 hours of work, split across safe PRs
+# Status: Archived
+Historical cleanup notes. Not authoritative.

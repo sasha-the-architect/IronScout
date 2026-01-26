@@ -23,7 +23,10 @@ When documents conflict, **precedence rules apply**. Lower-precedence documents 
 3. **Accepted ADRs (`context/decisions/`)**  
    Binding internal decisions. Override all non-public documents.
 
-4. **`06_ux_charter.md`**  
+4. **`01_product_overview.md`**  
+   Narrative product framing. Advisory. Must align with ADRs.
+
+5. **`06_ux_charter.md`**  
    UX principles and constraints, unless explicitly superseded by an Accepted ADR.
 
 5. **`apps/`**  

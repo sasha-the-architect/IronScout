@@ -282,3 +282,5 @@ The real decisions needed are:
 3. Implement fixes based on decisions
 4. Re-audit after changes
 5. Update `compliance_audit.md` with current status
+# Status: Historical Audit Notes (Archived)
+This document is historical and non-authoritative.
