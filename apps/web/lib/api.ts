@@ -744,19 +744,6 @@ export async function getMarketPulse(token: string): Promise<MarketPulseResponse
   return response.json()
 }
 
-/**
- * Get personalized deals feed
- * Free: 5 deals max
- * Premium: 20 deals + explanations
- */
-export async function getDealsForYou(token: string): Promise<DealsResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/dashboard/deals`, {
-    headers: buildAuthHeaders(token),
-  })
-  await handleAuthResponse(response, 'Failed to fetch results')
-  return response.json()
-}
-
 // ============================================================================
 // Dashboard v4 State API
 // ============================================================================
@@ -798,43 +785,6 @@ export interface WatchlistPreviewResponse {
 }
 
 /**
- * Best price item for non-personalized deals
- */
-export interface BestPriceItem {
-  id: string
-  product: {
-    id: string
-    name: string
-    caliber: string | null
-    brand: string | null
-    imageUrl: string | null
-    roundCount: number | null
-    grainWeight: number | null
-  }
-  retailer: {
-    id: string
-    name: string
-    logoUrl: string | null
-  }
-  price: number
-  pricePerRound: number | null
-  url: string
-  inStock: boolean
-  updatedAt: string | null
-}
-
-export interface BestPricesResponse {
-  items: BestPriceItem[]
-  _meta: {
-    scope: 'global'
-    tier: null
-    itemsShown: number
-    itemsLimit: number
-    personalized: false
-  }
-}
-
-/**
  * Get dashboard state for v4 state-driven rendering
  * State resolution is server-side per dashboard-product-spec.md
  */
@@ -858,22 +808,6 @@ export async function getWatchlistPreview(
     headers: buildAuthHeaders(token),
   })
   await handleAuthResponse(response, 'Failed to fetch watchlist preview')
-  return response.json()
-}
-
-/**
- * Get best prices (non-personalized deals) for dashboard
- * Uses scope=global to get non-user-specific deals
- */
-export async function getBestPrices(limit: number = 5): Promise<BestPricesResponse> {
-  const params = new URLSearchParams({
-    scope: 'global',
-    limit: limit.toString(),
-  })
-  const response = await fetch(`${API_BASE_URL}/api/dashboard/deals?${params}`)
-  if (!response.ok) {
-    throw new Error('Failed to fetch price highlights')
-  }
   return response.json()
 }
 
@@ -1786,69 +1720,6 @@ export async function getFirearmCaliber(
 }
 
 // ============================================
-// Market Deals API
-// ============================================
-
-/**
- * Market Deal per dashboard_market_deals_v1_spec.md
- * Note: caliber is non-null because unmapped calibers are excluded
- * Note: dropPercent removed to avoid user-facing scores
- */
-export interface MarketDeal {
-  productId: string
-  productName: string
-  caliber: CaliberValue  // NOT nullable - unmapped calibers excluded
-  pricePerRound: number | null  // null if roundCount unavailable
-  price: number
-  retailerName: string
-  retailerId: string
-  url: string
-  contextLine: string
-  detectedAt: string
-  reason: 'PRICE_DROP' | 'BACK_IN_STOCK' | 'LOWEST_90D'
-}
-
-export interface MarketDealsSection {
-  title: string
-  deals: MarketDeal[]
-}
-
-export interface MarketDealsResponse {
-  hero: MarketDeal | null
-  sections: MarketDealsSection[]
-  lastCheckedAt: string
-  _meta: {
-    personalized: boolean
-    userCalibers?: CaliberValue[]
-  }
-}
-
-/**
- * Get market deals for dashboard
- * Returns personalized deals if user has Gun Locker
- */
-export async function getMarketDeals(token?: string): Promise<MarketDealsResponse> {
-  if (E2E_TEST_MODE) {
-    return {
-      hero: null,
-      sections: [{ title: 'Notable Price Moves Today', deals: [] }],
-      lastCheckedAt: new Date().toISOString(),
-      _meta: { personalized: false },
-    }
-  }
-
-  const response = await fetch(`${API_BASE_URL}/api/dashboard/market-deals`, {
-    headers: token ? buildAuthHeaders(token) : { 'Content-Type': 'application/json' },
-  })
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch market activity')
-  }
-
-  return response.json()
-}
-
-// ============================================
 // Price Check API
 // ============================================
 
@@ -1943,24 +1814,6 @@ export interface UpcLookupProduct {
 export interface UpcLookupResult {
   found: boolean
   product: UpcLookupProduct | null
-}
-
-// ============================================
-// Dashboard v5 API
-// ============================================
-
-import type { DashboardV5Data } from '@/components/dashboard/v5/types'
-
-/**
- * Get Dashboard v5 data for authenticated user
- * Per ADR-020 and dashboard-product-spec-v5.md
- */
-export async function getDashboardV5(token: string): Promise<DashboardV5Data> {
-  const response = await fetch(`${API_BASE_URL}/api/dashboard/v5`, {
-    headers: buildAuthHeaders(token),
-  })
-  await handleAuthResponse(response, 'Failed to fetch dashboard data')
-  return response.json()
 }
 
 // ============================================
