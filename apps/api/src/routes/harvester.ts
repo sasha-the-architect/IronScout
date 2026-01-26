@@ -5,10 +5,14 @@ import { prisma } from '@ironscout/db'
 import { Queue } from 'bullmq'
 import Redis from 'ioredis'
 import { logger } from '../config/logger'
+import { requireAdmin } from '../middleware/auth'
 
 const log = logger.child('harvester')
 
 const router: any = Router()
+
+// SECURITY: All harvester management routes require admin authentication
+router.use(requireAdmin)
 
 // Redis connection for BullMQ
 const redisHost = process.env.REDIS_HOST || 'localhost'

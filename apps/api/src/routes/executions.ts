@@ -2,10 +2,14 @@ import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
 import { logger } from '../config/logger'
+import { requireAdmin } from '../middleware/auth'
 
 const log = logger.child('executions')
 
 const router: any = Router()
+
+// SECURITY: All execution management routes require admin authentication
+router.use(requireAdmin)
 
 // Query schema
 const listExecutionsSchema = z.object({

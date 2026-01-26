@@ -3,10 +3,14 @@ import { randomUUID } from 'crypto'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
 import { logger } from '../config/logger'
+import { requireAdmin } from '../middleware/auth'
 
 const log = logger.child('sources')
 
 const router: any = Router()
+
+// SECURITY: All source management routes require admin authentication
+router.use(requireAdmin)
 
 // Validation schemas
 const createSourceSchema = z.object({
