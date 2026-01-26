@@ -150,11 +150,13 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
       JOIN prices pr ON pr."sourceProductId" = pl."sourceProductId"
       JOIN retailers r ON r.id = pr."retailerId"
       LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
+      LEFT JOIN affiliate_feed_runs afr ON afr.id = pr."affiliateFeedRunId"
       WHERE pl.status IN ('MATCHED', 'CREATED')
         AND pr."inStock" = true
         AND pr."observedAt" >= ${sevenDaysAgo}
         AND r."visibilityStatus" = 'ELIGIBLE'
         AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
+        AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL) -- ADR-015: Exclude ignored runs
     )
     SELECT * FROM ranked_prices WHERE rn = 1
     LIMIT 500 -- MAX_PRODUCTS_TO_EVALUATE: documented limit to prevent unbounded queries
@@ -200,11 +202,13 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
       JOIN prices pr ON pr."sourceProductId" = pl."sourceProductId"
       JOIN retailers r ON r.id = pr."retailerId"
       LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
+      LEFT JOIN affiliate_feed_runs afr ON afr.id = pr."affiliateFeedRunId"
       WHERE p.id = ANY(${productIds})
         AND pl.status IN ('MATCHED', 'CREATED')
         AND pr."observedAt" >= ${thirtyDaysAgo}
         AND r."visibilityStatus" = 'ELIGIBLE'
         AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
+        AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL) -- ADR-015: Exclude ignored runs
       GROUP BY p.id, DATE_TRUNC('day', pr."observedAt")
     )
     SELECT
@@ -241,11 +245,13 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
     JOIN prices pr ON pr."sourceProductId" = pl."sourceProductId"
     JOIN retailers r ON r.id = pr."retailerId"
     LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
+    LEFT JOIN affiliate_feed_runs afr ON afr.id = pr."affiliateFeedRunId"
     WHERE p.id = ANY(${productIds})
       AND pl.status IN ('MATCHED', 'CREATED')
       AND pr."observedAt" >= ${ninetyDaysAgo}
       AND r."visibilityStatus" = 'ELIGIBLE'
       AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
+      AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL) -- ADR-015: Exclude ignored runs
     GROUP BY p.id
   `
 
@@ -275,11 +281,13 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
       JOIN prices pr ON pr."sourceProductId" = pl."sourceProductId"
       JOIN retailers r ON r.id = pr."retailerId"
       LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
+      LEFT JOIN affiliate_feed_runs afr ON afr.id = pr."affiliateFeedRunId"
       WHERE pl."productId" = ANY(${productIds})
         AND pl.status IN ('MATCHED', 'CREATED')
         AND pr."observedAt" >= ${thirtyDaysAgo}
         AND r."visibilityStatus" = 'ELIGIBLE'
         AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
+        AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL) -- ADR-015: Exclude ignored runs
       GROUP BY pl."productId", DATE_TRUNC('day', pr."observedAt" AT TIME ZONE 'UTC')
     ),
     with_gaps AS (
