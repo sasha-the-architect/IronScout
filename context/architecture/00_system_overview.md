@@ -334,6 +334,3 @@ This section calls out concrete mismatches between code and current context docs
 
 
 
-# Status: Advisory (v1 scope applies)
-This document is non-authoritative. v1 scope and cut list govern what ships.
-If this conflicts with `context/02_v1_scope_and_cut_list.md`, this doc is wrong.

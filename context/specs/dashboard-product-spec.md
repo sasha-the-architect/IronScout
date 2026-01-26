@@ -201,5 +201,3 @@ Footer copy:
 - No silent failures
 
 This spec replaces Dashboard v3 in full.
-# Status: Superseded
-Superseded by ADR-020. Do not use for v1 behavior.

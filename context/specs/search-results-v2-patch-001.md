@@ -112,5 +112,3 @@ Collapse cards to a **price summary** representation. Defer retailer comparison 
 - **RetailerPanel**: Unchanged. Still the destination for full retailer comparison.
 - **ResultRowV2**: Table view already uses this pattern (summary, not inline detail).
 - **SearchResultsGridV2**: No changes needed, consumes same props.
-# Status: Superseded
-Merged into `context/specs/search-results-v2.md`. Do not use.

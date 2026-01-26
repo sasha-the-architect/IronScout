@@ -439,5 +439,3 @@ The revised design introduces **ambient vitality** through:
 These elements create a sense of **ongoing value** without introducing urgency, recommendations, or feed-like behavior.
 
 The dashboard becomes a **living monitoring console** rather than a **static list waiting for deals**.
-# Status: Superseded
-Superseded by ADR-020. Do not use for v1 behavior.

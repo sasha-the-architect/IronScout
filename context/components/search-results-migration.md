@@ -1,9 +1,7 @@
-# Search Results Migration Guide (Updated)
+# Search Results Migration Guide
 
-Status: Updated to reflect current implementation.
-
-**From:** v1 single-retailer cards
-**To:** Search Results UX Spec (v2 summary model)
+**From:** Current implementation (v1)
+**To:** Search Results UX Spec (v2)
 
 ---
 
@@ -11,9 +9,9 @@ Status: Updated to reflect current implementation.
 
 ### Philosophy Shift
 
-| v1 | v2 (current) |
+| v1 | v2 |
 |----|-----|
-| Single-retailer focus per card | Multi-retailer summary per card |
+| Single-retailer focus per card | Multi-retailer comparison inline |
 | "Best price" highlighting | No visual hierarchy by price |
 | Navigate to compare | Compare without leaving results |
 | Dense grid shows one retailer | Grid shows retailer count, panel shows detail |
@@ -23,7 +21,7 @@ Status: Updated to reflect current implementation.
 | Area | Current (v1) | New (v2) |
 |------|--------------|----------|
 | Card CTA | "View at {Retailer}" | "Compare {N} prices" |
-| Card content | Single price + retailer | Summary: lowest price + range |
+| Card content | Single price + retailer | Up to 3 retailer rows inline |
 | Best price badge | `isBestPrice` crown/scale | Removed entirely |
 | Grid retailer column | Single retailer name | "{N} retailers" count |
 | Multi-retailer view | Navigate to PDP | RetailerPanel drawer |
@@ -38,8 +36,8 @@ Status: Updated to reflect current implementation.
 |---------|---------|-------|
 | `pricePerRound` | (via retailers[0]) | Computed from retailer array |
 | `totalPrice` | (via retailers[0]) | Computed from retailer array |
-| `retailerName` | (via retailers[]) | Used in panel |
-| `retailerUrl` | (via retailers[]) | Used in panel |
+| `retailerName` | (via retailers[]) | Now shows multiple |
+| `retailerUrl` | (via retailers[]) | Per-retailer |
 | `isBestPrice` | **REMOVED** | Violates neutrality |
 | `badges` | **REMOVED** | Context badges removed |
 | `updatedAt` | **REMOVED** | Creates urgency |
@@ -60,7 +58,7 @@ Status: Updated to reflect current implementation.
 
 ### New Component: RetailerPanel
 
-Component for multi-retailer comparison.
+Creates new component for multi-retailer comparison.
 
 Location: `apps/web/components/results/retailer-panel.tsx`
 
@@ -94,7 +92,7 @@ interface RetailerPrice {
 }
 ```
 
-The current `prices` array can be mapped to `retailers`. Shipping info enrichment may be needed.
+The current `prices` array can be mapped to `retailers`, but shipping info enrichment may be needed.
 
 ### Shipping Info
 
@@ -141,28 +139,31 @@ Before merging, verify these are removed:
 
 ---
 
-## Migration Status
+## Migration Steps
 
-### Phase 1: Create New Components (Done)
+### Phase 1: Create New Components
 1. Create `RetailerPanel` component
-2. Create `ResultCardV2` with summary model
-3. Create `ResultRowV2` with retailer count
+2. Create `RetailerRow` component (for panel)
+3. Create `ResultCardV2` with inline retailers
+4. Create `ResultRowV2` with retailer count
 
-### Phase 2: Update Data Flow (Partial)
+### Phase 2: Update Data Flow
 1. Ensure products have full retailer array
 2. Add `ShippingInfo` to price/retailer data
 3. Update API responses if needed
 
-### Phase 3: Wire Up Panel (Done)
-1. Add panel state to `SearchResultsGridV2`
+### Phase 3: Wire Up Panel
+1. Add panel state to `SearchResultsGrid`
 2. Connect card/row "Compare" actions to panel
 3. Implement sort/filter in panel
 
-### Phase 4: Replace Components (Partial)
-1. SearchResultsGridV2 is active in search results
-2. Legacy components still exist for other surfaces
+### Phase 4: Replace Components
+1. Swap `ResultCard` → `ResultCardV2`
+2. Swap `ResultRow` → `ResultRowV2`
+3. Remove old components
+4. Rename v2 components (drop suffix)
 
-### Phase 5: Cleanup (Pending)
+### Phase 5: Cleanup
 1. Remove unused props from types
 2. Update tests
 3. Remove old component files
@@ -173,9 +174,10 @@ Before merging, verify these are removed:
 
 ### New Test Cases
 
-1. **Multi-retailer summary**
-   - Lowest price and range render correctly
-   - Retailer count matches offers
+1. **Multi-retailer display**
+   - 1 retailer: no overflow
+   - 2-3 retailers: all inline
+   - 4+ retailers: overflow with count
 
 2. **Retailer panel**
    - Opens on Compare click
@@ -193,4 +195,3 @@ Before merging, verify these are removed:
 - `isBestPrice` rendering
 - Badge display tests
 - Single-retailer CTA tests
-

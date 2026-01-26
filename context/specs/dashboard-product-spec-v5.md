@@ -419,5 +419,3 @@ Header:
 3. Personalization is additive; lack of configuration must never feel like a failure state.
 
 4. The dashboard must degrade gracefully across all four states without ever feeling empty, broken, or nagging.
-# Status: Superseded
-Superseded by My Loadout (spec pending). Do not use for v1 behavior.

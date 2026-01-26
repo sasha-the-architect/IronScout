@@ -87,5 +87,3 @@ MarketDeal {
 - Non-empty dashboard rate
 - Deal CTR
 - Return visits
-# Status: Superseded
-Superseded by ADR-020. Do not use for v1 behavior.

@@ -19,12 +19,11 @@ If this document conflicts with the actual repo layout, the repo wins. Update th
 - `apps/`
   - `api/` Backend API (Node, Express)
   - `web/` Consumer Next.js app (App Router)
-  - `merchant/` Merchant portal Next.js app (canonical name; may not exist yet)
   - `dealer/` Merchant portal Next.js app (legacy path)
   - `admin/` Admin Next.js app (App Router)
   - `harvester/` Worker app (Node + BullMQ)
 - `context/` Authoritative product and system documentation
-- `context/decisions/` ADRs (immutable once accepted)
+- `decisions/` ADRs (immutable once accepted)
 - `packages/` Shared packages (common libs, db client, types) if present
 
 ---
@@ -73,14 +72,9 @@ Note:
 
 ---
 
-## apps/merchant (Merchant Portal)
-
-Canonical name for the Merchant portal. The codebase may still use the legacy
-path `apps/dealer` during migration.
-
 ## apps/dealer (Merchant Portal - legacy path)
 
-Legacy directory name for the Merchant portal.
+> Legacy note: directory name `apps/dealer` is a migration artifact. Functionally this is the Merchant portal.
 
 Primary responsibilities:
 - Merchant authentication

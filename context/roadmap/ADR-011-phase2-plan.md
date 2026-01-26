@@ -1,6 +1,6 @@
-# Saved Items Phase 2: Implementation Plan (Draft)
+# ADR-011 Phase 2: Implementation Plan
 
-**Status**: Draft (non-authoritative)
+**Status**: In Progress
 
 ## Goal
 One user concept: **Saved Items**. One action: **Save**.

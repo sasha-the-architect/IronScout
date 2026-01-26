@@ -584,5 +584,3 @@ Note: During quiet periods (no exceptional events), the dashboard shows:
 
 - **v5-patch-001** (2026-01-24): Added structural hierarchy, layout constraints, status text rules, anti-patterns, and acceptance test.
 - **v5-patch-001a** (2026-01-24): Added vitality requirements section with monitoring summary, freshness timestamps, market context line, and sparklines. Added vitality anti-patterns. Added normative rules 13-17.
-# Status: Superseded
-Superseded by ADR-020. Do not use for v1 behavior.

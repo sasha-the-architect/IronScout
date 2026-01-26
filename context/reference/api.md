@@ -267,10 +267,9 @@ Use the unified `/api/saved-items/*` endpoints instead.
 
 ---
 
-## Dashboard (v5 Status-Oriented)
+## Dashboard (v4 State-Driven)
 
-The dashboard is a status-oriented monitoring surface (ADR-020). It reports the
-state of what a user is tracking and recent changes, without recommendations.
+The dashboard uses a state-driven model with 6 user states that determine UI presentation.
 
 ### GET /api/dashboard/state
 Get resolved dashboard state for authenticated user.
@@ -286,7 +285,7 @@ Response:
 }
 ```
 
-States (if still used in implementation):
+States:
 - `BRAND_NEW`: 0 saved items
 - `NEW`: 1-4 saved items
 - `NEEDS_ALERTS`: 5+ items, some without alerts configured

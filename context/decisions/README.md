@@ -59,15 +59,6 @@ ADRs are not change logs.
 ADRs are never edited after acceptance.  
 They are only superseded.
 
-## Superseded ADRs (Index)
-
-- ADR-012 is superseded by ADR-020.
-
-## Proposed ADRs
-
-Proposed/draft ADRs live under `context/decisions/proposed/` and are not authoritative.
-Only Accepted ADRs in the main folder are binding.
-
 ---
 
 ## ADR Rules and Governance

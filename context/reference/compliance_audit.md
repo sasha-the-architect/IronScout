@@ -316,5 +316,3 @@ Next steps:
 2. Decide on remediation approach for ADR-006 (remove vs reframe)
 3. Implement fixes in priority order
 4. Re-audit after changes
-# Status: Historical Audit (Archived)
-This document is historical and non-authoritative.

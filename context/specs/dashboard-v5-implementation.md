@@ -580,5 +580,3 @@ Validation method:
 8. Ask: "Do I feel told what to do?" If yes, fail.
 
 All four must pass for launch approval.
-# Status: Superseded
-Superseded by ADR-020. Do not use for v1 behavior.
