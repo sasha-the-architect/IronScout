@@ -29,14 +29,11 @@ const log = loggers.dashboard
 const router: any = Router()
 
 // ============================================================================
-// DASHBOARD V5 ENDPOINT
-// Per ADR-020 and dashboard-product-spec-v5.md
-// Status-oriented monitoring surface with sections:
-// - Spotlight (single signal)
-// - Watchlist (max 10)
-// - Price Movement (max 5)
-// - Back in Stock (max 5)
-// - Gun Locker Matches (max 5, conditional)
+// DASHBOARD V5 ENDPOINT (DEPRECATED)
+// @deprecated Use GET /api/dashboard/loadout instead
+// Kept for backwards compatibility - will be removed in future release
+//
+// Legacy: Per ADR-020 and dashboard-product-spec-v5.md
 // ============================================================================
 
 router.get('/v5', async (req: Request, res: Response) => {

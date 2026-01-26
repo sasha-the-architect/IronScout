@@ -28,10 +28,10 @@ export interface UseDashboardV5Result {
 /**
  * Hook for Dashboard v5 state-oriented monitoring surface
  *
- * Per ADR-020 and dashboard-product-spec-v5.md:
- * - Status-oriented, not deal-driven
- * - Sections: Spotlight, Watchlist, Price Movement, Back in Stock, Gun Locker Matches
- * - Cold-start handling for new users
+ * @deprecated Use useLoadout() from '@/hooks/use-loadout' instead.
+ * This hook is kept for backwards compatibility but should not be used for new features.
+ *
+ * Legacy: Per ADR-020 and dashboard-product-spec-v5.md
  */
 export function useDashboardV5(): UseDashboardV5Result {
   const { data: session, status, update } = useSession()

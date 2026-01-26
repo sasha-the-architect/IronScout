@@ -1,6 +1,17 @@
 /**
  * Dashboard v5 Service
  *
+ * @deprecated This service is deprecated in favor of the loadout service (loadout.ts).
+ * The loadout service provides a cleaner, more modular approach with:
+ * - Gun Locker with ammo preferences and prices
+ * - Watching items with status
+ * - Market activity stats
+ *
+ * This file is kept for backwards compatibility but should not be used for new features.
+ * TODO: Remove once all consumers have migrated to /api/dashboard/loadout
+ *
+ * ---
+ * Legacy documentation (for reference):
  * Per ADR-020 and dashboard-product-spec-v5.md:
  * - Status-oriented monitoring surface
  * - Spotlight: single synthesized signal
