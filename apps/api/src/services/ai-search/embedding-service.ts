@@ -217,87 +217,12 @@ export async function vectorSearch(
     ORDER BY embedding <=> ${JSON.stringify(queryEmbedding)}::vector
     LIMIT ${limit}
   `
-  
+
   // Filter by minimum similarity
   return results.filter(r => r.similarity >= minSimilarity)
 }
 
-/**
- * Hybrid search: combines vector similarity with traditional filters
- */
-export async function hybridSearch(
-  queryText: string,
-  filters: {
-    calibers?: string[]
-    purpose?: string
-    brands?: string[]
-    inStockOnly?: boolean
-  },
-  options: {
-    limit?: number
-    vectorWeight?: number // 0-1, how much to weight vector vs filter match
-  } = {}
-): Promise<Array<{ id: string; score: number; vectorSimilarity: number }>> {
-  const { limit = 20, vectorWeight = 0.6 } = options
-  
-  // Generate embedding for query
-  const queryEmbedding = await generateEmbedding(queryText)
-  
-  // Build filter conditions
-  const conditions: string[] = ['embedding IS NOT NULL']
-  
-  if (filters.calibers?.length) {
-    // Use caliberNorm for filtering (normalized form, always populated by resolver)
-    const caliberPatterns = filters.calibers.map(c => `'%${c}%'`).join(',')
-    conditions.push(`"caliberNorm" ILIKE ANY(ARRAY[${caliberPatterns}])`)
-  }
-  
-  if (filters.purpose) {
-    conditions.push(`purpose = '${filters.purpose}'`)
-  }
-  
-  if (filters.brands?.length) {
-    const brandList = filters.brands.map(b => `'${b}'`).join(',')
-    conditions.push(`brand IN (${brandList})`)
-  }
-  
-  const whereClause = conditions.join(' AND ')
-  
-  // Query with both vector similarity and filter matching
-  // Per Spec v1.2 §0.0: Join through product_links for in-stock filtering
-  const results = await prisma.$queryRaw<Array<{
-    id: string
-    similarity: number
-    filter_match: number
-  }>>`
-    SELECT
-      p.id,
-      1 - (p.embedding <=> ${JSON.stringify(queryEmbedding)}::vector) as similarity,
-      CASE
-        WHEN ${filters.calibers?.length ? 1 : 0} = 1 AND
-          p."caliberNorm" ILIKE ANY(${filters.calibers?.map(c => `%${c}%`) || []})
-        THEN 1
-        ELSE 0
-      END +
-      CASE
-        WHEN ${filters.purpose ? 1 : 0} = 1 AND p.purpose = ${filters.purpose || ''} THEN 1
-        ELSE 0
-      END as filter_match
-    FROM products p
-    ${filters.inStockOnly ? prisma.$queryRaw`
-      INNER JOIN product_links pl ON pl."productId" = p.id AND pl.status IN ('MATCHED', 'CREATED')
-      INNER JOIN prices pr ON pr."sourceProductId" = pl."sourceProductId" AND pr."inStock" = true
-    ` : prisma.$queryRaw``}
-    WHERE ${prisma.$queryRaw`${whereClause}`}
-    ORDER BY
-      (${vectorWeight} * (1 - (p.embedding <=> ${JSON.stringify(queryEmbedding)}::vector))) +
-      (${1 - vectorWeight} * filter_match / 2.0) DESC
-    LIMIT ${limit}
-  `
-  
-  return results.map(r => ({
-    id: r.id,
-    score: vectorWeight * r.similarity + (1 - vectorWeight) * (r.filter_match / 2),
-    vectorSimilarity: r.similarity,
-  }))
-}
+// NOTE: hybridSearch function was removed due to SQL injection vulnerabilities.
+// It was unused and contained unsafe string interpolation in raw SQL queries.
+// If hybrid search is needed in the future, it should be re-implemented using
+// Prisma's parameterized queries or $queryRaw tagged template literals.
