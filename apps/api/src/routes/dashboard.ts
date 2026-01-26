@@ -22,36 +22,11 @@ import {
 } from '../services/dashboard-state'
 import { getMarketDeals, getMarketDealsWithGunLocker } from '../services/market-deals'
 import { getUserCalibers, type CaliberValue } from '../services/gun-locker'
-import { getDashboardV5Data } from '../services/dashboard-v5'
 import { getLoadoutData } from '../services/loadout'
 
 const log = loggers.dashboard
 
 const router: any = Router()
-
-// ============================================================================
-// DASHBOARD V5 ENDPOINT (DEPRECATED)
-// @deprecated Use GET /api/dashboard/loadout instead
-// Kept for backwards compatibility - will be removed in future release
-//
-// Legacy: Per ADR-020 and dashboard-product-spec-v5.md
-// ============================================================================
-
-router.get('/v5', async (req: Request, res: Response) => {
-  try {
-    const userId = getAuthenticatedUserId(req)
-    if (!userId) {
-      return res.status(401).json({ error: 'Authentication required' })
-    }
-
-    const data = await getDashboardV5Data(userId)
-
-    res.json(data)
-  } catch (error) {
-    log.error('Dashboard v5 error', { error }, error as Error)
-    res.status(500).json({ error: 'Failed to load dashboard' })
-  }
-})
 
 // ============================================================================
 // MY LOADOUT ENDPOINT
