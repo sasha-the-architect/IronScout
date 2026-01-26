@@ -94,11 +94,13 @@ export async function checkPrice(
       JOIN prices pr ON pr."sourceProductId" = pl."sourceProductId"
       JOIN retailers r ON r.id = pr."retailerId"
       LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
+      LEFT JOIN affiliate_feed_runs afr ON afr.id = pr."affiliateFeedRunId"
       WHERE pl.status IN ('MATCHED', 'CREATED')
         AND pr."observedAt" >= $1
         AND pr."inStock" = true
         AND r."visibilityStatus" = 'ELIGIBLE'
         AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
+        AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL) -- ADR-015: Exclude ignored runs
         AND (${caliberConditions.sql})
         ${brandCondition}
         ${grainCondition}
