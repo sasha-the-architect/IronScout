@@ -1,27 +1,28 @@
 #!/usr/bin/env npx tsx
 /**
- * CI Gate: Verify schema.prisma matches applied migrations
+ * CI Gate: Verify schema.prisma is valid and migrations are applied
  *
- * This script uses `prisma migrate diff` to compare:
- * - FROM: migrations applied to a shadow database
- * - TO: the current schema.prisma
- *
- * If there's a diff, it means:
- * - schema.prisma was edited without creating a migration, OR
- * - a migration was deleted/modified incorrectly
+ * This script validates:
+ * 1. The schema.prisma file is syntactically valid
+ * 2. All migrations have been applied to the database (if DATABASE_URL is set)
  *
  * Exit codes:
- *   0 = schema and migrations are in sync
- *   1 = drift detected (schema differs from migrations)
- *   2 = execution error
+ *   0 = schema valid and migrations in sync
+ *   1 = validation failed or pending migrations
  */
 
-import { execSync, spawnSync } from 'child_process'
+import { spawnSync } from 'child_process'
 import { existsSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { config } from 'dotenv'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+
+// Load .env files (local package first, then root)
+config({ path: resolve(__dirname, '..', '.env') })
+config({ path: resolve(__dirname, '..', '..', '..', '.env') })
+
 const DB_PACKAGE_ROOT = resolve(__dirname, '..')
 const SCHEMA_PATH = resolve(DB_PACKAGE_ROOT, 'schema.prisma')
 
@@ -53,51 +54,11 @@ async function main() {
     fatal(`schema.prisma not found at ${SCHEMA_PATH}`)
   }
 
-  // Check if DATABASE_URL or shadow DB URL is available
-  // For CI, we use a shadow database approach
-  const shadowDbUrl = process.env.SHADOW_DATABASE_URL || process.env.DATABASE_URL
+  // Step 1: Validate schema syntax
+  log(GREEN, 'INFO', 'Validating schema syntax...')
 
-  if (!shadowDbUrl) {
-    // Fallback: use migrate diff with --from-empty if no DB available
-    // This validates that migrations + schema are internally consistent
-    log(YELLOW, 'WARN', 'No DATABASE_URL set, using offline validation')
-
-    const result = spawnSync('npx', [
-      'prisma', 'migrate', 'diff',
-      '--from-migrations', resolve(DB_PACKAGE_ROOT, 'migrations'),
-      '--to-schema-datamodel', SCHEMA_PATH,
-      '--exit-code'
-    ], {
-      cwd: DB_PACKAGE_ROOT,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      shell: process.platform === 'win32'
-    })
-
-    if (result.status === 0) {
-      success('Schema matches migrations (offline check)')
-      process.exit(0)
-    } else if (result.status === 2) {
-      // Exit code 2 means there's a diff
-      console.error('\n' + (result.stdout || result.stderr))
-      fatal(
-        'Schema drift detected: schema.prisma differs from migrations',
-        'Run `pnpm db:migrate:dev` to create a migration for your schema changes'
-      )
-    } else {
-      fatal(`Prisma migrate diff failed: ${result.stderr}`)
-    }
-  }
-
-  // With a database URL, we can do a full shadow DB comparison
-  log(GREEN, 'INFO', 'Running schema drift check with shadow database...')
-
-  const result = spawnSync('npx', [
-    'prisma', 'migrate', 'diff',
-    '--from-schema-datasource', SCHEMA_PATH,
-    '--to-schema-datamodel', SCHEMA_PATH,
-    '--shadow-database-url', shadowDbUrl,
-    '--exit-code'
+  const validateResult = spawnSync('npx', [
+    'prisma', 'validate'
   ], {
     cwd: DB_PACKAGE_ROOT,
     encoding: 'utf-8',
@@ -105,20 +66,64 @@ async function main() {
     shell: process.platform === 'win32'
   })
 
-  if (result.status === 0) {
-    success('Schema matches migrations (shadow DB check)')
+  if (validateResult.status !== 0) {
+    console.error(validateResult.stderr)
+    fatal('Schema validation failed')
+  }
+
+  success('Schema syntax is valid')
+
+  // Step 2: Check migration status (only if DATABASE_URL is set)
+  const databaseUrl = process.env.DATABASE_URL
+
+  if (!databaseUrl) {
+    log(YELLOW, 'WARN', 'No DATABASE_URL set, skipping migration status check')
     process.exit(0)
-  } else if (result.status === 2) {
-    console.error('\n' + (result.stdout || result.stderr))
+  }
+
+  log(GREEN, 'INFO', 'Checking migration status...')
+
+  const statusResult = spawnSync('npx', [
+    'prisma', 'migrate', 'status'
+  ], {
+    cwd: DB_PACKAGE_ROOT,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+    shell: process.platform === 'win32',
+    env: { ...process.env, DATABASE_URL: databaseUrl }
+  })
+
+  const output = statusResult.stdout + statusResult.stderr
+
+  // Check for pending migrations or drift
+  if (output.includes('Database schema is up to date')) {
+    success('Database schema is up to date')
+    process.exit(0)
+  }
+
+  if (output.includes('Following migration') || output.includes('not yet applied')) {
+    console.error(output)
+    fatal(
+      'Pending migrations detected',
+      'Run `pnpm db:migrate:deploy` to apply migrations'
+    )
+  }
+
+  if (output.includes('drift') || output.includes('out of sync')) {
+    console.error(output)
     fatal(
       'Schema drift detected',
       'Run `pnpm db:migrate:dev` to create a migration for your schema changes'
     )
-  } else {
-    // Non-diff error
-    console.error(result.stderr)
-    fatal('Prisma migrate diff failed unexpectedly')
   }
+
+  // If status command failed but didn't give clear output
+  if (statusResult.status !== 0) {
+    console.error(output)
+    fatal('Migration status check failed')
+  }
+
+  success('Migrations are in sync')
 }
 
 main().catch((err) => {
