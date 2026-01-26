@@ -1,6 +1,6 @@
 'use client'
 
-import { Eye, Search } from 'lucide-react'
+import { Eye, Search, Bookmark } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -52,6 +52,7 @@ export function WatchingCard({
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Bookmark className="h-10 w-10 text-muted-foreground mb-3" />
             <p className="text-muted-foreground">
               No items in your watchlist yet
             </p>

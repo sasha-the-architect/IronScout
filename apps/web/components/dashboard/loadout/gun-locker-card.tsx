@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Package, Search, ChevronDown, ChevronUp } from 'lucide-react'
+import { Package, Search, ChevronDown, ChevronUp, Crosshair } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -76,11 +76,12 @@ export function GunLockerCard({
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Crosshair className="h-10 w-10 text-muted-foreground mb-3" />
             <p className="text-muted-foreground">
               No firearms in your Gun Locker yet
             </p>
             <Button variant="outline" size="sm" className="mt-4" asChild>
-              <a href="/gun-locker">Add your first firearm</a>
+              <a href="/dashboard/gun-locker">Add your first firearm</a>
             </Button>
           </div>
         </CardContent>

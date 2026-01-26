@@ -238,12 +238,11 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
       <>
         <SearchHeader query={query} />
         <div className="text-center py-12 mt-6 space-y-2">
-          <p className="text-muted-foreground font-semibold">Failed to load search results</p>
-          <p className="text-sm text-muted-foreground">Reason: {message}</p>
-          <p className="text-xs text-muted-foreground">
-            If running locally, ensure the API is up and env vars are set (`NEXT_PUBLIC_API_URL` on web; `OPENAI_API_KEY`, `DATABASE_URL` on API).
+          <p className="text-muted-foreground font-semibold">Unable to load search results</p>
+          <p className="text-sm text-muted-foreground">
+            Something went wrong. Please try again in a moment.
           </p>
-          <div className="flex justify-center gap-3 pt-2 text-sm">
+          <div className="flex justify-center gap-3 pt-4 text-sm">
             <a className="text-primary underline" href="/search">Try again</a>
             <a className="text-primary underline" href="/help">Help</a>
           </div>

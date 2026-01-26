@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Search, Sparkles, X, Loader2, SlidersHorizontal, ChevronDown, RotateCcw, TrendingUp } from 'lucide-react'
+import { Search, Sparkles, X, Loader2, SlidersHorizontal, ChevronDown, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getSearchSuggestions } from '@/lib/api'
 import { PremiumFilters } from '@/components/premium'
@@ -270,14 +270,14 @@ export function UnifiedSearch({ initialQuery = '' }: UnifiedSearchProps) {
       <div className="max-w-4xl mx-auto">
         <form onSubmit={handleSubmit} className="relative">
           <div className="relative">
-            {/* AI Search - confident positioning */}
+            {/* AI Search - subtle indicator */}
             <div className="absolute left-5 top-1/2 -translate-y-1/2 flex items-center gap-2">
               <div className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-mono text-xs font-bold tracking-wider transition-all",
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-muted-foreground font-mono text-xs transition-all",
                 isSearching && "animate-pulse"
               )}>
-                <Sparkles className={cn("h-4 w-4", isSearching && "animate-spin")} />
-                <span className="text-xs font-semibold">AI</span>
+                <Sparkles className={cn("h-3.5 w-3.5", isSearching && "animate-spin")} />
+                <span className="text-xs font-medium">AI</span>
               </div>
             </div>
 
@@ -331,7 +331,7 @@ export function UnifiedSearch({ initialQuery = '' }: UnifiedSearchProps) {
           {/* Confident AI helper - only show when no query */}
           {!query && (
             <p className="mt-2 text-xs text-muted-foreground text-center">
-              Describe what you need. I'll handle the filters.
+              Describe what you need. Filters are applied automatically.
             </p>
           )}
 
@@ -383,11 +383,10 @@ export function UnifiedSearch({ initialQuery = '' }: UnifiedSearchProps) {
               ))}
             </div>
 
-            {/* Social proof - trending searches with stronger label */}
+            {/* Common searches - neutral label without implied ranking */}
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full font-medium">
-                <TrendingUp className="h-3 w-3" />
-                Popular today
+              <span className="text-muted-foreground font-medium">
+                Common searches:
               </span>
               {TRENDING_SEARCHES.map((term, i) => (
                 <button

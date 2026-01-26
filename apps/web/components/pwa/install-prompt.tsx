@@ -9,6 +9,7 @@ import { BRAND_NAME } from '@/lib/brand'
 const logger = createLogger('components:pwa:install-prompt')
 
 const PWA_DISMISS_KEY = 'pwa-prompt-dismissed'
+const PWA_SESSION_DISMISS_KEY = 'pwa-prompt-dismissed-session'
 const PWA_DISMISS_PERMANENT = 'permanent'
 const PWA_DISMISS_COOLDOWN_DAYS = 7
 
@@ -34,7 +35,10 @@ export function PWAInstallPrompt() {
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
     setIsIOS(ios)
 
-    // Check if we've already dismissed
+    // Check if dismissed this session
+    if (sessionStorage.getItem(PWA_SESSION_DISMISS_KEY)) return
+
+    // Check if we've already dismissed permanently
     const dismissed = localStorage.getItem(PWA_DISMISS_KEY)
 
     // Permanently dismissed - never show again
@@ -87,11 +91,12 @@ export function PWAInstallPrompt() {
 
   const handleDismiss = (permanent = false) => {
     setShowPrompt(false)
+    // Always dismiss for the current session
+    sessionStorage.setItem(PWA_SESSION_DISMISS_KEY, 'true')
+
     if (permanent) {
       localStorage.setItem(PWA_DISMISS_KEY, PWA_DISMISS_PERMANENT)
       logger.info('User permanently dismissed the install prompt')
-    } else {
-      localStorage.setItem(PWA_DISMISS_KEY, Date.now().toString())
     }
   }
 
