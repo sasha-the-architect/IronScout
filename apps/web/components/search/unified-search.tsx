@@ -36,7 +36,7 @@ const GRAIN_RANGES = [
 
 // Rotating placeholder examples - outcome-driven
 const ROTATING_PLACEHOLDERS = [
-  "Find the best 9mm deals for range practice",
+  "Find 9mm ammo for range practice",
   "Cheap .223 for target shooting",
   "Home defense 9mm hollow points",
   "Bulk 5.56 NATO for training",

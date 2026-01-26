@@ -104,7 +104,7 @@ function BrandNewBanner() {
           <Link href="/search">
             <Button size="lg" className="gap-2">
               <Search className="h-4 w-4" />
-              Find ammo deals
+              Find ammo prices
             </Button>
           </Link>
 
@@ -144,7 +144,7 @@ function NewUserBanner({ watchlistCount }: { watchlistCount: number }) {
               Your watchlist has {watchlistCount} item{watchlistCount !== 1 ? 's' : ''}. Most price drops are still invisible.
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Add {itemsNeeded}+ more items so we can catch real savings.
+              Add {itemsNeeded}+ more items so we can catch more price drops.
             </p>
           </div>
 

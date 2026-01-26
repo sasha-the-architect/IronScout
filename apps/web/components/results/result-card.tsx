@@ -290,7 +290,7 @@ export function ResultCard({
 
         {/* 4. Price Block */}
         <div className="mb-3">
-          {/* Primary: $/rd with delivery indicator */}
+          {/* Primary: $per rd with delivery indicator */}
           <div className="flex items-baseline gap-1">
             <span className={cn(
               'font-bold font-mono tracking-tight text-2xl',
@@ -298,9 +298,8 @@ export function ResultCard({
             )}>
               {formatPricePerRound(pricePerRound)}
             </span>
-            <span className="text-primary text-lg">•</span>
             <span className="text-sm text-muted-foreground">
-              /rd {includesShipping ? 'delivered' : ''}
+              per rd {includesShipping ? 'delivered' : ''}
             </span>
           </div>
 

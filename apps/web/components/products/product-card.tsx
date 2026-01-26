@@ -271,7 +271,7 @@ export function ProductCard({ product, showRelevance = false }: ProductCardProps
               className="flex items-center justify-center gap-1"
             >
               <ExternalLink className="h-3 w-3" />
-              Buy Now
+              Compare prices
             </a>
           </Button>
           <Button

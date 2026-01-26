@@ -364,7 +364,7 @@ export default function EmbeddingsAdminPage() {
               value={testQuery}
               onChange={(e) => setTestQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && testSearch()}
-              placeholder="Try: best ammo for long range AR15 target practice"
+              placeholder="Try: ammo for long range AR15 target practice"
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>

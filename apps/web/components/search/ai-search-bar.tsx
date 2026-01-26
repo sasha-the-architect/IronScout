@@ -14,7 +14,7 @@ interface AISearchBarProps {
 }
 
 const exampleQueries = [
-  "best 9mm for home defense",
+  "9mm for home defense",
   "cheap bulk .223 for the range",
   "match grade .308 long range",
   "AR15 ammo for beginners",

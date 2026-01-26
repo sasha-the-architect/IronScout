@@ -19,9 +19,9 @@ export function DashboardOverview({ variant = 'grid' }: DashboardOverviewProps) 
       icon: Bell
     },
     {
-      title: 'Deals Found',
+      title: 'Price Drops Seen',
       value: loading ? '...' : stats.triggeredAlerts.toString(),
-      description: 'Price drops detected',
+      description: 'Recent drops detected',
       icon: TrendingUp
     },
     {
@@ -31,9 +31,9 @@ export function DashboardOverview({ variant = 'grid' }: DashboardOverviewProps) 
       icon: Eye
     },
     {
-      title: 'Potential Savings',
+      title: 'Price Difference',
       value: loading ? '...' : `$${stats.potentialSavings.toFixed(2)}`,
-      description: 'Based on target prices',
+      description: 'Compared to target prices',
       icon: DollarSign
     }
   ]

@@ -753,7 +753,7 @@ export async function getDealsForYou(token: string): Promise<DealsResponse> {
   const response = await fetch(`${API_BASE_URL}/api/dashboard/deals`, {
     headers: buildAuthHeaders(token),
   })
-  await handleAuthResponse(response, 'Failed to fetch deals')
+  await handleAuthResponse(response, 'Failed to fetch results')
   return response.json()
 }
 
@@ -872,7 +872,7 @@ export async function getBestPrices(limit: number = 5): Promise<BestPricesRespon
   })
   const response = await fetch(`${API_BASE_URL}/api/dashboard/deals?${params}`)
   if (!response.ok) {
-    throw new Error('Failed to fetch best prices')
+    throw new Error('Failed to fetch price highlights')
   }
   return response.json()
 }
@@ -1831,7 +1831,7 @@ export async function getMarketDeals(token?: string): Promise<MarketDealsRespons
   if (E2E_TEST_MODE) {
     return {
       hero: null,
-      sections: [{ title: 'Notable Deals Today', deals: [] }],
+      sections: [{ title: 'Notable Price Moves Today', deals: [] }],
       lastCheckedAt: new Date().toISOString(),
       _meta: { personalized: false },
     }
@@ -1842,7 +1842,7 @@ export async function getMarketDeals(token?: string): Promise<MarketDealsRespons
   })
 
   if (!response.ok) {
-    throw new Error('Failed to fetch market deals')
+    throw new Error('Failed to fetch market activity')
   }
 
   return response.json()

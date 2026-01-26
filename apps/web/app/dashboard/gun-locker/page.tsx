@@ -7,7 +7,7 @@ export default function GunLockerPage() {
       <div className="mb-6">
         <h1 className="text-xl md:text-2xl font-semibold">Gun Locker</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Add the guns you shoot to personalize your deals
+          Add the guns you shoot to personalize your results
         </p>
       </div>
 

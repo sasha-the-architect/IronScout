@@ -92,7 +92,7 @@ export function TopMatch() {
 
               <div>
                 <h2 className="text-xl md:text-2xl font-bold text-foreground">
-                  Find your first deal in 30 seconds
+                  Find your first price match in 30 seconds
                 </h2>
                 <p className="text-sm text-muted-foreground mt-2">
                   Search, compare prices, then save what you find to get alerts.

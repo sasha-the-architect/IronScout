@@ -21,8 +21,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: 'IronScout - AI-Powered Ammo Search',
-  description: 'Intent-aware ammunition search and price comparison. Find the best deals on ammo with natural language search.',
-  keywords: 'ammunition, ammo, price comparison, ammo deals, AI search, gun ammunition, bulk ammo, ammo alerts',
+  description: 'Intent-aware ammunition search and price comparison. Compare prices and view historical context with natural language search.',
+  keywords: 'ammunition, ammo, price comparison, ammo search, price history, AI search, gun ammunition, bulk ammo, ammo alerts',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'IronScout - AI-Powered Ammo Search',
-    description: 'Intent-aware ammunition search and price comparison. Find the best deals on ammo with natural language search.',
+    description: 'Intent-aware ammunition search and price comparison. Compare prices and view historical context with natural language search.',
     url: 'https://ironscout.ai',
     siteName: 'IronScout',
     type: 'website',

@@ -46,7 +46,7 @@ export interface UseDashboardStateResult {
   state: DashboardStateContext | null
   /** Watchlist preview items */
   watchlistPreview: WatchlistPreviewItem[]
-  /** Best prices (non-personalized) */
+  /** price highlights (non-personalized) */
   bestPrices: BestPriceItem[]
   /** Whether the initial fetch is in progress */
   loading: boolean
@@ -62,7 +62,7 @@ export interface UseDashboardStateResult {
  * Fetches:
  * 1. Dashboard state (resolved server-side)
  * 2. Watchlist preview items
- * 3. Best prices (non-personalized, scope=global)
+ * 3. price highlights (non-personalized, scope=global)
  *
  * Per dashboard-product-spec.md: state resolution is server-side.
  */
@@ -79,13 +79,13 @@ export function useDashboardState(): UseDashboardStateResult {
   const token = (session as any)?.accessToken as string | undefined
 
   const fetchData = useCallback(async () => {
-    // Best prices don't require auth - fetch immediately
+    // price highlights don't require auth - fetch immediately
     try {
       const bestPricesResponse = await getBestPrices(5)
       setBestPrices(bestPricesResponse.items)
     } catch (err) {
-      logger.error('Failed to fetch best prices', {}, err)
-      // Don't fail the whole dashboard for best prices
+      logger.error('Failed to fetch price highlights', {}, err)
+      // Don't fail the whole dashboard for price highlights
     }
 
     // If not authenticated, show BRAND_NEW state
@@ -168,3 +168,4 @@ export function useDashboardState(): UseDashboardStateResult {
     refetch,
   }
 }
+

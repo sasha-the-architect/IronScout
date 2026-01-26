@@ -58,8 +58,8 @@ export function useDealsForYou(): UseDealsResult {
         signOut({ callbackUrl: '/auth/signin' })
         return
       }
-      logger.error('Failed to fetch deals', {}, err)
-      setError(err instanceof Error ? err.message : 'Failed to load deals')
+      logger.error('Failed to fetch results', {}, err)
+      setError(err instanceof Error ? err.message : 'Failed to load results')
     } finally {
       setLoading(false)
     }

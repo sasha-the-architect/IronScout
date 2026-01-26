@@ -55,7 +55,7 @@ export function AIExplanationBanner({ intent, processingTimeMs }: AIExplanationB
                 <>Searching {intent.calibers.join(', ')}. </>
               )}
               {intent.grainWeights?.length && (
-                <>Recommended weights: {intent.grainWeights.join('/')}&nbsp;gr. </>
+                <>Detected weights: {intent.grainWeights.join('/')}&nbsp;gr. </>
               )}
             </p>
           )}

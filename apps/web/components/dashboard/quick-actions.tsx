@@ -5,7 +5,7 @@ import { Plus, Search, Settings, Bell } from 'lucide-react'
 const actions = [
   {
     title: 'Search Products',
-    description: 'Find the best ammo deals',
+    description: 'Compare current ammo prices',
     icon: Search,
     href: '/dashboard/search'
   },

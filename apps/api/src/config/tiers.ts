@@ -287,6 +287,20 @@ export function nonIgnoredRunPriceWhere(): Prisma.pricesWhereInput {
   }
 }
 
+/**
+ * Visibility filter for historical price reads.
+ * Applies retailer eligibility + listing and ignored-run exclusion.
+ * Does NOT apply current-price lookback.
+ */
+export function visibleHistoricalPriceWhere(): Prisma.pricesWhereInput {
+  return {
+    AND: [
+      visibleRetailerPriceWhere(),
+      nonIgnoredRunPriceWhere(),
+    ],
+  }
+}
+
 // ============================================================================
 // PRICE LOOKBACK FILTER (per search-lens-v1.md)
 // ============================================================================

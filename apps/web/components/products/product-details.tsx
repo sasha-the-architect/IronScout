@@ -91,7 +91,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             <CardContent className="pt-6">
               <div className="space-y-4">
                 <div>
-                  <div className="text-sm text-muted-foreground mb-1">Best Price</div>
+                  <div className="text-sm text-muted-foreground mb-1">Lowest Price</div>
                   <div className="text-4xl font-bold text-primary">
                     ${lowestPrice.price.toFixed(2)}
                   </div>
@@ -128,7 +128,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                 className="flex items-center justify-center gap-2"
               >
                 <ExternalLink className="h-4 w-4" />
-                Buy at Best Price
+                Compare prices
               </a>
             </Button>
             <Button
@@ -191,7 +191,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
               >
                 <div className="flex items-center gap-4 flex-1">
                   {index === 0 && (
-                    <Badge variant="default">Best Price</Badge>
+                    <Badge variant="default">Lowest Price</Badge>
                   )}
 
                   <div className="flex-1">

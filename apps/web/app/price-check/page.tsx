@@ -634,7 +634,7 @@ function ManualEntryForm({
       </form>
 
       <p className="text-xs text-center text-muted-foreground">
-        Prices compared against recent online deals from major retailers.
+        Prices compared against recent online listings from major retailers.
         <br />
         This is not financial advice.
       </p>
@@ -721,7 +721,7 @@ function PriceCheckResultDisplay({
           <Link href="/dashboard/gun-locker">
             <Button variant="outline" className="w-full">
               <Plus className="h-4 w-4 mr-2" />
-              Add to Gun Locker for personalized deals
+              Add to Gun Locker for personalized results
             </Button>
           </Link>
         )}

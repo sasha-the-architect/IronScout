@@ -36,7 +36,7 @@ export function MarketDeals() {
         const response = await getMarketDeals(token)
         setData(response)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load deals')
+        setError(err instanceof Error ? err.message : 'Failed to load market activity')
       } finally {
         setIsLoading(false)
       }
@@ -75,7 +75,7 @@ export function MarketDeals() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Market Deals</CardTitle>
+          <CardTitle className="text-lg">Market Activity</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-6">

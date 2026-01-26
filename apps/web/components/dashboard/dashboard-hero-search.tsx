@@ -11,7 +11,7 @@ import { createLogger } from '@/lib/logger'
 const logger = createLogger('components:dashboard-hero-search')
 
 const exampleQueries = [
-  "best 9mm for home defense",
+  "9mm for home defense",
   "cheap bulk .223 for the range",
   "match grade .308 long range",
   "subsonic 300 blackout",

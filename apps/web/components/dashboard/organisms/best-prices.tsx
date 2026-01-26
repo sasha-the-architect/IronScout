@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 
 /**
- * Best price item - matches backend deals response for scope=global
+ * Lowest price item - matches backend pricing response for scope=global
  */
 export interface BestPriceItem {
   id: string
@@ -54,7 +54,7 @@ export function BestPrices({ items, footerText }: BestPricesProps) {
   const [isExpanded, setIsExpanded] = useState(true)
 
   // Default footer text if not provided
-  const defaultFooter = "Deals like these are caught when items are in your watchlist."
+  const defaultFooter = "Price updates like these are surfaced when items are in your watchlist."
 
   return (
     <div className="space-y-3">
@@ -76,7 +76,7 @@ export function BestPrices({ items, footerText }: BestPricesProps) {
         <>
           {items.length === 0 ? (
             <div className="py-6 text-center text-sm text-muted-foreground">
-              No deals available right now. Check back later.
+              No notable price changes right now. Check back later.
             </div>
           ) : (
             <div className="space-y-2">
@@ -130,8 +130,7 @@ function BestPriceRow({ item }: BestPriceRowProps) {
         <span className="text-lg font-bold text-primary font-mono">
           {formatPrice()}
         </span>
-        <span className="text-primary">•</span>
-        <span className="text-xs text-muted-foreground">/rd delivered</span>
+        <span className="text-xs text-muted-foreground">per rd delivered</span>
       </div>
 
       {/* Retailer Button */}

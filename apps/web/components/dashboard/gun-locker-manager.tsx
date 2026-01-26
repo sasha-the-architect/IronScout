@@ -431,7 +431,7 @@ export function GunLockerManager() {
           <DialogHeader>
             <DialogTitle>Add a Gun</DialogTitle>
             <DialogDescription>
-              Tell us what calibers you use to personalize your deals.
+              Tell us what calibers you use to personalize your results.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -707,7 +707,7 @@ export function GunLockerManager() {
             <Crosshair className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No guns added yet</h3>
             <p className="text-sm text-muted-foreground max-w-sm mb-4">
-              Add the guns you shoot to see relevant deals first. Your data stays private
+              Add the guns you shoot to see relevant listings first. Your data stays private
               and you can remove guns at any time.
             </p>
             <Button onClick={() => setIsAddDialogOpen(true)}>
@@ -790,9 +790,10 @@ export function GunLockerManager() {
 
       {/* Privacy Note */}
       <p className="text-xs text-muted-foreground">
-        Your Gun Locker is private. This information is only used to personalize deal
+        Your Gun Locker is private. This information is only used to personalize results
         ordering and is never shared. You can remove guns at any time.
       </p>
     </div>
   )
 }
+

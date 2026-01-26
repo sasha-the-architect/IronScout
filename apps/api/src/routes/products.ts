@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import { prisma } from '@ironscout/db'
-import { hasPriceHistoryAccess, getPriceHistoryDays, shapePriceHistory } from '../config/tiers'
+import { hasPriceHistoryAccess, getPriceHistoryDays, shapePriceHistory, visibleHistoricalPriceWhere } from '../config/tiers'
 import { getUserTier } from '../middleware/auth'
 import { loggers } from '../config/logger'
 import { batchGetPricesViaProductLinks, getPricesViaProductLinks } from '../services/ai-search/price-resolver'
@@ -346,13 +346,13 @@ router.get('/:id/prices', async (req: Request, res: Response) => {
     // Filter to prices from last 7 days
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     const recentPrices = prices.filter((p: any) =>
-      p.createdAt && new Date(p.createdAt) >= sevenDaysAgo
+      p.observedAt && new Date(p.observedAt) >= sevenDaysAgo
     )
 
     // Get unique latest price for each retailer
     // Sort by createdAt desc first to get latest
     const sortedByDate = [...recentPrices].sort((a: any, b: any) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime()
     )
 
     const pricesByRetailer = new Map()
@@ -397,7 +397,7 @@ router.get('/:id/prices', async (req: Request, res: Response) => {
         inStock: price.inStock,
         url: price.url,
         tier: price.retailers?.tier,
-        lastUpdated: price.createdAt
+        lastUpdated: price.observedAt
       })),
       cheapest: cheapest ? {
         retailers: cheapest.retailers?.name,
@@ -423,81 +423,6 @@ router.get('/:id/history', async (req: Request, res: Response) => {
     const id = req.params.id as string
     const { days = '30', retailerId } = req.query
 
-    // Check user tier for price history access
-    const userTier = await getUserTier(req)
-    
-    if (!hasPriceHistoryAccess(userTier)) {
-      return res.status(403).json({
-        error: 'Price history unavailable',
-        message: 'Price history is not available for this request.',
-        tier: userTier,
-      })
-    }
-
-    // Enforce tier-based day limit
-    const maxDays = getPriceHistoryDays(userTier)
-    const requestedDays = parseInt(days as string)
-    const daysNum = Math.min(requestedDays, maxDays)
-    const startDate = new Date(Date.now() - daysNum * 24 * 60 * 60 * 1000)
-
-    // Per Spec v1.2 §0.0: Query through product_links for price history
-    let prices: Array<{
-      price: any
-      createdAt: Date
-      retailerId: string
-      retailerName: string
-      retailerTier: string
-    }>
-
-    if (retailerId) {
-      prices = await prisma.$queryRaw`
-        SELECT pr.price, pr."createdAt", pr."retailerId",
-               r.name as "retailerName", r.tier as "retailerTier"
-        FROM prices pr
-        JOIN product_links pl ON pl."sourceProductId" = pr."sourceProductId"
-        JOIN retailers r ON r.id = pr."retailerId"
-        WHERE pl."productId" = ${id}
-          AND pl.status IN ('MATCHED', 'CREATED')
-          AND pr."createdAt" >= ${startDate}
-          AND r."visibilityStatus" = 'ELIGIBLE'
-          AND pr."retailerId" = ${retailerId as string}
-        ORDER BY pr."createdAt" ASC
-      `
-    } else {
-      prices = await prisma.$queryRaw`
-        SELECT pr.price, pr."createdAt", pr."retailerId",
-               r.name as "retailerName", r.tier as "retailerTier"
-        FROM prices pr
-        JOIN product_links pl ON pl."sourceProductId" = pr."sourceProductId"
-        JOIN retailers r ON r.id = pr."retailerId"
-        WHERE pl."productId" = ${id}
-          AND pl.status IN ('MATCHED', 'CREATED')
-          AND pr."createdAt" >= ${startDate}
-          AND r."visibilityStatus" = 'ELIGIBLE'
-        ORDER BY pr."createdAt" ASC
-      `
-    }
-
-    // Group by date and calculate daily stats
-    const pricesByDate = new Map<string, number[]>()
-
-    prices.forEach((price: any) => {
-      const date = price.createdAt.toISOString().split('T')[0]
-      if (!pricesByDate.has(date)) {
-        pricesByDate.set(date, [])
-      }
-      pricesByDate.get(date)!.push(parseFloat(price.price.toString()))
-    })
-
-    const history = Array.from(pricesByDate.entries()).map(([date, prices]) => ({
-      date,
-      avgPrice: prices.reduce((a, b) => a + b, 0) / prices.length,
-      minPrice: Math.min(...prices),
-      maxPrice: Math.max(...prices),
-      dataPoints: prices.length
-    }))
-
-    // Get product info
     const product = await prisma.products.findUnique({
       where: { id },
       select: {
@@ -513,7 +438,81 @@ router.get('/:id/history', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Product not found' })
     }
 
-    const isLimited = requestedDays > maxDays
+    // Check user tier for price history access
+    const userTier = await getUserTier(req)
+
+    if (!hasPriceHistoryAccess(userTier)) {
+      return res.status(403).json({
+        error: 'Price history unavailable',
+        message: 'Price history is not available for this request.',
+        tier: userTier,
+      })
+    }
+
+    // Enforce tier-based day limit
+    const maxDays = getPriceHistoryDays(userTier)
+    const requestedDays = parseInt(days as string)
+    const daysNum = Math.min(requestedDays, maxDays)
+    const startDate = new Date(Date.now() - daysNum * 24 * 60 * 60 * 1000)
+
+    // Per Spec v1.2 0.0: Query through product_links for price history
+    const links = await prisma.product_links.findMany({
+      where: {
+        productId: id,
+        status: { in: ['MATCHED', 'CREATED'] }
+      },
+      select: { sourceProductId: true }
+    })
+
+    if (links.length === 0) {
+      return res.json({
+        product,
+        history: [],
+        summary: {
+          days: daysNum,
+          requestedDays,
+          maxDays,
+          dataPoints: 0,
+          lowestPrice: null,
+          highestPrice: null,
+          currentPrice: null
+        }
+      })
+    }
+
+    const sourceProductIds = links.map(link => link.sourceProductId)
+    const prices = await prisma.prices.findMany({
+      where: {
+        sourceProductId: { in: sourceProductIds },
+        observedAt: { gte: startDate },
+        ...(retailerId ? { retailerId: retailerId as string } : {}),
+        ...visibleHistoricalPriceWhere(),
+      },
+      select: {
+        price: true,
+        observedAt: true
+      },
+      orderBy: { observedAt: 'asc' }
+    })
+
+    // Group by date and calculate daily stats
+    const pricesByDate = new Map<string, number[]>()
+
+    prices.forEach((price: any) => {
+      const date = price.observedAt.toISOString().split('T')[0]
+      if (!pricesByDate.has(date)) {
+        pricesByDate.set(date, [])
+      }
+      pricesByDate.get(date)!.push(parseFloat(price.price.toString()))
+    })
+
+    const history = Array.from(pricesByDate.entries()).map(([date, prices]) => ({
+      date,
+      avgPrice: prices.reduce((a, b) => a + b, 0) / prices.length,
+      minPrice: Math.min(...prices),
+      maxPrice: Math.max(...prices),
+      dataPoints: prices.length
+    }))
 
     // Shape history based on tier (FREE gets summary only, PREMIUM gets full history)
     const shapedHistory = shapePriceHistory(history, userTier)
@@ -539,3 +538,5 @@ router.get('/:id/history', async (req: Request, res: Response) => {
 })
 
 export { router as productsRouter }
+
+

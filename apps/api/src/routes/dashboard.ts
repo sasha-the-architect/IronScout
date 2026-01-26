@@ -9,6 +9,7 @@ import {
   hasPriceHistoryAccess,
   getPriceHistoryDays,
   shapePriceHistory,
+  visibleHistoricalPriceWhere,
 } from '../config/tiers'
 import { batchGetPricesViaProductLinks } from '../services/ai-search/price-resolver'
 import { getUserTier, getAuthenticatedUserId } from '../middleware/auth'
@@ -158,7 +159,7 @@ router.get('/market-deals', async (req: Request, res: Response) => {
           hero,
           sections: [
             { title: 'Fits Your Gun Locker', deals: forYourGuns },
-            { title: 'Other Notable Deals', deals: otherDeals },
+            { title: 'Other Notable Price Moves', deals: otherDeals },
           ],
           lastCheckedAt,
           _meta: {
@@ -169,12 +170,12 @@ router.get('/market-deals', async (req: Request, res: Response) => {
       }
     }
 
-    // Non-personalized: "Notable Deals Today"
+    // Non-personalized: "Notable Price Moves Today"
     const { deals, hero, lastCheckedAt } = await getMarketDeals()
 
     res.json({
       hero,
-      sections: [{ title: 'Notable Deals Today', deals: deals.slice(0, 5) }],
+      sections: [{ title: 'Notable Price Moves Today', deals: deals.slice(0, 5) }],
       lastCheckedAt,
       _meta: {
         personalized: false,
@@ -182,7 +183,7 @@ router.get('/market-deals', async (req: Request, res: Response) => {
     })
   } catch (error) {
     log.error('Market deals error', { error }, error as Error)
-    res.status(500).json({ error: 'Failed to fetch market deals' })
+    res.status(500).json({ error: 'Failed to fetch market activity' })
   }
 })
 
@@ -314,27 +315,28 @@ router.get('/pulse', async (req: Request, res: Response) => {
         const windowStart = new Date(asOf)
         windowStart.setDate(windowStart.getDate() - windowDays)
 
-        // ADR-005: Apply full visibility predicate with A1 semantics
-        // - Crawl-only retailers (no ACTIVE merchant relationships) are visible
-        // - Merchant-managed retailers need ACTIVE + LISTED relationship
-        const historicalPricesRaw = await prisma.$queryRaw<Array<{ price: any }>>`
-          SELECT pr.price
-          FROM prices pr
-          JOIN product_links pl ON pl."sourceProductId" = pr."sourceProductId"
-          JOIN products p ON p.id = pl."productId"
-          JOIN retailers r ON r.id = pr."retailerId"
-          LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
-          WHERE p.caliber = ${caliber}
-            AND pl.status IN ('MATCHED', 'CREATED')
-            AND pr."createdAt" < ${windowStart}
-            AND r."visibilityStatus" = 'ELIGIBLE'
-            AND (
-              mr.id IS NULL
-              OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE')
-            )
-          ORDER BY pr."createdAt" DESC
-          LIMIT 50
-        `
+        // Historical baseline (observedAt-based, visibility enforced)
+        const links = await prisma.product_links.findMany({
+          where: {
+            productId: { in: productIds },
+            status: { in: ['MATCHED', 'CREATED'] }
+          },
+          select: { sourceProductId: true }
+        })
+
+        const sourceProductIds = links.map(link => link.sourceProductId)
+        const historicalPricesRaw = sourceProductIds.length === 0
+          ? []
+          : await prisma.prices.findMany({
+              where: {
+                sourceProductId: { in: sourceProductIds },
+                observedAt: { lt: windowStart },
+                ...visibleHistoricalPriceWhere(),
+              },
+              select: { price: true },
+              orderBy: { observedAt: 'desc' },
+              take: 50
+            })
 
         let trend: 'UP' | 'DOWN' | 'STABLE' = 'STABLE'
         let trendPercent = 0
@@ -622,7 +624,7 @@ router.get('/deals', async (req: Request, res: Response) => {
     })
   } catch (error) {
     log.error('Deals for you error', { error }, error as Error)
-    res.status(500).json({ error: 'Failed to fetch deals' })
+    res.status(500).json({ error: 'Failed to fetch results' })
   }
 })
 
@@ -722,34 +724,45 @@ router.get('/price-history/:caliber', async (req: Request, res: Response) => {
     startDate.setDate(startDate.getDate() - effectiveDays)
 
     // Get price history aggregated by day
-    // Per Spec v1.2 §0.0: Query through product_links for prices
-    // ADR-005: Apply full visibility predicate with A1 semantics
-    // - Crawl-only retailers (no ACTIVE merchant relationships) are visible
-    // - Merchant-managed retailers need ACTIVE + LISTED relationship
+    // Per Spec v1.2 0.0: Query through product_links for prices
     const decodedCaliber = decodeURIComponent(caliber)
-    const prices = await prisma.$queryRaw<Array<{ price: any; createdAt: Date }>>`
-      SELECT pr.price, pr."createdAt"
-      FROM prices pr
-      JOIN product_links pl ON pl."sourceProductId" = pr."sourceProductId"
-      JOIN products p ON p.id = pl."productId"
-      JOIN retailers r ON r.id = pr."retailerId"
-      LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
-      WHERE p.caliber = ${decodedCaliber}
-        AND pl.status IN ('MATCHED', 'CREATED')
-        AND pr."createdAt" >= ${startDate}
-        AND r."visibilityStatus" = 'ELIGIBLE'
-        AND (
-          mr.id IS NULL
-          OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE')
-        )
-      ORDER BY pr."createdAt" ASC
-    `
+    const products = await prisma.products.findMany({
+      where: { caliber: decodedCaliber },
+      select: { id: true }
+    })
+
+    const productIds = products.map(product => product.id)
+    const links = productIds.length === 0
+      ? []
+      : await prisma.product_links.findMany({
+          where: {
+            productId: { in: productIds },
+            status: { in: ['MATCHED', 'CREATED'] }
+          },
+          select: { sourceProductId: true }
+        })
+
+    const sourceProductIds = links.map(link => link.sourceProductId)
+    const prices = sourceProductIds.length === 0
+      ? []
+      : await prisma.prices.findMany({
+          where: {
+            sourceProductId: { in: sourceProductIds },
+            observedAt: { gte: startDate },
+            ...visibleHistoricalPriceWhere(),
+          },
+          select: {
+            price: true,
+            observedAt: true
+          },
+          orderBy: { observedAt: 'asc' }
+        })
 
     // Aggregate by day
     const dailyData: Record<string, { prices: number[]; date: string }> = {}
 
     for (const price of prices) {
-      const dateKey = price.createdAt.toISOString().split('T')[0]
+      const dateKey = price.observedAt.toISOString().split('T')[0]
       if (!dailyData[dateKey]) {
         dailyData[dateKey] = { prices: [], date: dateKey }
       }
@@ -770,7 +783,7 @@ router.get('/price-history/:caliber', async (req: Request, res: Response) => {
     const shapedHistory = shapePriceHistory(history, userTier)
 
     res.json({
-      caliber: decodeURIComponent(caliber),
+      caliber: decodedCaliber,
       days: effectiveDays,
       ...shapedHistory,
       _meta: {
@@ -793,3 +806,4 @@ router.get('/price-history/:caliber', async (req: Request, res: Response) => {
 })
 
 export { router as dashboardRouter }
+
