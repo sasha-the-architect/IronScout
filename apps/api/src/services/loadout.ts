@@ -317,11 +317,13 @@ async function getWatchingWithPrices(
         JOIN prices pr ON pr."sourceProductId" = pl."sourceProductId"
         JOIN retailers r ON r.id = pr."retailerId"
         LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
+        LEFT JOIN affiliate_feed_runs afr ON afr.id = pr."affiliateFeedRunId"
         WHERE p.id = ANY(${productIds})
           AND pl.status IN ('MATCHED', 'CREATED')
           AND pr."observedAt" >= ${ninetyDaysAgo}
           AND r."visibilityStatus" = 'ELIGIBLE'
           AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
+          AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL)
         GROUP BY p.id
       `
     : []
@@ -408,11 +410,13 @@ async function getMarketActivityStats(): Promise<MarketActivityStats> {
     JOIN prices pr ON pr."sourceProductId" = pl."sourceProductId"
     JOIN retailers r ON r.id = pr."retailerId"
     LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
+    LEFT JOIN affiliate_feed_runs afr ON afr.id = pr."affiliateFeedRunId"
     WHERE pl.status IN ('MATCHED', 'CREATED')
       AND pr."inStock" = true
       AND pr."observedAt" >= ${sevenDaysAgo}
       AND r."visibilityStatus" = 'ELIGIBLE'
       AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
+      AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL)
   `
 
   // Get top calibers by in-stock count
@@ -423,11 +427,13 @@ async function getMarketActivityStats(): Promise<MarketActivityStats> {
     JOIN prices pr ON pr."sourceProductId" = pl."sourceProductId"
     JOIN retailers r ON r.id = pr."retailerId"
     LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
+    LEFT JOIN affiliate_feed_runs afr ON afr.id = pr."affiliateFeedRunId"
     WHERE pl.status IN ('MATCHED', 'CREATED')
       AND pr."inStock" = true
       AND pr."observedAt" >= ${sevenDaysAgo}
       AND r."visibilityStatus" = 'ELIGIBLE'
       AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
+      AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL)
       AND p.caliber IS NOT NULL
     GROUP BY p.caliber
     ORDER BY count DESC
