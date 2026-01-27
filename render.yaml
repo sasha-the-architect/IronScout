@@ -177,9 +177,8 @@ services:
   - type: web
     name: ironscout-www
     runtime: static
-    rootDir: apps/www
-    buildCommand: npm install && npm run build
-    staticPublishPath: out
+    buildCommand: corepack enable && corepack prepare pnpm@10.28.1 --activate && pnpm install --filter @ironscout/www && pnpm --filter @ironscout/www build
+    staticPublishPath: apps/www/out
     envVars:
       - key: NODE_ENV
         value: production
