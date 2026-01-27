@@ -267,16 +267,6 @@ export function UserSettings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <div className="font-medium">Data Export</div>
-            <div className="text-sm text-muted-foreground mb-2">
-              Download a copy of your data
-            </div>
-            <Button variant="outline" className="w-full">
-              Export My Data
-            </Button>
-          </div>
-
-          <div className="pt-4 border-t space-y-2">
             <div className="font-medium">Connected Accounts</div>
             <div className="text-sm text-muted-foreground mb-2">
               Manage your connected authentication providers
