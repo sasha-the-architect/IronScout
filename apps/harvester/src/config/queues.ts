@@ -24,6 +24,8 @@ export const QUEUE_NAMES = {
   EMBEDDING_GENERATE: 'embedding-generate',
   // Quarantine Reprocess queue (Admin-triggered bulk reprocessing)
   QUARANTINE_REPROCESS: 'quarantine-reprocess',
+  // ADR-015: Current Price Recompute queue
+  CURRENT_PRICE_RECOMPUTE: 'current-price-recompute',
 } as const
 
 // Job data interfaces
@@ -149,6 +151,7 @@ export async function initQueueSettings(): Promise<void> {
         'affiliate-feed': true,
         'affiliate-feed-scheduler': true,
         'embedding-generate': true,
+        'current-price-recompute': true,
       },
     }
   }
@@ -579,6 +582,108 @@ export async function enqueueQuarantineReprocess(
   return batchId
 }
 
+// ============================================================================
+// CURRENT PRICE RECOMPUTE QUEUE (ADR-015)
+// ============================================================================
+
+/**
+ * ADR-015: Current Price Recompute job data
+ * Triggers rebuild of the current_visible_prices derived table
+ */
+export interface CurrentPriceRecomputeJobData {
+  /** Scope of recompute: FULL rebuilds entire table, others rebuild subset */
+  scope: 'FULL' | 'PRODUCT' | 'RETAILER' | 'SOURCE'
+  /** ID of the scoped entity (productId, retailerId, or sourceId) */
+  scopeId?: string
+  /** What triggered the recompute */
+  trigger:
+    | 'CORRECTION_CREATED'
+    | 'CORRECTION_REVOKED'
+    | 'RUN_IGNORED'
+    | 'RUN_UNIGNORED'
+    | 'INGESTION'
+    | 'MANUAL'
+    | 'SCHEDULED'
+  /** Who triggered the recompute (admin user ID or 'system' or 'scheduler') */
+  triggeredBy?: string
+  /** Correlation ID for tracing */
+  correlationId: string
+}
+
+/**
+ * Current Price Recompute queue
+ * Per ADR-015: Rebuilds derived table when corrections or run-ignore state changes
+ * - JobId format for dedup: RECOMPUTE_<scope>_<scopeId> or RECOMPUTE_FULL_<correlationId>
+ * - Retry: max 3 attempts with exponential backoff
+ */
+export const currentPriceRecomputeQueue = new Queue<CurrentPriceRecomputeJobData>(
+  QUEUE_NAMES.CURRENT_PRICE_RECOMPUTE,
+  {
+    connection: redisConnection,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000, // 5s, 15s, 45s
+      },
+      ...getJobOptions('current-price-recompute'),
+    },
+  }
+)
+
+/**
+ * Enqueue a current price recompute job
+ *
+ * Per ADR-015: Called after correction create/revoke or run ignore/unignore.
+ * Uses jobId-based deduplication:
+ * - FULL scope: RECOMPUTE_FULL_<correlationId> (allows multiple full recomputes)
+ * - Scoped: RECOMPUTE_<scope>_<scopeId> (dedupes by scope)
+ *
+ * @param data - Job data without correlationId (will be generated)
+ * @returns Correlation ID for tracing
+ */
+export async function enqueueCurrentPriceRecompute(
+  data: Omit<CurrentPriceRecomputeJobData, 'correlationId'>
+): Promise<string> {
+  const correlationId = `recompute-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+
+  // JobId strategy:
+  // - FULL: unique per call (allows multiple scheduled full recomputes)
+  // - Scoped: dedupe by scope+scopeId (only one recompute per entity at a time)
+  const jobId =
+    data.scope === 'FULL'
+      ? `RECOMPUTE_FULL_${correlationId}`
+      : `RECOMPUTE_${data.scope}_${data.scopeId}`
+
+  try {
+    await currentPriceRecomputeQueue.add(
+      'RECOMPUTE',
+      { ...data, correlationId },
+      {
+        jobId,
+        // Small delay for scoped recomputes to allow batching
+        delay: data.scope === 'FULL' ? 0 : 5000,
+      }
+    )
+    return correlationId
+  } catch (err: any) {
+    // Job already exists - this is expected deduplication for scoped jobs
+    if (err?.message?.includes('Job already exists')) {
+      rootLogger.debug('[enqueueCurrentPriceRecompute] Job deduplicated', {
+        scope: data.scope,
+        scopeId: data.scopeId,
+      })
+      return correlationId
+    }
+    rootLogger.error(
+      '[enqueueCurrentPriceRecompute] Failed to enqueue recompute job',
+      { scope: data.scope, scopeId: data.scopeId, trigger: data.trigger },
+      err
+    )
+    throw err
+  }
+}
+
 // Export all queues
 export const queues = {
   crawl: crawlQueue,
@@ -599,5 +704,7 @@ export const queues = {
   embeddingGenerate: embeddingGenerateQueue,
   // Quarantine Reprocess queue
   quarantineReprocess: quarantineReprocessQueue,
+  // Current Price Recompute queue (ADR-015)
+  currentPriceRecompute: currentPriceRecomputeQueue,
 }
 

@@ -5,20 +5,25 @@
  * product_links table. Per Spec v1.2 §0.0, this is the canonical path
  * for price grouping.
  *
- * Query path: products → product_links → source_products → prices
+ * Per ADR-015: Hot-path queries now read from current_visible_prices
+ * derived table instead of evaluating corrections at query time.
+ *
+ * Query path: products → product_links → source_products → current_visible_prices
  */
 
 import { prisma, Prisma } from '@ironscout/db'
-import { visiblePriceWhere } from '../../config/tiers'
+import { currentVisiblePriceWhere } from '../../config/tiers'
 
 /**
  * Get prices for a canonical product through product_links
  *
- * This implements the spec-compliant query path:
- * products ← product_links ← source_products → prices
+ * Per ADR-015: Now reads from current_visible_prices derived table
+ * instead of evaluating corrections at query time.
+ *
+ * Query path: product_links → source_products → current_visible_prices
  *
  * @param productId - Canonical product ID
- * @returns Prices with retailer info, grouped by source_product
+ * @returns Prices with retailer info (denormalized in derived table)
  */
 export async function getPricesViaProductLinks(productId: string) {
   // Find all source_products linked to this canonical product
@@ -41,29 +46,29 @@ export async function getPricesViaProductLinks(productId: string) {
 
   const sourceProductIds = links.map(l => l.sourceProductId)
 
-  // Get prices for all linked source_products
-  const prices = await prisma.prices.findMany({
+  // ADR-015: Query derived table instead of prices with corrections overlay
+  // The derived table already has retailer info denormalized
+  const prices = await prisma.current_visible_prices.findMany({
     where: {
       sourceProductId: { in: sourceProductIds },
-      ...visiblePriceWhere(),
-    },
-    include: {
-      retailers: true,
-      source_products: {
-        select: {
-          id: true,
-          title: true,
-          url: true,
-        },
-      },
+      ...currentVisiblePriceWhere(),
     },
     orderBy: [
-      { retailers: { tier: 'desc' } },
-      { price: 'asc' },
+      { retailerTier: 'desc' },
+      { visiblePrice: 'asc' },
     ],
   })
 
-  return prices
+  // Transform to match the previous return shape for API compatibility
+  return prices.map(p => ({
+    ...p,
+    price: p.visiblePrice, // Use corrected price as the visible price
+    retailers: {
+      id: p.retailerId,
+      name: p.retailerName,
+      tier: p.retailerTier,
+    },
+  }))
 }
 
 /**
@@ -93,6 +98,9 @@ export async function batchGetPricesViaProductLinks(
 /**
  * Get prices and confidence for multiple canonical products through product_links.
  * Per search-lens-v1.md: canonicalConfidence source = ProductResolver.matchScore
+ *
+ * Per ADR-015: Now reads from current_visible_prices derived table
+ * instead of evaluating corrections at query time.
  *
  * @param productIds - Array of canonical product IDs
  * @returns Prices and max confidence per product
@@ -140,18 +148,15 @@ export async function batchGetPricesWithConfidence(
 
   const sourceProductIds = Array.from(sourceToProduct.keys())
 
-  // Get all prices for linked source_products
-  const prices = await prisma.prices.findMany({
+  // ADR-015: Query derived table instead of prices with corrections overlay
+  const prices = await prisma.current_visible_prices.findMany({
     where: {
       sourceProductId: { in: sourceProductIds },
-      ...visiblePriceWhere(),
-    },
-    include: {
-      retailers: true,
+      ...currentVisiblePriceWhere(),
     },
     orderBy: [
-      { retailers: { tier: 'desc' } },
-      { price: 'asc' },
+      { retailerTier: 'desc' },
+      { visiblePrice: 'asc' },
     ],
   })
 
@@ -162,7 +167,16 @@ export async function batchGetPricesWithConfidence(
     if (price.sourceProductId) {
       const productId = sourceToProduct.get(price.sourceProductId)
       if (productId) {
-        pricesMap.get(productId)?.push(price)
+        // Transform to match expected shape for API compatibility
+        pricesMap.get(productId)?.push({
+          ...price,
+          price: price.visiblePrice, // Use corrected price
+          retailers: {
+            id: price.retailerId,
+            name: price.retailerName,
+            tier: price.retailerTier,
+          },
+        })
       }
     }
   }

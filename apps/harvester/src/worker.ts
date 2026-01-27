@@ -60,6 +60,14 @@ import {
   stopQuarantineReprocessWorker,
 } from './quarantine/worker'
 
+// Current Price Recompute Worker (ADR-015)
+import {
+  startCurrentPriceRecomputeWorker,
+  stopCurrentPriceRecomputeWorker,
+  startCurrentPriceScheduler,
+  stopCurrentPriceScheduler,
+} from './currentprice'
+
 import type { Worker } from 'bullmq'
 
 // Create affiliate workers (lazy initialization)
@@ -74,6 +82,9 @@ let embeddingWorker: Worker | null = null
 
 // Quarantine reprocess worker (lazy initialization)
 let quarantineReprocessWorker: Worker | null = null
+
+// Current price recompute worker (ADR-015, lazy initialization)
+let currentPriceRecomputeWorker: Worker | null = null
 
 /**
  * Scheduler enabled flags (set during startup from database/env)
@@ -253,6 +264,10 @@ async function startup() {
   log.info('Starting quarantine reprocess worker')
   quarantineReprocessWorker = await startQuarantineReprocessWorker({ concurrency: 10 })
 
+  // Start current price recompute worker (ADR-015 - always on)
+  log.info('Starting current price recompute worker')
+  currentPriceRecomputeWorker = await startCurrentPriceRecomputeWorker({ concurrency: 5 })
+
   // Start stuck PROCESSING sweeper (recovers jobs that crash mid-processing)
   log.info('Starting product resolver sweeper')
   startProcessingSweeper()
@@ -261,6 +276,11 @@ async function startup() {
   if (harvesterSchedulerEnabled) {
     log.info('Starting retailer scheduler')
     await startRetailerScheduler()
+
+    // Start current price recompute scheduler (ADR-015)
+    // Per ADR-001: Only one scheduler instance should run
+    log.info('Starting current price recompute scheduler')
+    startCurrentPriceScheduler()
   }
 
   // Start affiliate feed scheduler only if enabled
@@ -297,6 +317,9 @@ const shutdown = async (signal: string) => {
     if (harvesterSchedulerEnabled) {
       log.info('Stopping retailer scheduler')
       stopRetailerScheduler()
+
+      log.info('Stopping current price recompute scheduler')
+      stopCurrentPriceScheduler()
     }
 
     // 2. Close workers (waits for current jobs to complete)
@@ -323,6 +346,8 @@ const shutdown = async (signal: string) => {
       stopEmbeddingWorker(),
       // Quarantine reprocess worker
       stopQuarantineReprocessWorker(),
+      // Current price recompute worker (ADR-015)
+      stopCurrentPriceRecomputeWorker(),
     ])
     log.info('All workers closed')
 

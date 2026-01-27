@@ -18,7 +18,9 @@
     "test:schema": "vitest run src/__tests__/schema-validation.test.ts",
     "test:integration": "vitest run src/__tests__/*.integration.test.ts",
     "validate:sql": "vitest run src/__tests__/schema-validation.test.ts --reporter=verbose",
-    "smoke:resolver": "tsx src/scripts/smoke-test-resolver.ts"
+    "smoke:resolver": "tsx src/scripts/smoke-test-resolver.ts",
+    "recompute": "tsx src/cli/trigger-recompute.ts",
+    "recompute:full": "tsx src/cli/trigger-recompute.ts --scope FULL"
   },
   "dependencies": {
     "@bull-board/api": "^6.16.4",

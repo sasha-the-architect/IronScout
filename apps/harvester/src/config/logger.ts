@@ -13,6 +13,7 @@ const rootLogger = wrapLoggerWithSlack(createLogger('harvester'), { service: 'ha
 
 // Pre-configured child loggers for harvester components
 export const logger = {
+  root: rootLogger,
   worker: rootLogger.child('worker'),
   redis: rootLogger.child('redis'),
   database: rootLogger.child('database'),
@@ -27,6 +28,7 @@ export const logger = {
   resolver: rootLogger.child('resolver'),
   embedding: rootLogger.child('embedding'),
   quarantine: rootLogger.child('quarantine'),
+  currentprice: rootLogger.child('currentprice'),
 }
 
 // Export root logger for custom child creation

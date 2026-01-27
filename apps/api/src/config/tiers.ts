@@ -345,3 +345,92 @@ export function visiblePriceWhere(): Prisma.pricesWhereInput {
     ],
   }
 }
+
+// ============================================================================
+// ADR-015: CURRENT VISIBLE PRICES (DERIVED TABLE)
+// ============================================================================
+
+/**
+ * Prisma where clause for current visible prices.
+ *
+ * Per ADR-015: Hot paths (Search, Dashboard, Alerts) MUST read from the
+ * current_visible_prices derived table instead of evaluating corrections
+ * at query time.
+ *
+ * The derived table already has:
+ * - IGNORE corrections excluded
+ * - MULTIPLIER corrections applied to visiblePrice
+ * - Ignored runs excluded
+ * - Retailer visibility applied
+ *
+ * This helper only needs to apply the lookback filter.
+ */
+export function currentVisiblePriceWhere(): Prisma.current_visible_pricesWhereInput {
+  const lookbackDays = getPriceLookbackDays()
+  const cutoffDate = new Date()
+  cutoffDate.setDate(cutoffDate.getDate() - lookbackDays)
+
+  return {
+    observedAt: { gte: cutoffDate },
+  }
+}
+
+/**
+ * Get visible prices from the derived table for a product.
+ *
+ * Per ADR-015: Use this for hot-path queries instead of querying
+ * the prices table with corrections overlay.
+ *
+ * @param productId - Canonical product ID
+ * @returns Current visible prices with corrections already applied
+ */
+export async function getVisiblePricesForProduct(productId: string) {
+  // Import prisma lazily to avoid circular dependency
+  const { prisma } = await import('@ironscout/db')
+
+  return prisma.current_visible_prices.findMany({
+    where: {
+      productId,
+      ...currentVisiblePriceWhere(),
+    },
+    orderBy: [
+      { retailerTier: 'desc' },
+      { visiblePrice: 'asc' },
+    ],
+  })
+}
+
+/**
+ * Get visible prices from the derived table for multiple products.
+ *
+ * @param productIds - Array of canonical product IDs
+ * @returns Map of productId → visible prices
+ */
+export async function batchGetVisiblePrices(productIds: string[]) {
+  // Import prisma lazily to avoid circular dependency
+  const { prisma } = await import('@ironscout/db')
+
+  const prices = await prisma.current_visible_prices.findMany({
+    where: {
+      productId: { in: productIds },
+      ...currentVisiblePriceWhere(),
+    },
+    orderBy: [
+      { retailerTier: 'desc' },
+      { visiblePrice: 'asc' },
+    ],
+  })
+
+  // Group by productId
+  const pricesMap = new Map<string, typeof prices>()
+  for (const id of productIds) {
+    pricesMap.set(id, [])
+  }
+  for (const price of prices) {
+    if (price.productId) {
+      pricesMap.get(price.productId)?.push(price)
+    }
+  }
+
+  return pricesMap
+}

@@ -4,6 +4,7 @@ import { prisma } from '@ironscout/db';
 import { revalidatePath } from 'next/cache';
 import { getAdminSession, logAdminAction } from '@/lib/auth';
 import { loggers } from '@/lib/logger';
+import { enqueueCurrentPriceRecompute, mapCorrectionScopeToRecomputeScope } from '@/lib/queue';
 
 // =============================================================================
 // Types
@@ -179,6 +180,24 @@ export async function createCorrection(data: CreateCorrectionInput) {
       },
     });
 
+    // ADR-015: Trigger current price recompute
+    try {
+      const { scope } = mapCorrectionScopeToRecomputeScope(data.scopeType);
+      await enqueueCurrentPriceRecompute({
+        scope,
+        scopeId: scope !== 'FULL' ? data.scopeId : undefined,
+        trigger: 'CORRECTION_CREATED',
+        triggeredBy: session.email,
+      });
+    } catch (recomputeError) {
+      // Non-blocking: log error but don't fail the correction creation
+      loggers.admin.error(
+        'Failed to enqueue price recompute after correction creation',
+        { correctionId: correction.id },
+        recomputeError instanceof Error ? recomputeError : new Error(String(recomputeError))
+      );
+    }
+
     revalidatePath('/corrections');
 
     return { success: true, correction };
@@ -239,6 +258,24 @@ export async function revokeCorrection(id: string, reason: string) {
         revokeReason: reason,
       },
     });
+
+    // ADR-015: Trigger current price recompute
+    try {
+      const { scope } = mapCorrectionScopeToRecomputeScope(correction.scopeType as CorrectionScopeType);
+      await enqueueCurrentPriceRecompute({
+        scope,
+        scopeId: scope !== 'FULL' ? correction.scopeId : undefined,
+        trigger: 'CORRECTION_REVOKED',
+        triggeredBy: session.email,
+      });
+    } catch (recomputeError) {
+      // Non-blocking: log error but don't fail the correction revocation
+      loggers.admin.error(
+        'Failed to enqueue price recompute after correction revocation',
+        { correctionId: id },
+        recomputeError instanceof Error ? recomputeError : new Error(String(recomputeError))
+      );
+    }
 
     revalidatePath('/corrections');
 

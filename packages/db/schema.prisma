@@ -730,6 +730,61 @@ model price_corrections {
   @@index([createdAt])
 }
 
+/// ADR-015: Derived table for current visible prices.
+/// Materialized by CURRENT_PRICE_RECOMPUTE job.
+/// Hot paths (Search, Dashboard, Alerts) read from this table instead of evaluating corrections at query time.
+/// Contains prices with:
+/// - IGNORE corrections excluded
+/// - MULTIPLIER corrections applied to visiblePrice
+/// - Ignored runs excluded
+/// - Retailer visibility applied
+/// - Within lookback window
+model current_visible_prices {
+  id String @id /// Same as prices.id
+
+  // Core linkage
+  productId       String?
+  retailerId      String
+  merchantId      String?
+  sourceId        String?
+  sourceProductId String?
+
+  // Price data
+  price        Decimal @db.Decimal(10, 2) /// Raw price from prices table
+  visiblePrice Decimal @db.Decimal(10, 2) /// After MULTIPLIER corrections applied
+  currency     String  @default("USD")
+  url          String
+  inStock      Boolean
+
+  // Timestamps
+  observedAt DateTime
+
+  // Shipping
+  shippingCost Decimal? @db.Decimal(10, 2)
+
+  // Denormalized retailer info (avoid JOIN in hot paths)
+  retailerName String
+  retailerTier RetailerTier
+
+  // Provenance
+  ingestionRunType IngestionRunType?
+  ingestionRunId   String?
+
+  // Recompute tracking
+  recomputedAt   DateTime @default(now())
+  recomputeJobId String?
+
+  // Indexes for hot-path queries
+  @@index([productId])
+  @@index([retailerId])
+  @@index([sourceProductId])
+  @@index([observedAt])
+  @@index([inStock])
+  @@index([recomputedAt])
+
+  @@map("current_visible_prices")
+}
+
 model product_reports {
   id          String           @id @default(cuid())
   productId   String
