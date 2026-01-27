@@ -183,7 +183,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
-        value: 25.5.0
+        value: 22
       - key: PNPM_VERSION
         value: 10.28.1
       - key: SKIP_INSTALL_DEPS
