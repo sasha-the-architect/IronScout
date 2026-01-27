@@ -7,10 +7,11 @@
 
 import { NextResponse } from 'next/server'
 import { createLogger } from '@/lib/logger'
+import { env } from '@/lib/env'
 
 const logger = createLogger('api:signup')
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = env.NEXT_PUBLIC_API_URL
 
 export async function POST(req: Request) {
   try {

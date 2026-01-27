@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { createLogger } from '@/lib/logger'
+import { env } from '@/lib/env'
 
 const logger = createLogger('components:admin:recent-executions')
 
@@ -32,8 +33,7 @@ export default function RecentExecutions() {
 
   async function fetchExecutions() {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${apiUrl}/api/executions?limit=10`)
+      const response = await fetch(`${env.NEXT_PUBLIC_API_URL}/api/executions?limit=10`)
       const data = await response.json()
       setExecutions(data.executions)
     } catch (error) {

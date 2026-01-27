@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import { createLogger } from '@/lib/logger'
+import { env } from '@/lib/env'
 
 const logger = createLogger('price-history-chart')
 
@@ -60,9 +61,8 @@ export function PriceHistoryChart({ productId }: PriceHistoryProps) {
     try {
       setLoading(true)
       setError(null)
-      
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${API_BASE_URL}/api/products/${productId}/history?days=${days}`)
+
+      const response = await fetch(`${env.NEXT_PUBLIC_API_URL}/api/products/${productId}/history?days=${days}`)
       
       if (!response.ok) {
         throw new Error('Failed to fetch price history')

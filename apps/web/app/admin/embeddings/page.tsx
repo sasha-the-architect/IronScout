@@ -14,10 +14,11 @@ import {
   Search
 } from 'lucide-react'
 import { createLogger } from '@/lib/logger'
+import { env } from '@/lib/env'
 
 const logger = createLogger('admin-embeddings')
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_BASE_URL = env.NEXT_PUBLIC_API_URL
 
 interface EmbeddingStats {
   total: number

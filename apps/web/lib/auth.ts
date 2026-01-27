@@ -17,12 +17,13 @@ import TwitterProvider from 'next-auth/providers/twitter'
 import GitHubProvider from 'next-auth/providers/github'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { logger } from './logger'
+import { env, isProd } from './env'
 
 // API URL for auth endpoints
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = env.NEXT_PUBLIC_API_URL
 
 // Admin emails - must use OAuth, not credentials
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+const ADMIN_EMAILS = env.ADMIN_EMAILS
   .split(',')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean)
@@ -67,14 +68,14 @@ async function refreshAccessToken(refreshToken: string): Promise<{
 }
 
 // Detect if running on localhost (even in production mode)
-const isLocalhost = process.env.NEXTAUTH_URL?.includes('localhost') || false
+const isLocalhost = env.NEXTAUTH_URL.includes('localhost')
 
 // Use secure cookies only in production AND not on localhost
-const useSecureCookies = process.env.NODE_ENV === 'production' && !isLocalhost
+const useSecureCookies = isProd && !isLocalhost
 
 // Cookie domain for cross-subdomain auth
-const COOKIE_DOMAIN = useSecureCookies
-  ? process.env.COOKIE_DOMAIN || '.ironscout.ai'
+const COOKIE_DOMAIN = useSecureCookies && env.COOKIE_DOMAIN
+  ? env.COOKIE_DOMAIN
   : undefined
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -132,8 +133,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
     // Google OAuth
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
     }),
 
     // Optional providers
@@ -348,24 +349,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
 
       // Subsequent requests - check if access token needs refresh
+      const accessToken = token.accessToken as string | undefined
       const accessTokenExpires = token.accessTokenExpires as number | undefined
       const refreshToken = token.refreshToken as string | undefined
 
-      // If no expiry tracked or no refresh token, return as-is
-      if (!accessTokenExpires || !refreshToken) {
-        return token
-      }
-
-      // Check if token is expired or about to expire
-      const shouldRefresh = Date.now() > accessTokenExpires - REFRESH_BUFFER_MS
+      // Determine if we need to refresh:
+      // 1. No accessToken at all (legacy session before accessToken was added)
+      // 2. Token is expired or about to expire
+      const tokenMissing = !accessToken
+      const tokenExpiring = accessTokenExpires && Date.now() > accessTokenExpires - REFRESH_BUFFER_MS
+      const shouldRefresh = tokenMissing || tokenExpiring
 
       if (!shouldRefresh) {
-        // Token still valid
+        // Token exists and is still valid
         return token
       }
 
-      // Token expired or expiring soon - attempt refresh
-      logger.auth.debug('Access token expiring, attempting refresh')
+      // Need to refresh - but we need a refresh token
+      if (!refreshToken) {
+        // No refresh token available - user needs to re-authenticate
+        // This happens for very old sessions or edge cases
+        logger.auth.warn('No refresh token available, session needs re-authentication')
+        token.error = 'RefreshTokenError'
+        return token
+      }
+
+      // Token missing or expiring - attempt refresh
+      logger.auth.debug('Refreshing access token', { reason: tokenMissing ? 'missing' : 'expiring' })
       const refreshed = await refreshAccessToken(refreshToken)
 
       if (refreshed) {
@@ -373,6 +383,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.accessToken = refreshed.accessToken
         token.refreshToken = refreshed.refreshToken
         token.accessTokenExpires = refreshed.accessTokenExpires
+        logger.auth.debug('Access token refreshed successfully')
         return token
       }
 

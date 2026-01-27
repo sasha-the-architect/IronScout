@@ -3,9 +3,10 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { BRAND_NAME } from '@/lib/brand'
+import { env } from '@/lib/env'
 
 // Admin emails from environment variable
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+const ADMIN_EMAILS = env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
 
 export default async function AdminLayout({
   children,

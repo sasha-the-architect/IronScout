@@ -2,12 +2,17 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useLoadout, type AmmoItemWithPrice, type WatchingItemWithPrice } from '@/hooks/use-loadout'
 import { GunLockerCard, WatchingCard, MarketActivityCard } from '@/components/dashboard/loadout'
 import { RetailerPanel } from '@/components/results/retailer-panel'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { RetailerPrice, ShippingInfo } from '@/components/results/types'
+import { refreshSessionToken } from '@/hooks/use-session-refresh'
+import { env } from '@/lib/env'
+
+const API_BASE_URL = env.NEXT_PUBLIC_API_URL
 
 /**
  * Dashboard Page - My Loadout
@@ -23,8 +28,10 @@ import type { RetailerPrice, ShippingInfo } from '@/components/results/types'
  * - "Find similar" navigates to search with caliber filter
  */
 export default function DashboardPage() {
+  const { data: session } = useSession()
   const { data, isLoading, error, mutate } = useLoadout()
   const router = useRouter()
+  const token = session?.accessToken
 
   // Panel state
   const [panelOpen, setPanelOpen] = useState(false)
@@ -62,8 +69,19 @@ export default function DashboardPage() {
       setPanelOpen(true)
 
       try {
-        const res = await fetch(`/api/products/${productId}/prices`, {
-          credentials: 'include',
+        // Get token, trying to refresh if missing
+        let authToken: string | undefined = token
+        if (!authToken) {
+          const refreshed = await refreshSessionToken()
+          if (refreshed) {
+            authToken = refreshed
+          }
+        }
+
+        const res = await fetch(`${API_BASE_URL}/api/products/${productId}/prices`, {
+          headers: authToken ? {
+            Authorization: `Bearer ${authToken}`,
+          } : {},
         })
 
         if (!res.ok) {

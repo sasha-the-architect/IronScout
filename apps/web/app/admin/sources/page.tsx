@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { createLogger } from '@/lib/logger'
+import { env } from '@/lib/env'
 
 const logger = createLogger('app:admin:sources')
 
@@ -32,7 +33,7 @@ export default function SourcesPage() {
 
   async function fetchSources() {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = env.NEXT_PUBLIC_API_URL
       const response = await fetch(`${apiUrl}/api/sources`)
       const data = await response.json()
       setSources(data)
@@ -45,7 +46,7 @@ export default function SourcesPage() {
 
   async function toggleSource(id: string) {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = env.NEXT_PUBLIC_API_URL
       const response = await fetch(`${apiUrl}/api/sources/${id}/toggle`, {
         method: 'POST',
       })
@@ -61,7 +62,7 @@ export default function SourcesPage() {
     if (!confirm('Are you sure you want to delete this source?')) return
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = env.NEXT_PUBLIC_API_URL
       const response = await fetch(`${apiUrl}/api/sources/${id}`, {
         method: 'DELETE',
       })
@@ -75,7 +76,7 @@ export default function SourcesPage() {
 
   async function triggerCrawl(sourceId?: string) {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = env.NEXT_PUBLIC_API_URL
       const response = await fetch(`${apiUrl}/api/harvester/trigger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -196,7 +197,7 @@ function AddSourceForm({ onSuccess }: { onSuccess: () => void }) {
     e.preventDefault()
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = env.NEXT_PUBLIC_API_URL
       const response = await fetch(`${apiUrl}/api/sources`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

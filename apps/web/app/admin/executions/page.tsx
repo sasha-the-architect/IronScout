@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { createLogger } from '@/lib/logger'
+import { env } from '@/lib/env'
 
 const logger = createLogger('app:admin:executions')
 
@@ -41,7 +42,7 @@ export default function ExecutionsPage() {
   async function fetchExecutions() {
     setLoading(true)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const apiUrl = env.NEXT_PUBLIC_API_URL
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '20',

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { createLogger } from '@/lib/logger'
+import { env } from '@/lib/env'
 
 const logger = createLogger('components:admin:dashboard-stats')
 
@@ -26,8 +27,7 @@ export default function DashboardStats() {
 
   async function fetchStats() {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${apiUrl}/api/executions/stats`)
+      const response = await fetch(`${env.NEXT_PUBLIC_API_URL}/api/executions/stats`)
       const data = await response.json()
       setStats(data)
     } catch (error) {
