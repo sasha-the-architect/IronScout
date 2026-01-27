@@ -184,6 +184,8 @@ services:
         value: production
       - key: NODE_VERSION
         value: 22
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
     headers:
       - path: /*
         name: X-Frame-Options
