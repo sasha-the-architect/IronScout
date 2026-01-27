@@ -4,82 +4,14 @@
 # IMPORTANT: Redis must be created manually in Render dashboard
 # Redis cannot be defined in Blueprint files - see DEPLOYMENT.md for instructions
 
-# ============================================================================
-# ENVIRONMENT GROUPS - Shared configuration across services
-# ============================================================================
-envVarGroups:
-  # Shared build environment (Node.js + pnpm versions)
-  - name: ironscout-build
-    envVars:
-      - key: NODE_VERSION
-        value: 25.5.0
-      - key: PNPM_VERSION
-        value: 10.28.1
-
-  # Shared secrets (set manually in Render dashboard)
-  - name: ironscout-secrets
-    envVars:
-      - key: JWT_SECRET
-        sync: false  # REQUIRED: Must be same across all services for auth
-      - key: RESEND_API_KEY
-        sync: false
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: STRIPE_WEBHOOK_SECRET
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: SLACK_DATAFEED_ALERTS_WEBHOOK_URL
-        sync: false
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
-
-  # Shared Redis config (set manually after creating Redis instance)
-  - name: ironscout-redis
-    envVars:
-      - key: REDIS_HOST
-        sync: false
-      - key: REDIS_PORT
-        sync: false
-
-  # Shared admin config
-  - name: ironscout-admin-config
-    envVars:
-      - key: ADMIN_EMAILS
-        sync: false  # Comma-separated admin emails
-      - key: FROM_EMAIL
-        sync: false
-
-  # Shared URLs
-  - name: ironscout-urls
-    envVars:
-      - key: FRONTEND_URL
-        value: https://www.ironscout.ai
-      - key: NEXT_PUBLIC_API_URL
-        value: https://api.ironscout.ai
-      - key: NEXT_PUBLIC_WEB_URL
-        value: https://ironscout.ai
-      - key: NEXT_PUBLIC_MERCHANT_URL
-        value: https://merchant.ironscout.ai
-      - key: ADMIN_PORTAL_URL
-        value: https://admin.ironscout.ai
-
-# ============================================================================
-# DATABASE
-# ============================================================================
 databases:
   - name: ironscout-db
     databaseName: ironscout
     user: ironscout
-    plan: free  # Change to 'starter' or 'standard' for production
+    plan: free
     region: ohio
-    ipAllowList: []  # Empty = allow all Render services
+    ipAllowList: []
 
-# ============================================================================
-# SERVICES
-# ============================================================================
 services:
   # --------------------------------------------------------------------------
   # API Backend Service
@@ -88,25 +20,45 @@ services:
     name: ironscout-api
     runtime: node
     region: ohio
-    plan: free  # Change to 'starter' or 'standard' for production
+    plan: free
     buildCommand: pnpm install && pnpm --filter @ironscout/db db:generate && pnpm --filter @ironscout/api build
     startCommand: cd apps/api && pnpm start
     healthCheckPath: /health
-    envVarGroups:
-      - ironscout-build
-      - ironscout-secrets
-      - ironscout-redis
-      - ironscout-admin-config
-      - ironscout-urls
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 25.5.0
+      - key: PNPM_VERSION
+        value: 10.28.1
       - key: PORT
         value: 8000
       - key: DATABASE_URL
         fromDatabase:
           name: ironscout-db
           property: connectionString
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        sync: false
+      - key: FRONTEND_URL
+        value: https://www.ironscout.ai
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SLACK_DATAFEED_ALERTS_WEBHOOK_URL
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
 
   # --------------------------------------------------------------------------
   # Next.js Web Frontend
@@ -115,50 +67,35 @@ services:
     name: ironscout-web
     runtime: node
     region: ohio
-    plan: free  # Change to 'starter' or 'standard' for production
+    plan: free
     buildCommand: pnpm install && pnpm --filter @ironscout/web build
     startCommand: cd apps/web && pnpm start
     healthCheckPath: /
-    envVarGroups:
-      - ironscout-build
-      - ironscout-secrets
-      - ironscout-admin-config
-      - ironscout-urls
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 25.5.0
+      - key: PNPM_VERSION
+        value: 10.28.1
+      - key: NEXT_PUBLIC_API_URL
+        value: https://api.ironscout.ai
       - key: NEXTAUTH_URL
         value: https://ironscout.ai
+      - key: JWT_SECRET
+        sync: false
       - key: AUTH_TRUST_HOST
         value: true
       - key: COOKIE_DOMAIN
-        value: .ironscout.ai  # For cross-subdomain auth
+        value: .ironscout.ai
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
       - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-        sync: false  # Set manually in Render dashboard
-
-  # --------------------------------------------------------------------------
-  # Harvester Background Worker
-  # --------------------------------------------------------------------------
-  - type: worker
-    name: ironscout-harvester
-    runtime: node
-    region: ohio
-    plan: starter
-    buildCommand: pnpm install && pnpm --filter @ironscout/db db:generate && pnpm --filter @ironscout/notifications build && pnpm --filter @ironscout/harvester build
-    startCommand: cd apps/harvester && pnpm worker
-    envVarGroups:
-      - ironscout-build
-      - ironscout-secrets
-      - ironscout-redis
-      - ironscout-admin-config
-      - ironscout-urls
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: ironscout-db
-          property: connectionString
+        sync: false
 
   # --------------------------------------------------------------------------
   # Merchant Portal (B2B retailer interface)
@@ -167,25 +104,39 @@ services:
     name: ironscout-merchant
     runtime: node
     region: ohio
-    plan: free  # Change to 'starter' or 'standard' for production
+    plan: free
     buildCommand: pnpm install && pnpm --filter @ironscout/db db:generate && pnpm --filter @ironscout/notifications build && pnpm --filter @ironscout/merchant build
     startCommand: cd apps/merchant && pnpm start
     healthCheckPath: /
-    envVarGroups:
-      - ironscout-build
-      - ironscout-secrets
-      - ironscout-redis
-      - ironscout-admin-config
-      - ironscout-urls
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 25.5.0
+      - key: PNPM_VERSION
+        value: 10.28.1
       - key: DATABASE_URL
         fromDatabase:
           name: ironscout-db
           property: connectionString
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: NEXT_PUBLIC_API_URL
+        value: https://api.ironscout.ai
+      - key: NEXT_PUBLIC_MERCHANT_URL
+        value: https://merchant.ironscout.ai
+      - key: RESEND_API_KEY
+        sync: false
       - key: EMAIL_FROM
         value: IronScout <noreply@ironscout.ai>
+      - key: ADMIN_PORTAL_URL
+        value: https://admin.ironscout.ai
+      - key: ADMIN_EMAILS
+        sync: false
 
   # --------------------------------------------------------------------------
   # Admin Portal (internal administration)
@@ -194,24 +145,31 @@ services:
     name: ironscout-admin
     runtime: node
     region: ohio
-    plan: free  # Change to 'starter' or 'standard' for production
+    plan: free
     buildCommand: pnpm install && pnpm --filter @ironscout/db db:generate && pnpm --filter @ironscout/notifications build && pnpm --filter @ironscout/admin build
     startCommand: cd apps/admin && pnpm start
     healthCheckPath: /
-    envVarGroups:
-      - ironscout-build
-      - ironscout-secrets
-      - ironscout-admin-config
-      - ironscout-urls
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 25.5.0
+      - key: PNPM_VERSION
+        value: 10.28.1
       - key: DATABASE_URL
         fromDatabase:
           name: ironscout-db
           property: connectionString
       - key: NEXTAUTH_SECRET
-        sync: false  # Must match JWT_SECRET
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: NEXT_PUBLIC_WEB_URL
+        value: https://ironscout.ai
+      - key: NEXT_PUBLIC_MERCHANT_URL
+        value: https://merchant.ironscout.ai
+      - key: RESEND_API_KEY
+        sync: false
 
   # --------------------------------------------------------------------------
   # Marketing Site (static) - www.ironscout.ai
@@ -244,3 +202,33 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+
+# --------------------------------------------------------------------------
+# NOTE: Harvester worker commented out - requires paid plan
+# --------------------------------------------------------------------------
+# - type: worker
+#   name: ironscout-harvester
+#   runtime: node
+#   region: ohio
+#   plan: starter  # Workers require paid plan
+#   buildCommand: pnpm install && pnpm --filter @ironscout/db db:generate && pnpm --filter @ironscout/notifications build && pnpm --filter @ironscout/harvester build
+#   startCommand: cd apps/harvester && pnpm worker
+#   envVars:
+#     - key: NODE_ENV
+#       value: production
+#     - key: DATABASE_URL
+#       fromDatabase:
+#         name: ironscout-db
+#         property: connectionString
+#     - key: REDIS_HOST
+#       sync: false
+#     - key: REDIS_PORT
+#       sync: false
+#     - key: RESEND_API_KEY
+#       sync: false
+#     - key: SLACK_DATAFEED_ALERTS_WEBHOOK_URL
+#       sync: false
+#     - key: FROM_EMAIL
+#       sync: false
+#     - key: FRONTEND_URL
+#       value: https://www.ironscout.ai
