@@ -120,6 +120,7 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
 
   // Get current best prices per product
   // ADR-005: Apply full visibility predicate
+  // ADR-015: Apply corrections overlay (IGNORE corrections exclude prices)
   const currentPrices = await prisma.$queryRaw<
     Array<{
       productId: string
@@ -157,6 +158,21 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
         AND r."visibilityStatus" = 'ELIGIBLE'
         AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
         AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL) -- ADR-015: Exclude ignored runs
+        -- ADR-015: Exclude prices with active IGNORE corrections
+        AND NOT EXISTS (
+          SELECT 1 FROM price_corrections pc
+          WHERE pc."revokedAt" IS NULL
+            AND pc.action = 'IGNORE'
+            AND pr."observedAt" >= pc."startTs"
+            AND pr."observedAt" < pc."endTs"
+            AND (
+              (pc."scopeType" = 'PRODUCT' AND pc."scopeId" = p.id) OR
+              (pc."scopeType" = 'RETAILER' AND pc."scopeId" = r.id) OR
+              (pc."scopeType" = 'SOURCE' AND pc."scopeId" = pr."sourceId") OR
+              (pc."scopeType" = 'AFFILIATE' AND pc."scopeId" = pr."affiliateId") OR
+              (pc."scopeType" = 'FEED_RUN' AND pr."ingestionRunId" IS NOT NULL AND pc."scopeId" = pr."ingestionRunId")
+            )
+        )
     )
     SELECT * FROM ranked_prices WHERE rn = 1
     LIMIT 500 -- MAX_PRODUCTS_TO_EVALUATE: documented limit to prevent unbounded queries
@@ -188,6 +204,7 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
   const query2Start = performance.now()
 
   // Get 30-day median prices per product
+  // ADR-015: Apply corrections overlay (IGNORE corrections exclude prices)
   const productIds = currentPrices.map((p) => p.productId)
   const medianPrices = await prisma.$queryRaw<
     Array<{ productId: string; medianPrice: any; priceCount: number }>
@@ -209,6 +226,21 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
         AND r."visibilityStatus" = 'ELIGIBLE'
         AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
         AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL) -- ADR-015: Exclude ignored runs
+        -- ADR-015: Exclude prices with active IGNORE corrections
+        AND NOT EXISTS (
+          SELECT 1 FROM price_corrections pc
+          WHERE pc."revokedAt" IS NULL
+            AND pc.action = 'IGNORE'
+            AND pr."observedAt" >= pc."startTs"
+            AND pr."observedAt" < pc."endTs"
+            AND (
+              (pc."scopeType" = 'PRODUCT' AND pc."scopeId" = p.id) OR
+              (pc."scopeType" = 'RETAILER' AND pc."scopeId" = r.id) OR
+              (pc."scopeType" = 'SOURCE' AND pc."scopeId" = pr."sourceId") OR
+              (pc."scopeType" = 'AFFILIATE' AND pc."scopeId" = pr."affiliateId") OR
+              (pc."scopeType" = 'FEED_RUN' AND pr."ingestionRunId" IS NOT NULL AND pc."scopeId" = pr."ingestionRunId")
+            )
+        )
       GROUP BY p.id, DATE_TRUNC('day', pr."observedAt")
     )
     SELECT
@@ -234,6 +266,7 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
   const query3Start = performance.now()
 
   // Get 90-day lowest prices per product
+  // ADR-015: Apply corrections overlay (IGNORE corrections exclude prices)
   const lowestPrices = await prisma.$queryRaw<
     Array<{ productId: string; lowestPrice: any }>
   >`
@@ -252,6 +285,21 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
       AND r."visibilityStatus" = 'ELIGIBLE'
       AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
       AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL) -- ADR-015: Exclude ignored runs
+      -- ADR-015: Exclude prices with active IGNORE corrections
+      AND NOT EXISTS (
+        SELECT 1 FROM price_corrections pc
+        WHERE pc."revokedAt" IS NULL
+          AND pc.action = 'IGNORE'
+          AND pr."observedAt" >= pc."startTs"
+          AND pr."observedAt" < pc."endTs"
+          AND (
+            (pc."scopeType" = 'PRODUCT' AND pc."scopeId" = p.id) OR
+            (pc."scopeType" = 'RETAILER' AND pc."scopeId" = r.id) OR
+            (pc."scopeType" = 'SOURCE' AND pc."scopeId" = pr."sourceId") OR
+            (pc."scopeType" = 'AFFILIATE' AND pc."scopeId" = pr."affiliateId") OR
+            (pc."scopeType" = 'FEED_RUN' AND pr."ingestionRunId" IS NOT NULL AND pc."scopeId" = pr."ingestionRunId")
+          )
+      )
     GROUP BY p.id
   `
 
@@ -271,6 +319,7 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
   // Get products that were out of stock (zero visible offers) for ≥7 consecutive days
   // Per spec: "Product had zero visible offers for ≥7 consecutive days, now has ≥1"
   // This requires checking for a gap of at least 7 days with no in-stock offers
+  // ADR-015: Apply corrections overlay (IGNORE corrections exclude prices)
   const backInStockProducts = await prisma.$queryRaw<Array<{ productId: string }>>`
     WITH daily_stock AS (
       SELECT
@@ -280,6 +329,7 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
       FROM product_links pl
       JOIN prices pr ON pr."sourceProductId" = pl."sourceProductId"
       JOIN retailers r ON r.id = pr."retailerId"
+      JOIN products p ON p.id = pl."productId"
       LEFT JOIN merchant_retailers mr ON mr."retailerId" = r.id AND mr.status = 'ACTIVE'
       LEFT JOIN affiliate_feed_runs afr ON afr.id = pr."affiliateFeedRunId"
       WHERE pl."productId" = ANY(${productIds})
@@ -288,6 +338,21 @@ export async function getMarketDeals(): Promise<MarketDealsResponse> {
         AND r."visibilityStatus" = 'ELIGIBLE'
         AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
         AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL) -- ADR-015: Exclude ignored runs
+        -- ADR-015: Exclude prices with active IGNORE corrections
+        AND NOT EXISTS (
+          SELECT 1 FROM price_corrections pc
+          WHERE pc."revokedAt" IS NULL
+            AND pc.action = 'IGNORE'
+            AND pr."observedAt" >= pc."startTs"
+            AND pr."observedAt" < pc."endTs"
+            AND (
+              (pc."scopeType" = 'PRODUCT' AND pc."scopeId" = p.id) OR
+              (pc."scopeType" = 'RETAILER' AND pc."scopeId" = r.id) OR
+              (pc."scopeType" = 'SOURCE' AND pc."scopeId" = pr."sourceId") OR
+              (pc."scopeType" = 'AFFILIATE' AND pc."scopeId" = pr."affiliateId") OR
+              (pc."scopeType" = 'FEED_RUN' AND pr."ingestionRunId" IS NOT NULL AND pc."scopeId" = pr."ingestionRunId")
+            )
+        )
       GROUP BY pl."productId", DATE_TRUNC('day', pr."observedAt" AT TIME ZONE 'UTC')
     ),
     with_gaps AS (

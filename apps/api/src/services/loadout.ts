@@ -307,6 +307,7 @@ async function getWatchingWithPrices(
   const ninetyDaysAgo = new Date(now)
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
 
+  // ADR-015: Apply corrections overlay (IGNORE corrections exclude prices)
   const lowestPrices = productIds.length > 0
     ? await prisma.$queryRaw<Array<{ productId: string; lowestPrice: any }>>`
         SELECT
@@ -324,6 +325,21 @@ async function getWatchingWithPrices(
           AND r."visibilityStatus" = 'ELIGIBLE'
           AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
           AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL)
+          -- ADR-015: Exclude prices with active IGNORE corrections
+          AND NOT EXISTS (
+            SELECT 1 FROM price_corrections pc
+            WHERE pc."revokedAt" IS NULL
+              AND pc.action = 'IGNORE'
+              AND pr."observedAt" >= pc."startTs"
+              AND pr."observedAt" < pc."endTs"
+              AND (
+                (pc."scopeType" = 'PRODUCT' AND pc."scopeId" = p.id) OR
+                (pc."scopeType" = 'RETAILER' AND pc."scopeId" = r.id) OR
+                (pc."scopeType" = 'SOURCE' AND pc."scopeId" = pr."sourceId") OR
+                (pc."scopeType" = 'AFFILIATE' AND pc."scopeId" = pr."affiliateId") OR
+                (pc."scopeType" = 'FEED_RUN' AND pr."ingestionRunId" IS NOT NULL AND pc."scopeId" = pr."ingestionRunId")
+              )
+          )
         GROUP BY p.id
       `
     : []
@@ -403,6 +419,7 @@ async function getMarketActivityStats(): Promise<MarketActivityStats> {
   })
 
   // Count in-stock items (deduplicated by product) from last 7 days
+  // ADR-015: Apply corrections overlay (IGNORE corrections exclude prices)
   const inStockCount = await prisma.$queryRaw<[{ count: bigint }]>`
     SELECT COUNT(DISTINCT p.id) as count
     FROM products p
@@ -417,9 +434,25 @@ async function getMarketActivityStats(): Promise<MarketActivityStats> {
       AND r."visibilityStatus" = 'ELIGIBLE'
       AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
       AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL)
+      -- ADR-015: Exclude prices with active IGNORE corrections
+      AND NOT EXISTS (
+        SELECT 1 FROM price_corrections pc
+        WHERE pc."revokedAt" IS NULL
+          AND pc.action = 'IGNORE'
+          AND pr."observedAt" >= pc."startTs"
+          AND pr."observedAt" < pc."endTs"
+          AND (
+            (pc."scopeType" = 'PRODUCT' AND pc."scopeId" = p.id) OR
+            (pc."scopeType" = 'RETAILER' AND pc."scopeId" = r.id) OR
+            (pc."scopeType" = 'SOURCE' AND pc."scopeId" = pr."sourceId") OR
+            (pc."scopeType" = 'AFFILIATE' AND pc."scopeId" = pr."affiliateId") OR
+            (pc."scopeType" = 'FEED_RUN' AND pr."ingestionRunId" IS NOT NULL AND pc."scopeId" = pr."ingestionRunId")
+          )
+      )
   `
 
   // Get top calibers by in-stock count
+  // ADR-015: Apply corrections overlay (IGNORE corrections exclude prices)
   const topCalibers = await prisma.$queryRaw<Array<{ caliber: string; count: bigint }>>`
     SELECT p.caliber, COUNT(DISTINCT p.id) as count
     FROM products p
@@ -434,6 +467,21 @@ async function getMarketActivityStats(): Promise<MarketActivityStats> {
       AND r."visibilityStatus" = 'ELIGIBLE'
       AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
       AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL)
+      -- ADR-015: Exclude prices with active IGNORE corrections
+      AND NOT EXISTS (
+        SELECT 1 FROM price_corrections pc
+        WHERE pc."revokedAt" IS NULL
+          AND pc.action = 'IGNORE'
+          AND pr."observedAt" >= pc."startTs"
+          AND pr."observedAt" < pc."endTs"
+          AND (
+            (pc."scopeType" = 'PRODUCT' AND pc."scopeId" = p.id) OR
+            (pc."scopeType" = 'RETAILER' AND pc."scopeId" = r.id) OR
+            (pc."scopeType" = 'SOURCE' AND pc."scopeId" = pr."sourceId") OR
+            (pc."scopeType" = 'AFFILIATE' AND pc."scopeId" = pr."affiliateId") OR
+            (pc."scopeType" = 'FEED_RUN' AND pr."ingestionRunId" IS NOT NULL AND pc."scopeId" = pr."ingestionRunId")
+          )
+      )
       AND p.caliber IS NOT NULL
     GROUP BY p.caliber
     ORDER BY count DESC

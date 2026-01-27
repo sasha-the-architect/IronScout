@@ -77,6 +77,7 @@ export async function checkPrice(
 
   // Get daily best prices per product for the caliber in trailing 30 days
   // Per spec: "One daily best price per product per caliber (lowest visible offer price on a given UTC calendar day)"
+  // ADR-015: Apply corrections overlay (IGNORE corrections exclude prices)
   const priceData = await prisma.$queryRawUnsafe<
     Array<{
       pricePerRound: any
@@ -101,6 +102,21 @@ export async function checkPrice(
         AND r."visibilityStatus" = 'ELIGIBLE'
         AND (mr.id IS NULL OR (mr."listingStatus" = 'LISTED' AND mr.status = 'ACTIVE'))
         AND (pr."affiliateFeedRunId" IS NULL OR afr."ignoredAt" IS NULL) -- ADR-015: Exclude ignored runs
+        -- ADR-015: Exclude prices with active IGNORE corrections
+        AND NOT EXISTS (
+          SELECT 1 FROM price_corrections pc
+          WHERE pc."revokedAt" IS NULL
+            AND pc.action = 'IGNORE'
+            AND pr."observedAt" >= pc."startTs"
+            AND pr."observedAt" < pc."endTs"
+            AND (
+              (pc."scopeType" = 'PRODUCT' AND pc."scopeId" = p.id) OR
+              (pc."scopeType" = 'RETAILER' AND pc."scopeId" = r.id) OR
+              (pc."scopeType" = 'SOURCE' AND pc."scopeId" = pr."sourceId") OR
+              (pc."scopeType" = 'AFFILIATE' AND pc."scopeId" = pr."affiliateId") OR
+              (pc."scopeType" = 'FEED_RUN' AND pr."ingestionRunId" IS NOT NULL AND pc."scopeId" = pr."ingestionRunId")
+            )
+        )
         AND (${caliberConditions.sql})
         ${brandCondition}
         ${grainCondition}
