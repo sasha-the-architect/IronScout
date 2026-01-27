@@ -315,6 +315,7 @@ export interface LensEvalTelemetry {
   lensSpecVersion: string
   timestamp: string // ISO-8601 UTC
   requestId: string
+  traceId?: string
 
   actor: {
     userIdHash?: string
@@ -354,6 +355,8 @@ export interface LensEvalTelemetry {
   config: {
     priceLookbackDays: number
     asOfTime: string // ISO-8601 UTC
+    eligibilityConfigVersion?: string
+    orderingConfigVersion?: string
   }
 
   eligibility: {
@@ -371,6 +374,18 @@ export interface LensEvalTelemetry {
       sortKeys: Record<string, unknown>
     }>
     finalProductIdsTopN?: string[]
+    offerSummary?: Array<{
+      productId: string
+      visibleOfferCount: number
+      aggregatedPrice: number | null
+      availabilityRank: number
+      pricePerRound: number | null
+      priceMeta: {
+        windowDays: number
+        sampleCount: number
+        asOf: string
+      }
+    }>
   }
 
   perf: {

@@ -169,6 +169,8 @@ export interface LensPipelineInput {
   userLensId?: string | null
   /** Request ID for telemetry correlation */
   requestId: string
+  /** Optional trace ID for telemetry correlation */
+  traceId?: string
   /** Optional user ID hash for telemetry */
   userIdHash?: string
   /** Optional session ID for telemetry */
@@ -231,6 +233,7 @@ export async function applyLensPipeline(input: LensPipelineInput): Promise<LensP
   // 7. Emit telemetry
   emitLensTelemetry({
     requestId: input.requestId,
+    traceId: input.traceId,
     userIdHash: input.userIdHash,
     sessionId: input.sessionId,
     query: input.query,

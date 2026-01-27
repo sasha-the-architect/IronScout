@@ -21,6 +21,7 @@ import { signalsToArray, SignalExtractionResult } from './signal-extractor'
 import { extractSortKeys } from './ordering'
 import { getCandidatesForTelemetry, getAllTriggerMatchesForTelemetry } from './selector'
 import { getPriceLookbackDays } from '../../config/tiers'
+import { getOfferSummary } from './aggregation'
 
 const log = loggers.search
 
@@ -69,6 +70,7 @@ export interface LensPerfTiming {
  */
 export interface LensEvalContext {
   requestId: string
+  traceId?: string
   userIdHash?: string
   sessionId?: string
   query: string
@@ -189,6 +191,40 @@ function buildTopResults(
 }
 
 /**
+ * Build the offer summary array for telemetry.
+ *
+ * @param products - Ordered products (already sorted)
+ * @param config - Telemetry config for window/asOf metadata
+ * @param topN - Number of products to include
+ */
+function buildOfferSummary(
+  products: AggregatedProduct[],
+  config: LensTelemetryConfig,
+  topN: number = 20
+): Array<{
+  productId: string
+  visibleOfferCount: number
+  aggregatedPrice: number | null
+  availabilityRank: number
+  pricePerRound: number | null
+  priceMeta: {
+    windowDays: number
+    sampleCount: number
+    asOf: string
+  }
+}> {
+  const asOf = config.asOfTime.toISOString()
+  return getOfferSummary(products, topN).map(summary => ({
+    ...summary,
+    priceMeta: {
+      windowDays: config.priceLookbackDays,
+      sampleCount: summary.visibleOfferCount,
+      asOf,
+    },
+  }))
+}
+
+/**
  * Build the lens_eval.v1 telemetry event.
  *
  * @param context - The evaluation context
@@ -204,6 +240,7 @@ export function buildLensEvalEvent(context: LensEvalContext): LensEvalTelemetry 
     lensSpecVersion: LENS_SPEC_VERSION,
     timestamp: new Date().toISOString(),
     requestId: context.requestId,
+    ...(context.traceId ? { traceId: context.traceId } : {}),
 
     actor: {
       userIdHash: context.userIdHash,
@@ -244,6 +281,8 @@ export function buildLensEvalEvent(context: LensEvalContext): LensEvalTelemetry 
     config: {
       priceLookbackDays: config.priceLookbackDays,
       asOfTime: config.asOfTime.toISOString(),
+      eligibilityConfigVersion: selectionResult.lens.version,
+      orderingConfigVersion: selectionResult.lens.version,
     },
 
     eligibility: {
@@ -262,6 +301,7 @@ export function buildLensEvalEvent(context: LensEvalContext): LensEvalTelemetry 
       returned: context.orderedProducts.length,
       top: buildTopResults(context.orderedProducts, selectionResult.lens.ordering, 20),
       finalProductIdsTopN: context.orderedProducts.slice(0, 20).map(p => p.productId),
+      offerSummary: buildOfferSummary(context.orderedProducts, config, 20),
     },
 
     perf: {
@@ -303,6 +343,7 @@ export function emitLensTelemetry(context: LensEvalContext): void {
       lens_ambiguous: context.selectionResult.metadata.ambiguous ?? false,
       lens_override: event.lens.overrideId !== null,
       intent_status: event.intent.status,
+      extractor_model_id: event.intent.extractorModelId,
       signal_count: event.intent.signals.length,
       // Per spec "Metrics (Required)"
       trigger_match_count: triggerMatchCount,
@@ -311,6 +352,7 @@ export function emitLensTelemetry(context: LensEvalContext): void {
       eligible: event.eligibility.eligible,
       zero_results: event.eligibility.zeroResults,
       returned: event.results.returned,
+      price_lookback_days: event.config.priceLookbackDays,
       latency_ms: event.perf.latencyMsTotal,
       status: event.status,
       // Full event for detailed analysis
