@@ -1,4 +1,9 @@
+import { Metadata } from 'next'
 import { UserSettings } from '@/components/dashboard/user-settings'
+
+export const metadata: Metadata = {
+  title: 'Settings',
+}
 
 export default function SettingsPage() {
   return (

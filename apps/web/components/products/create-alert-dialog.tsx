@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { saveItem, type Product } from '@/lib/api'
+import { saveItem, AuthError, type Product } from '@/lib/api'
 import { X, Bookmark, Eye } from 'lucide-react'
 import { toast } from 'sonner'
+import { refreshSessionToken, showSessionExpiredToast } from '@/hooks/use-session-refresh'
 
 interface SaveItemDialogProps {
   product: Product
@@ -29,18 +30,30 @@ export function SaveItemDialog({ product, open, onOpenChange }: SaveItemDialogPr
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const token = session?.accessToken
+
+  // Helper to get a valid token, refreshing if needed
+  const getValidToken = useCallback(async (): Promise<string | null> => {
+    if (token) return token
+    const refreshed = await refreshSessionToken()
+    if (!refreshed) {
+      showSessionExpiredToast()
+      return null
+    }
+    return refreshed
+  }, [token])
+
   const handleSave = async () => {
     setError(null)
 
-    const token = (session as any)?.accessToken
-    if (!token) {
-      router.push('/api/auth/signin')
+    const authToken = await getValidToken()
+    if (!authToken) {
       return
     }
 
     try {
       setLoading(true)
-      const result = await saveItem(token, product.id)
+      const result = await saveItem(authToken, product.id)
 
       if (result._meta.wasExisting) {
         toast.info('Already saved', {
@@ -60,9 +73,41 @@ export function SaveItemDialog({ product, open, onOpenChange }: SaveItemDialogPr
         })
       }
       onOpenChange(false)
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to save item')
-      setError(error.message || 'Failed to save item')
+    } catch (err: any) {
+      if (err instanceof AuthError) {
+        // Try refresh once
+        const newToken = await refreshSessionToken()
+        if (newToken) {
+          try {
+            const result = await saveItem(newToken, product.id)
+            if (result._meta.wasExisting) {
+              toast.info('Already saved', {
+                description: 'This item is already in your saved items.',
+                action: {
+                  label: 'View Saved',
+                  onClick: () => router.push('/dashboard/saved'),
+                },
+              })
+            } else {
+              toast.success('Item saved', {
+                description: 'IronScout will watch this item for you.',
+                action: {
+                  label: 'View Saved',
+                  onClick: () => router.push('/dashboard/saved'),
+                },
+              })
+            }
+            onOpenChange(false)
+            return
+          } catch {
+            // Retry failed
+          }
+        }
+        showSessionExpiredToast()
+        return
+      }
+      toast.error(err.message || 'Failed to save item')
+      setError(err.message || 'Failed to save item')
     } finally {
       setLoading(false)
     }

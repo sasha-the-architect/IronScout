@@ -387,9 +387,9 @@ export type UseMarketPulseResult = BaseHookResult<MarketPulseResponse>
 export type UseDealsResult = BaseHookResult<DealsResponse>
 export type UseSavingsResult = BaseHookResult<SavingsResponse>
 export type UseWatchlistResult = BaseHookResult<WatchlistResponse> & {
-  addItem: (productId: string, targetPrice?: number) => Promise<void>
-  removeItem: (id: string) => Promise<void>
-  updateItem: (id: string, updates: { targetPrice?: number | null }) => Promise<void>
+  addItem: (productId: string, targetPrice?: number) => Promise<boolean>
+  removeItem: (id: string) => Promise<boolean>
+  updateItem: (id: string, updates: { targetPrice?: number | null }) => Promise<boolean>
 }
 
 // ============================================================================

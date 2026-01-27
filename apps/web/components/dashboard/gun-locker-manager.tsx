@@ -44,6 +44,7 @@ import {
   removeAmmoPreference,
   updateAmmoPreferenceUseCase,
 } from '@/lib/api'
+import { refreshSessionToken, showSessionExpiredToast } from '@/hooks/use-session-refresh'
 import { Package, ExternalLink, ChevronDown } from 'lucide-react'
 import {
   Popover,
@@ -140,22 +141,29 @@ export function GunLockerManager() {
   const [ammoPreferences, setAmmoPreferences] = useState<AmmoPreferenceGroup[]>([])
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(false)
 
-  // Extract token from session
-  const token = (session as any)?.accessToken as string | undefined
+  // Extract token from session (properly typed in next-auth.d.ts)
+  const token = session?.accessToken
 
   // Fetch guns on mount
   useEffect(() => {
     if (status === 'loading') return
 
-    if (!token) {
-      // Session loaded but no token - stop loading
-      setIsLoading(false)
-      return
-    }
-
     const fetchGuns = async () => {
+      // Get token, trying to refresh if missing
+      let authToken: string | undefined = token
+      if (!authToken) {
+        // Try to refresh the session to get a new token
+        const refreshed = await refreshSessionToken()
+        if (!refreshed) {
+          // No token available - user needs to sign in
+          setIsLoading(false)
+          return
+        }
+        authToken = refreshed
+      }
+
       try {
-        const data = await getGunLocker(token)
+        const data = await getGunLocker(authToken)
         setGuns(data.guns || [])
       } catch (error) {
         console.error('Failed to fetch guns:', error)
@@ -174,15 +182,23 @@ export function GunLockerManager() {
       return
     }
 
-    if (!token) {
-      toast.error('Please sign in to add guns')
-      return
+    // Get token, trying to refresh if missing
+    let authToken: string | undefined = token
+    if (!authToken) {
+      // Try to refresh the session to get a new token
+      const refreshed = await refreshSessionToken()
+      if (!refreshed) {
+        // Refresh failed - show toast with sign in action
+        showSessionExpiredToast()
+        return
+      }
+      authToken = refreshed
     }
 
     setIsSubmitting(true)
     try {
       const data = await addGun(
-        token,
+        authToken,
         newGun.caliber as CaliberValue,
         newGun.nickname || null
       )

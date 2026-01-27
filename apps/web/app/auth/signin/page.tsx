@@ -11,16 +11,25 @@ import { Separator } from '@/components/ui/separator'
 import Link from 'next/link'
 import { BRAND_NAME } from '@/lib/brand'
 
+// Map reason codes to user-friendly messages
+const REASON_MESSAGES: Record<string, string> = {
+  session_expired: 'Your session has expired. Please sign in again to continue.',
+}
+
 function SignInForm() {
   const params = useSearchParams()
   const router = useRouter()
   const callbackUrl = params.get('callbackUrl') || '/dashboard'
   const error = params.get('error')
+  const reason = params.get('reason')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState(error || '')
+
+  // Get info message from reason parameter (not an error, just informational)
+  const infoMessage = reason ? REASON_MESSAGES[reason] : null
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,6 +63,14 @@ function SignInForm() {
           <CardDescription>Choose your preferred sign-in method</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Info message (e.g., session expired) */}
+          {infoMessage && (
+            <div className="bg-blue-500/15 text-blue-700 dark:text-blue-300 text-sm p-3 rounded-md">
+              {infoMessage}
+            </div>
+          )}
+
+          {/* Error message */}
           {errorMessage && (
             <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
               {errorMessage}

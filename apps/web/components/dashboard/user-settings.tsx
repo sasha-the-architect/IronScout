@@ -10,23 +10,14 @@ import { Input } from '@/components/ui/input'
 import { User, Mail, Bell, LogOut, Trash2, Shield, AlertTriangle, Clock, XCircle, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { createLogger } from '@/lib/logger'
+import {
+  checkDeletionEligibility,
+  requestAccountDeletion,
+  cancelAccountDeletion,
+  type DeletionEligibility,
+} from '@/lib/api'
 
 const logger = createLogger('user-settings')
-
-interface DeletionBlocker {
-  code: string
-  message: string
-  resolution?: string
-}
-
-interface DeletionEligibility {
-  eligible: boolean
-  blockers: DeletionBlocker[]
-  pendingDeletion: {
-    requestedAt: string
-    scheduledFor: string
-  } | null
-}
 
 export function UserSettings() {
   const { data: session } = useSession()
@@ -66,17 +57,16 @@ export function UserSettings() {
   }, [showDeleteDialog])
 
   const fetchDeletionEligibility = async () => {
+    const token = session?.accessToken
+    if (!token) {
+      logger.error('No access token available')
+      return
+    }
+
     setLoadingEligibility(true)
     try {
-      const res = await fetch('/api/users/me/deletion-eligibility', {
-        headers: {
-          'Authorization': `Bearer ${(session as any)?.accessToken}`
-        }
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setDeletionEligibility(data)
-      }
+      const data = await checkDeletionEligibility(token)
+      setDeletionEligibility(data)
     } catch (error) {
       logger.error('Failed to check deletion eligibility', {}, error)
     } finally {
@@ -90,50 +80,40 @@ export function UserSettings() {
       return
     }
 
+    const token = session?.accessToken
+    if (!token) {
+      setDeletionError('Please sign in again to continue')
+      return
+    }
+
     setDeletionLoading(true)
     setDeletionError(null)
 
     try {
-      const res = await fetch('/api/users/me/delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(session as any)?.accessToken}`
-        },
-        body: JSON.stringify({ confirmation: deleteConfirmation })
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        setDeletionError(data.error || 'Failed to initiate account deletion')
-        return
-      }
-
+      await requestAccountDeletion(token, deleteConfirmation)
       // Sign out after successful deletion request
       await signOut({ callbackUrl: '/?deleted=pending' })
     } catch (error) {
-      setDeletionError('An error occurred. Please try again.')
+      const message = error instanceof Error ? error.message : 'An error occurred. Please try again.'
+      setDeletionError(message)
     } finally {
       setDeletionLoading(false)
     }
   }
 
   const handleCancelDeletion = async () => {
+    const token = session?.accessToken
+    if (!token) {
+      logger.error('No access token available')
+      return
+    }
+
     setDeletionLoading(true)
     try {
-      const res = await fetch('/api/users/me/cancel-deletion', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${(session as any)?.accessToken}`
-        }
-      })
-
-      if (res.ok) {
-        // Refresh eligibility state
-        setDeletionEligibility(null)
-        fetchDeletionEligibility()
-      }
+      await cancelAccountDeletion(token)
+      // Refresh eligibility state
+      setDeletionEligibility(null)
+      fetchDeletionEligibility()
     } catch (error) {
       logger.error('Failed to cancel deletion', {}, error)
     } finally {

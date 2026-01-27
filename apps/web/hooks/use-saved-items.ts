@@ -7,11 +7,13 @@ import {
   saveItem,
   unsaveItem,
   updateSavedItemPrefs,
+  AuthError,
   type SavedItem,
   type SavedItemsResponse,
   type UpdateSavedItemPrefs,
 } from '@/lib/api'
 import { createLogger } from '@/lib/logger'
+import { refreshSessionToken, showSessionExpiredToast } from './use-session-refresh'
 
 const logger = createLogger('hooks:saved-items')
 
@@ -29,12 +31,12 @@ export interface UseSavedItemsResult {
   error: string | null
   /** Refetch the saved items list */
   refetch: () => Promise<void>
-  /** Save a product (idempotent) */
-  save: (productId: string) => Promise<SavedItem>
-  /** Unsave a product */
-  remove: (productId: string) => Promise<void>
-  /** Update notification preferences */
-  updatePrefs: (productId: string, prefs: UpdateSavedItemPrefs) => Promise<SavedItem>
+  /** Save a product (idempotent). Returns null if auth failed (toast shown). */
+  save: (productId: string) => Promise<SavedItem | null>
+  /** Unsave a product. Returns false if auth failed (toast shown). */
+  remove: (productId: string) => Promise<boolean>
+  /** Update notification preferences. Returns null if auth failed (toast shown). */
+  updatePrefs: (productId: string, prefs: UpdateSavedItemPrefs) => Promise<SavedItem | null>
   /** Check if a product is saved (uses local state, instant) */
   isSaved: (productId: string) => boolean
   /** Get saved item by productId (uses local state, instant) */
@@ -61,9 +63,22 @@ export function useSavedItems(): UseSavedItemsResult {
 
   // Memoize token extraction
   const token = useMemo(
-    () => (isE2E ? 'e2e-token' : ((session as any)?.accessToken as string | undefined)),
+    () => (isE2E ? 'e2e-token' : session?.accessToken),
     [isE2E, session]
   )
+
+  // Helper to get a valid token, refreshing if needed
+  const getValidToken = useCallback(async (): Promise<string | null> => {
+    if (isE2E) return 'e2e-token'
+    if (token) return token
+    // Try to refresh
+    const refreshed = await refreshSessionToken()
+    if (!refreshed) {
+      showSessionExpiredToast()
+      return null
+    }
+    return refreshed
+  }, [isE2E, token])
 
   // Build a lookup map for fast isSaved checks
   const savedItemsMap = useMemo(() => {
@@ -72,7 +87,8 @@ export function useSavedItems(): UseSavedItemsResult {
   }, [data?.items])
 
   const fetchSavedItems = useCallback(async () => {
-    if (!token) {
+    const authToken = await getValidToken()
+    if (!authToken) {
       logger.debug('No token available, skipping fetch')
       setLoading(false)
       return
@@ -81,17 +97,32 @@ export function useSavedItems(): UseSavedItemsResult {
     try {
       setLoading(true)
       setError(null)
-      logger.debug('Fetching saved items', { hasToken: !!token, tokenLength: token?.length })
-      const response = await getSavedItems(token)
+      logger.debug('Fetching saved items')
+      const response = await getSavedItems(authToken)
       setData(response)
     } catch (err) {
+      if (err instanceof AuthError) {
+        // Token was invalid - try refresh once
+        const newToken = await refreshSessionToken()
+        if (newToken) {
+          try {
+            const response = await getSavedItems(newToken)
+            setData(response)
+            return
+          } catch {
+            // Retry failed
+          }
+        }
+        showSessionExpiredToast()
+        return
+      }
       const message = err instanceof Error ? err.message : 'Failed to load saved items'
       logger.error('Failed to fetch saved items', { message }, err)
       setError(message)
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [getValidToken])
 
   // Fetch on mount or when token changes
   useEffect(() => {
@@ -117,14 +148,15 @@ export function useSavedItems(): UseSavedItemsResult {
   }, [token, status, fetchSavedItems])
 
   const save = useCallback(
-    async (productId: string): Promise<SavedItem> => {
-      if (!token) {
-        throw new Error('Not authenticated')
+    async (productId: string): Promise<SavedItem | null> => {
+      const authToken = await getValidToken()
+      if (!authToken) {
+        return null // Toast already shown
       }
 
       try {
         setError(null)
-        const response = await saveItem(token, productId)
+        const response = await saveItem(authToken, productId)
 
         // Update local state
         setData((prev) => {
@@ -145,23 +177,28 @@ export function useSavedItems(): UseSavedItemsResult {
 
         return response
       } catch (err) {
+        if (err instanceof AuthError) {
+          showSessionExpiredToast()
+          return null
+        }
         const message = err instanceof Error ? err.message : 'Failed to save item'
         setError(message)
         throw err
       }
     },
-    [token]
+    [getValidToken]
   )
 
   const remove = useCallback(
-    async (productId: string): Promise<void> => {
-      if (!token) {
-        throw new Error('Not authenticated')
+    async (productId: string): Promise<boolean> => {
+      const authToken = await getValidToken()
+      if (!authToken) {
+        return false // Toast already shown
       }
 
       try {
         setError(null)
-        await unsaveItem(token, productId)
+        await unsaveItem(authToken, productId)
 
         // Optimistically update local state
         setData((prev) =>
@@ -177,24 +214,30 @@ export function useSavedItems(): UseSavedItemsResult {
               }
             : null
         )
+        return true
       } catch (err) {
+        if (err instanceof AuthError) {
+          showSessionExpiredToast()
+          return false
+        }
         const message = err instanceof Error ? err.message : 'Failed to remove item'
         setError(message)
         throw err
       }
     },
-    [token]
+    [getValidToken]
   )
 
   const updatePrefs = useCallback(
-    async (productId: string, prefs: UpdateSavedItemPrefs): Promise<SavedItem> => {
-      if (!token) {
-        throw new Error('Not authenticated')
+    async (productId: string, prefs: UpdateSavedItemPrefs): Promise<SavedItem | null> => {
+      const authToken = await getValidToken()
+      if (!authToken) {
+        return null // Toast already shown
       }
 
       try {
         setError(null)
-        const updated = await updateSavedItemPrefs(token, productId, prefs)
+        const updated = await updateSavedItemPrefs(authToken, productId, prefs)
 
         // Update local state
         setData((prev) =>
@@ -210,12 +253,16 @@ export function useSavedItems(): UseSavedItemsResult {
 
         return updated
       } catch (err) {
+        if (err instanceof AuthError) {
+          showSessionExpiredToast()
+          return null
+        }
         const message = err instanceof Error ? err.message : 'Failed to update preferences'
         setError(message)
         throw err
       }
     },
-    [token]
+    [getValidToken]
   )
 
   const isSaved = useCallback(

@@ -1,21 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Bell, ExternalLink, Trash2, Edit2, Check, X, Filter } from 'lucide-react'
-import { getUserAlerts, updateAlert, deleteAlert, type Alert as AlertType } from '@/lib/api'
+import { getUserAlerts, updateAlert, deleteAlert, AuthError, type Alert as AlertType } from '@/lib/api'
 import { ProductImage } from '@/components/products/product-image'
 import { toast } from 'sonner'
 import { createLogger } from '@/lib/logger'
+import { refreshSessionToken, showSessionExpiredToast } from '@/hooks/use-session-refresh'
 
 const logger = createLogger('components:alerts-manager')
 
 export function AlertsManager() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [alerts, setAlerts] = useState<AlertType[]>([])
   const [filteredAlerts, setFilteredAlerts] = useState<AlertType[]>([])
   const [loading, setLoading] = useState(true)
@@ -24,26 +25,69 @@ export function AlertsManager() {
   const [editPrice, setEditPrice] = useState<string>('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'triggered'>('all')
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchAlerts()
+  const token = session?.accessToken
+
+  // Helper to get a valid token, refreshing if needed
+  const getValidToken = useCallback(async (): Promise<string | null> => {
+    if (token) return token
+    const refreshed = await refreshSessionToken()
+    if (!refreshed) {
+      showSessionExpiredToast()
+      return null
     }
-  }, [session])
+    return refreshed
+  }, [token])
+
+  useEffect(() => {
+    if (status === 'loading') return
+    if (status === 'unauthenticated') {
+      setLoading(false)
+      return
+    }
+    if (token) {
+      fetchAlerts()
+    } else {
+      // Authenticated but no token - try to get one
+      getValidToken().then((t) => {
+        if (t) fetchAlerts()
+        else setLoading(false)
+      })
+    }
+  }, [token, status])
 
   useEffect(() => {
     filterAlerts()
   }, [alerts, filterStatus])
 
   const fetchAlerts = async () => {
-    const token = (session as any)?.accessToken
-    if (!token) return
+    const authToken = await getValidToken()
+    if (!authToken) {
+      setLoading(false)
+      return
+    }
 
     try {
       setLoading(true)
-      const data = await getUserAlerts(token, false)
+      const data = await getUserAlerts(authToken, false)
       setAlerts(data)
       setError(null)
     } catch (err) {
+      if (err instanceof AuthError) {
+        // Try refresh once
+        const newToken = await refreshSessionToken()
+        if (newToken) {
+          try {
+            const data = await getUserAlerts(newToken, false)
+            setAlerts(data)
+            setError(null)
+            return
+          } catch {
+            // Retry failed
+          }
+        }
+        showSessionExpiredToast()
+        return
+      }
       setError('Failed to load alerts')
       logger.error('Failed to load alerts', {}, err)
     } finally {
@@ -69,31 +113,39 @@ export function AlertsManager() {
   }
 
   const handleDelete = async (alertId: string) => {
-    const token = (session as any)?.accessToken
-    if (!token) return
+    const authToken = await getValidToken()
+    if (!authToken) return
     if (!confirm('Are you sure you want to delete this alert?')) return
 
     try {
-      await deleteAlert(alertId, token)
+      await deleteAlert(alertId, authToken)
       setAlerts(alerts.filter(a => a.id !== alertId))
       toast.success('Alert deleted')
     } catch (err) {
+      if (err instanceof AuthError) {
+        showSessionExpiredToast()
+        return
+      }
       logger.error('Failed to delete alert', {}, err)
       toast.error('Failed to delete alert')
     }
   }
 
   const handleToggleActive = async (alert: AlertType) => {
-    const token = (session as any)?.accessToken
-    if (!token) return
+    const authToken = await getValidToken()
+    if (!authToken) return
 
     try {
-      await updateAlert(alert.id, { isActive: !alert.isActive }, token)
+      await updateAlert(alert.id, { isActive: !alert.isActive }, authToken)
       setAlerts(alerts.map(a =>
         a.id === alert.id ? { ...a, isActive: !a.isActive } : a
       ))
       toast.success(alert.isActive ? 'Alert paused' : 'Alert activated')
     } catch (err) {
+      if (err instanceof AuthError) {
+        showSessionExpiredToast()
+        return
+      }
       logger.error('Failed to toggle alert', {}, err)
       toast.error('Failed to update alert')
     }
@@ -110,8 +162,8 @@ export function AlertsManager() {
   }
 
   const saveEdit = async (alertId: string) => {
-    const token = (session as any)?.accessToken
-    if (!token) return
+    const authToken = await getValidToken()
+    if (!authToken) return
 
     try {
       const newPrice = parseFloat(editPrice)
@@ -120,7 +172,7 @@ export function AlertsManager() {
         return
       }
 
-      await updateAlert(alertId, { targetPrice: newPrice }, token)
+      await updateAlert(alertId, { targetPrice: newPrice }, authToken)
       setAlerts(alerts.map(a =>
         a.id === alertId ? { ...a, targetPrice: newPrice } : a
       ))
@@ -128,6 +180,10 @@ export function AlertsManager() {
       setEditPrice('')
       toast.success('Target price updated')
     } catch (err) {
+      if (err instanceof AuthError) {
+        showSessionExpiredToast()
+        return
+      }
       logger.error('Failed to update alert', {}, err)
       toast.error('Failed to update alert')
     }

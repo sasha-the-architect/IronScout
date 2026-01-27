@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useEffect, useState, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import {
   getWatchlist,
   addToWatchlist,
@@ -11,11 +11,9 @@ import {
 } from '@/lib/api'
 import type { WatchlistResponse, UseWatchlistResult } from '@/types/dashboard'
 import { createLogger } from '@/lib/logger'
+import { refreshSessionToken, showSessionExpiredToast } from './use-session-refresh'
 
 const logger = createLogger('hooks:watchlist')
-
-// Max retry attempts for auth errors
-const MAX_AUTH_RETRIES = 1
 
 /**
  * Hook for managing watchlist
@@ -23,15 +21,27 @@ const MAX_AUTH_RETRIES = 1
  * Premium: Unlimited items, collections
  */
 export function useWatchlist(): UseWatchlistResult {
-  const { data: session, update } = useSession()
+  const { data: session } = useSession()
   const [data, setData] = useState<WatchlistResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const authRetryCount = useRef(0)
+
+  const token = session?.accessToken
+
+  // Helper to get a valid token, refreshing if needed
+  const getValidToken = useCallback(async (): Promise<string | null> => {
+    if (token) return token
+    const refreshed = await refreshSessionToken()
+    if (!refreshed) {
+      showSessionExpiredToast()
+      return null
+    }
+    return refreshed
+  }, [token])
 
   const fetchWatchlist = useCallback(async () => {
-    const token = (session as any)?.accessToken
-    if (!token) {
+    const authToken = await getValidToken()
+    if (!authToken) {
       setLoading(false)
       return
     }
@@ -39,27 +49,22 @@ export function useWatchlist(): UseWatchlistResult {
     try {
       setLoading(true)
       setError(null)
-      const response = await getWatchlist(token)
+      const response = await getWatchlist(authToken)
       setData(response)
-      authRetryCount.current = 0 // Reset on success
     } catch (err) {
-      // Handle expired/invalid session - attempt refresh first
       if (err instanceof AuthError) {
-        if (authRetryCount.current < MAX_AUTH_RETRIES) {
-          authRetryCount.current++
-          logger.info('Token rejected, attempting session refresh', {
-            attempt: authRetryCount.current,
-          })
-
-          const updatedSession = await update()
-          if (updatedSession && !(updatedSession as any).error) {
-            logger.info('Session refreshed, retrying fetch')
-            return // Retry will happen via useEffect when token changes
+        // Try refresh once
+        const newToken = await refreshSessionToken()
+        if (newToken) {
+          try {
+            const response = await getWatchlist(newToken)
+            setData(response)
+            return
+          } catch {
+            // Retry failed
           }
         }
-
-        logger.info('Session refresh failed, signing out')
-        signOut({ callbackUrl: '/auth/signin' })
+        showSessionExpiredToast()
         return
       }
       logger.error('Failed to fetch watchlist', {}, err)
@@ -67,7 +72,7 @@ export function useWatchlist(): UseWatchlistResult {
     } finally {
       setLoading(false)
     }
-  }, [(session as any)?.accessToken, update])
+  }, [getValidToken])
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -76,36 +81,41 @@ export function useWatchlist(): UseWatchlistResult {
   }, [session?.user?.id, fetchWatchlist])
 
   const addItem = useCallback(
-    async (productId: string, targetPrice?: number) => {
-      const token = (session as any)?.accessToken
-      if (!token) {
-        throw new Error('Not authenticated')
+    async (productId: string, targetPrice?: number): Promise<boolean> => {
+      const authToken = await getValidToken()
+      if (!authToken) {
+        return false // Toast already shown
       }
 
       try {
         setError(null)
-        await addToWatchlist(token, productId, targetPrice)
+        await addToWatchlist(authToken, productId, targetPrice)
         // Refetch to get updated list
         await fetchWatchlist()
+        return true
       } catch (err) {
+        if (err instanceof AuthError) {
+          showSessionExpiredToast()
+          return false
+        }
         const message = err instanceof Error ? err.message : 'Failed to add item'
         setError(message)
         throw err
       }
     },
-    [(session as any)?.accessToken, fetchWatchlist]
+    [getValidToken, fetchWatchlist]
   )
 
   const removeItem = useCallback(
-    async (id: string) => {
-      const token = (session as any)?.accessToken
-      if (!token) {
-        throw new Error('Not authenticated')
+    async (id: string): Promise<boolean> => {
+      const authToken = await getValidToken()
+      if (!authToken) {
+        return false // Toast already shown
       }
 
       try {
         setError(null)
-        await removeFromWatchlist(id, token)
+        await removeFromWatchlist(id, authToken)
         // Optimistically update local state
         setData((prev) =>
           prev
@@ -120,34 +130,44 @@ export function useWatchlist(): UseWatchlistResult {
               }
             : null
         )
+        return true
       } catch (err) {
+        if (err instanceof AuthError) {
+          showSessionExpiredToast()
+          return false
+        }
         const message = err instanceof Error ? err.message : 'Failed to remove item'
         setError(message)
         throw err
       }
     },
-    [(session as any)?.accessToken]
+    [getValidToken]
   )
 
   const updateItem = useCallback(
-    async (id: string, updates: { targetPrice?: number | null }) => {
-      const token = (session as any)?.accessToken
-      if (!token) {
-        throw new Error('Not authenticated')
+    async (id: string, updates: { targetPrice?: number | null }): Promise<boolean> => {
+      const authToken = await getValidToken()
+      if (!authToken) {
+        return false // Toast already shown
       }
 
       try {
         setError(null)
-        await updateWatchlistItem(id, updates, token)
+        await updateWatchlistItem(id, updates, authToken)
         // Refetch to get updated item
         await fetchWatchlist()
+        return true
       } catch (err) {
+        if (err instanceof AuthError) {
+          showSessionExpiredToast()
+          return false
+        }
         const message = err instanceof Error ? err.message : 'Failed to update item'
         setError(message)
         throw err
       }
     },
-    [(session as any)?.accessToken, fetchWatchlist]
+    [getValidToken, fetchWatchlist]
   )
 
   return {

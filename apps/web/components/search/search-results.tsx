@@ -43,9 +43,9 @@ export async function SearchResults({ searchParams }: SearchResultsProps) {
   const page = parseInt(searchParams.page || '1')
   const sortBy = searchParams.sortBy || 'relevance'
   
-  // Get session for user tier and token
+  // Get session for user tier and token (server-side auth handles refresh)
   const session = await auth()
-  const accessToken = (session as any)?.accessToken
+  const accessToken = session?.accessToken
   
   // Build explicit filters from URL params
   const explicitFilters: ExplicitFilters = {}

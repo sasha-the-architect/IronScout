@@ -1,4 +1,9 @@
+import { Metadata } from 'next'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'Billing',
+}
 
 /**
  * V1: Billing page is not available.

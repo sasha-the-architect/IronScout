@@ -1,38 +1,82 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Bell, ExternalLink, Trash2 } from 'lucide-react'
-import { getUserAlerts, deleteAlert, type Alert } from '@/lib/api'
+import { getUserAlerts, deleteAlert, AuthError, type Alert } from '@/lib/api'
 import { createLogger } from '@/lib/logger'
+import { refreshSessionToken, showSessionExpiredToast } from '@/hooks/use-session-refresh'
 
 const logger = createLogger('components:recent-alerts')
 
 export function RecentAlerts() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchAlerts()
+  const token = session?.accessToken
+
+  // Helper to get a valid token, refreshing if needed
+  const getValidToken = useCallback(async (): Promise<string | null> => {
+    if (token) return token
+    const refreshed = await refreshSessionToken()
+    if (!refreshed) {
+      showSessionExpiredToast()
+      return null
     }
-  }, [session])
+    return refreshed
+  }, [token])
+
+  useEffect(() => {
+    if (status === 'loading') return
+    if (status === 'unauthenticated') {
+      setLoading(false)
+      return
+    }
+    if (token) {
+      fetchAlerts()
+    } else {
+      // Authenticated but no token - try to get one
+      getValidToken().then((t) => {
+        if (t) fetchAlerts()
+        else setLoading(false)
+      })
+    }
+  }, [token, status])
 
   const fetchAlerts = async () => {
-    const token = (session as any)?.accessToken
-    if (!token) return
+    const authToken = await getValidToken()
+    if (!authToken) {
+      setLoading(false)
+      return
+    }
 
     try {
       setLoading(true)
-      const data = await getUserAlerts(token, true)
+      const data = await getUserAlerts(authToken, true)
       setAlerts(data.slice(0, 3)) // Show only 3 most recent
       setError(null)
     } catch (err) {
+      if (err instanceof AuthError) {
+        // Try refresh once
+        const newToken = await refreshSessionToken()
+        if (newToken) {
+          try {
+            const data = await getUserAlerts(newToken, true)
+            setAlerts(data.slice(0, 3))
+            setError(null)
+            return
+          } catch {
+            // Retry failed
+          }
+        }
+        showSessionExpiredToast()
+        return
+      }
       setError('Failed to load alerts')
       logger.error('Failed to load alerts', {}, err)
     } finally {
@@ -41,13 +85,17 @@ export function RecentAlerts() {
   }
 
   const handleDelete = async (alertId: string) => {
-    const token = (session as any)?.accessToken
-    if (!token) return
+    const authToken = await getValidToken()
+    if (!authToken) return
 
     try {
-      await deleteAlert(alertId, token)
+      await deleteAlert(alertId, authToken)
       setAlerts(alerts.filter(a => a.id !== alertId))
     } catch (err) {
+      if (err instanceof AuthError) {
+        showSessionExpiredToast()
+        return
+      }
       logger.error('Failed to delete alert', {}, err)
     }
   }

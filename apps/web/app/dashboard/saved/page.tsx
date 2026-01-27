@@ -1,4 +1,9 @@
+import { Metadata } from 'next'
 import { SavedItemsManager } from '@/components/dashboard/saved-items-manager'
+
+export const metadata: Metadata = {
+  title: 'Watchlist',
+}
 
 export default function WatchlistPage() {
   return (

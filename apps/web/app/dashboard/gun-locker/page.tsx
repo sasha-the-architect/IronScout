@@ -1,4 +1,9 @@
+import { Metadata } from 'next'
 import { GunLockerManager } from '@/components/dashboard/gun-locker-manager'
+
+export const metadata: Metadata = {
+  title: 'Gun Locker',
+}
 
 export default function GunLockerPage() {
   return (

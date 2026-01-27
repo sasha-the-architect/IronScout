@@ -1,7 +1,15 @@
+import { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { SidebarNav } from '@/components/layout/sidebar-nav'
 import { SearchLoadingProvider } from '@/components/search/search-loading-context'
+
+export const metadata: Metadata = {
+  title: {
+    template: '%s - IronScout',
+    default: 'My Loadout - IronScout',
+  },
+}
 
 export default async function DashboardLayout({
   children,

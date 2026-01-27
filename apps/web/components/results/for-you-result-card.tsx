@@ -3,10 +3,11 @@
 import { useCallback } from 'react'
 import { ResultCard, type CardBadge } from './result-card'
 import type { ProductFeedItem } from '@/types/dashboard'
-import { addToWatchlist, removeFromWatchlist } from '@/lib/api'
+import { addToWatchlist, removeFromWatchlist, AuthError } from '@/lib/api'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { createLogger } from '@/lib/logger'
+import { refreshSessionToken, showSessionExpiredToast } from '@/hooks/use-session-refresh'
 
 const logger = createLogger('for-you-result-card')
 
@@ -32,15 +33,26 @@ export function ForYouResultCard({
   onTrackChange,
 }: ForYouResultCardProps) {
   const { data: session } = useSession()
-  const accessToken = (session as any)?.accessToken
+  const accessToken = session?.accessToken
+
+  // Helper to get a valid token, refreshing if needed
+  const getValidToken = useCallback(async (): Promise<string | null> => {
+    if (accessToken) return accessToken
+    const refreshed = await refreshSessionToken()
+    if (!refreshed) {
+      showSessionExpiredToast()
+      return null
+    }
+    return refreshed
+  }, [accessToken])
 
   // Calculate price per round (fallback to total price / default round count)
   const pricePerRound = item.pricePerRound ?? (item.price / (item.product.roundCount || 50))
 
   // Handle track toggle
   const handleTrackToggle = useCallback(async (id: string) => {
-    if (!accessToken) {
-      toast.error('Please sign in to create alerts')
+    const token = await getValidToken()
+    if (!token) {
       return
     }
 
@@ -48,17 +60,21 @@ export function ForYouResultCard({
       if (item.isWatched) {
         // Note: For legacy watchlist API, we need the watchlist item ID, not product ID
         // This may need adjustment based on actual API
-        await removeFromWatchlist(item.id, accessToken)
+        await removeFromWatchlist(item.id, token)
         onTrackChange?.(item.product.id, false)
       } else {
-        await addToWatchlist(accessToken, item.product.id)
+        await addToWatchlist(token, item.product.id)
         onTrackChange?.(item.product.id, true)
       }
     } catch (error) {
+      if (error instanceof AuthError) {
+        showSessionExpiredToast()
+        return
+      }
       logger.error('Failed to toggle tracking', {}, error)
       toast.error('Failed to update alert')
     }
-  }, [accessToken, item.isWatched, item.id, item.product.id, onTrackChange])
+  }, [getValidToken, item.isWatched, item.id, item.product.id, onTrackChange])
 
   return (
     <ResultCard

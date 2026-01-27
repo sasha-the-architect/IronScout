@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { getSavings } from '@/lib/api'
+import { getSavings, AuthError } from '@/lib/api'
 import type { SavingsResponse, UseSavingsResult } from '@/types/dashboard'
 import { createLogger } from '@/lib/logger'
+import { refreshSessionToken, showSessionExpiredToast } from './use-session-refresh'
 
 const logger = createLogger('hooks:savings')
 
@@ -19,11 +20,22 @@ export function useSavings(): UseSavingsResult {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Extract access token from session (set by auth callback)
-  const token = useMemo(() => (session as any)?.accessToken as string | undefined, [session])
+  const token = session?.accessToken
+
+  // Helper to get a valid token, refreshing if needed
+  const getValidToken = useCallback(async (): Promise<string | null> => {
+    if (token) return token
+    const refreshed = await refreshSessionToken()
+    if (!refreshed) {
+      showSessionExpiredToast()
+      return null
+    }
+    return refreshed
+  }, [token])
 
   const fetchSavings = useCallback(async () => {
-    if (!token) {
+    const authToken = await getValidToken()
+    if (!authToken) {
       setLoading(false)
       return
     }
@@ -31,15 +43,30 @@ export function useSavings(): UseSavingsResult {
     try {
       setLoading(true)
       setError(null)
-      const response = await getSavings(token)
+      const response = await getSavings(authToken)
       setData(response)
     } catch (err) {
+      if (err instanceof AuthError) {
+        // Try refresh once
+        const newToken = await refreshSessionToken()
+        if (newToken) {
+          try {
+            const response = await getSavings(newToken)
+            setData(response)
+            return
+          } catch {
+            // Retry failed
+          }
+        }
+        showSessionExpiredToast()
+        return
+      }
       logger.error('Failed to fetch savings', {}, err)
       setError(err instanceof Error ? err.message : 'Failed to load savings')
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [getValidToken])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -50,10 +77,13 @@ export function useSavings(): UseSavingsResult {
     if (token) {
       fetchSavings()
     } else {
-      // Authenticated but no token - stop loading
-      setLoading(false)
+      // Authenticated but no token - try to get one
+      getValidToken().then((t) => {
+        if (t) fetchSavings()
+        else setLoading(false)
+      })
     }
-  }, [token, status, fetchSavings])
+  }, [token, status, fetchSavings, getValidToken])
 
   return { data, loading, error, refetch: fetchSavings }
 }

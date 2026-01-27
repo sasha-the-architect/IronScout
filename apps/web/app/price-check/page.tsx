@@ -77,8 +77,8 @@ export default function PriceCheckPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Extract token from session
-  const token = (session as any)?.accessToken as string | undefined
+  // Extract token from session (price check works without auth, just with less detail)
+  const token = session?.accessToken
 
   // Handle barcode scan
   const handleScan = async (code: string) => {

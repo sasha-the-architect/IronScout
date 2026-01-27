@@ -1,7 +1,13 @@
 import { Suspense } from 'react'
+import { Metadata } from 'next'
 import { SearchResults } from '@/components/search/search-results'
 import { UnifiedSearch } from '@/components/search/unified-search'
 import { SearchLoadingOverlay } from '@/components/search/search-loading-overlay'
+
+export const metadata: Metadata = {
+  title: 'Search - IronScout',
+  description: 'Search and compare ammunition prices across retailers.',
+}
 
 interface SearchPageProps {
   searchParams: Promise<{

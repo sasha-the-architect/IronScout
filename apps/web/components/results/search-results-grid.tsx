@@ -7,11 +7,12 @@ import { SearchResultRow } from './search-result-row'
 import { ResultCardSkeleton } from './result-card'
 import { ResultTableHeader, ResultRowSkeleton, type GridSort } from './result-row'
 import type { Product } from '@/lib/api'
-import { getSavedItems } from '@/lib/api'
+import { getSavedItems, AuthError } from '@/lib/api'
 import { useSession } from 'next-auth/react'
 import { useViewPreference } from '@/hooks/use-view-preference'
 import { useSearchLoading } from '@/components/search/search-loading-context'
 import { createLogger } from '@/lib/logger'
+import { refreshSessionToken, showSessionExpiredToast } from '@/hooks/use-session-refresh'
 
 const logger = createLogger('search-results-grid')
 
@@ -59,7 +60,19 @@ export function SearchResultsGrid({
 }: SearchResultsGridProps) {
   const { data: session } = useSession()
   const isE2E = process.env.NEXT_PUBLIC_E2E_TEST_MODE === 'true'
-  const accessToken = (session as any)?.accessToken || (isE2E ? 'e2e-token' : undefined)
+  const accessToken = session?.accessToken || (isE2E ? 'e2e-token' : undefined)
+
+  // Helper to get a valid token, refreshing if needed
+  const getValidToken = useCallback(async (): Promise<string | null> => {
+    if (isE2E) return 'e2e-token'
+    if (accessToken) return accessToken
+    const refreshed = await refreshSessionToken()
+    if (!refreshed) {
+      showSessionExpiredToast()
+      return null
+    }
+    return refreshed
+  }, [isE2E, accessToken])
   const searchParams = useSearchParams()
   const { navigateWithLoading } = useSearchLoading()
 
@@ -100,21 +113,27 @@ export function SearchResultsGrid({
 
   // Load saved items on mount
   useEffect(() => {
-    if (!accessToken) return
+    const loadSavedItems = async () => {
+      const token = await getValidToken()
+      if (!token) return
 
-    setLoadingTracked(true)
-    getSavedItems(accessToken)
-      .then((response) => {
+      setLoadingTracked(true)
+      try {
+        const response = await getSavedItems(token)
         const savedIds = new Set(response.items.map((item) => item.productId))
         setTrackedIds(savedIds)
-      })
-      .catch((error) => {
+      } catch (error) {
+        if (error instanceof AuthError) {
+          showSessionExpiredToast()
+          return
+        }
         logger.error('Failed to load saved items', {}, error)
-      })
-      .finally(() => {
+      } finally {
         setLoadingTracked(false)
-      })
-  }, [accessToken])
+      }
+    }
+    loadSavedItems()
+  }, [getValidToken])
 
   // Handle track state change
   const handleTrackChange = useCallback((productId: string, isTracked: boolean) => {

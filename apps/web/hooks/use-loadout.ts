@@ -3,8 +3,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { createLogger } from '@/lib/logger'
+import { refreshSessionToken, showSessionExpiredToast } from '@/hooks/use-session-refresh'
+import { env } from '@/lib/env'
 
 const logger = createLogger('hooks:loadout')
+
+// Backend API URL
+const API_BASE_URL = env.NEXT_PUBLIC_API_URL
 
 // Max retry attempts for auth errors
 const MAX_AUTH_RETRIES = 1
@@ -103,59 +108,66 @@ export interface UseLoadoutResult {
  * - Market activity stats
  */
 export function useLoadout(): UseLoadoutResult {
-  const { data: session, status, update } = useSession()
+  const { data: session, status } = useSession()
   const [data, setData] = useState<LoadoutData | undefined>(undefined)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | undefined>(undefined)
   const authRetryCount = useRef(0)
 
   // Extract token from session
-  const token = (session as any)?.accessToken as string | undefined
+  const token = session?.accessToken
 
   const fetchData = useCallback(async () => {
-    // If not authenticated, show empty state
-    if (!token) {
-      setData({
-        gunLocker: { firearms: [], totalAmmoItems: 0 },
-        watching: { items: [], totalCount: 0 },
-        marketActivity: {
-          retailersTracked: 0,
-          itemsInStock: 0,
-          lastUpdated: new Date().toISOString(),
-          topCalibers: [],
-        },
-        lastUpdatedAt: new Date().toISOString(),
-      })
-      setIsLoading(false)
-      return
+    // Get token, trying to refresh if missing
+    let authToken: string | undefined = token
+    if (!authToken) {
+      // Try to refresh the session to get a new token
+      const refreshed = await refreshSessionToken()
+      if (!refreshed) {
+        // No token available - show empty state for unauthenticated users
+        setData({
+          gunLocker: { firearms: [], totalAmmoItems: 0 },
+          watching: { items: [], totalCount: 0 },
+          marketActivity: {
+            retailersTracked: 0,
+            itemsInStock: 0,
+            lastUpdated: new Date().toISOString(),
+            topCalibers: [],
+          },
+          lastUpdatedAt: new Date().toISOString(),
+        })
+        setIsLoading(false)
+        return
+      }
+      authToken = refreshed
     }
 
     try {
-      const res = await fetch('/api/dashboard/loadout', {
+      const res = await fetch(`${API_BASE_URL}/api/dashboard/loadout`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
         },
-        credentials: 'include',
       })
 
       if (res.status === 401) {
-        // Handle expired/invalid session
+        // Handle expired/invalid session - try refresh once
         if (authRetryCount.current < MAX_AUTH_RETRIES) {
           authRetryCount.current++
           logger.info('Token rejected, attempting session refresh', {
             attempt: authRetryCount.current,
           })
 
-          const updatedSession = await update()
-
-          if (updatedSession && !(updatedSession as any).error) {
+          const refreshed = await refreshSessionToken()
+          if (refreshed) {
             logger.info('Session refreshed, retrying fetch')
+            // Retry will happen on next render due to token change
             return
           }
         }
 
-        logger.info('Session refresh failed, signing out')
-        signOut({ callbackUrl: '/auth/signin' })
+        logger.info('Session refresh failed, showing toast')
+        showSessionExpiredToast()
         return
       }
 
@@ -173,7 +185,7 @@ export function useLoadout(): UseLoadoutResult {
     } finally {
       setIsLoading(false)
     }
-  }, [token, update])
+  }, [token])
 
   // Fetch on mount and when token changes
   useEffect(() => {
