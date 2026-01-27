@@ -1,7 +1,7 @@
 import { logger } from './logger'
+import { env, isE2E } from './env'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const E2E_TEST_MODE = process.env.NEXT_PUBLIC_E2E_TEST_MODE === 'true'
+const API_BASE_URL = env.NEXT_PUBLIC_API_URL
 
 /**
  * Custom error class for authentication failures (401)
@@ -38,6 +38,75 @@ async function handleAuthResponse(response: Response, errorMessage: string): Pro
   if (!response.ok) {
     throw new Error(errorMessage)
   }
+}
+
+// Session refresh helpers - imported dynamically to avoid circular deps
+let refreshSessionToken: (() => Promise<string | null>) | null = null
+let showSessionExpiredToast: (() => void) | null = null
+
+/**
+ * Initialize session refresh helpers (called from client components)
+ * This avoids importing client-only code at module level
+ */
+export function initSessionHelpers(
+  refreshFn: () => Promise<string | null>,
+  toastFn: () => void
+) {
+  refreshSessionToken = refreshFn
+  showSessionExpiredToast = toastFn
+}
+
+/**
+ * Make an authenticated API request with automatic token refresh on 401.
+ * If the first request fails with 401, attempts to refresh the token and retry.
+ * If refresh fails, shows a toast prompting user to sign in.
+ *
+ * @param url - Full URL to fetch
+ * @param token - Current access token
+ * @param options - Fetch options (method, body, etc.)
+ * @returns Response object
+ */
+export async function fetchWithAuth(
+  url: string,
+  token: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  // First attempt
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...buildAuthHeaders(token),
+      ...options.headers,
+    },
+  })
+
+  // If not 401 or no refresh helper available, return as-is
+  if (response.status !== 401 || !refreshSessionToken) {
+    return response
+  }
+
+  // Try to refresh the token
+  logger.api.info('API returned 401, attempting token refresh')
+  const newToken = await refreshSessionToken()
+
+  if (!newToken) {
+    // Refresh failed - show toast and return original 401 response
+    logger.api.warn('Token refresh failed, prompting user to sign in')
+    if (showSessionExpiredToast) {
+      showSessionExpiredToast()
+    }
+    return response
+  }
+
+  // Retry with new token
+  logger.api.info('Token refreshed, retrying request')
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...buildAuthHeaders(newToken),
+      ...options.headers,
+    },
+  })
 }
 
 /**
@@ -565,7 +634,7 @@ function getE2eSearchResponse(params: AISearchParams): AISearchResponse {
  * AI-powered semantic search
  */
 export async function aiSearch(params: AISearchParams): Promise<AISearchResponse> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     return getE2eSearchResponse(params)
   }
 
@@ -1056,7 +1125,7 @@ function buildE2eSavedItemsResponse(): SavedItemsResponse {
  * Get all saved items for the authenticated user
  */
 export async function getSavedItems(token: string): Promise<SavedItemsResponse> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     return buildE2eSavedItemsResponse()
   }
 
@@ -1077,7 +1146,7 @@ export async function getSavedItems(token: string): Promise<SavedItemsResponse> 
  * Save a product (idempotent - returns existing if already saved)
  */
 export async function saveItem(token: string, productId: string): Promise<SaveItemResponse> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     const existing = e2eSavedItems.find((item) => item.productId === productId)
     if (existing) {
       return {
@@ -1142,7 +1211,7 @@ export async function saveItem(token: string, productId: string): Promise<SaveIt
  * Unsave a product
  */
 export async function unsaveItem(token: string, productId: string): Promise<void> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     e2eSavedItems = e2eSavedItems.filter((item) => item.productId !== productId)
     return
   }
@@ -1166,7 +1235,7 @@ export async function updateSavedItemPrefs(
   productId: string,
   prefs: UpdateSavedItemPrefs
 ): Promise<SavedItem> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     const existing = e2eSavedItems.find((item) => item.productId === productId)
     if (!existing) {
       throw new Error('Saved item not found')
@@ -1308,7 +1377,7 @@ let e2eGuns: Gun[] = []
  * Get all guns in the user's Gun Locker
  */
 export async function getGunLocker(token: string): Promise<GunLockerResponse> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     return {
       guns: e2eGuns,
       _meta: { count: e2eGuns.length },
@@ -1335,7 +1404,7 @@ export async function addGun(
   caliber: CaliberValue,
   nickname?: string | null
 ): Promise<AddGunResponse> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     const newGun: Gun = {
       id: `e2e-gun-${Date.now()}`,
       caliber,
@@ -1368,7 +1437,7 @@ export async function addGun(
  * Remove a gun from the user's Gun Locker
  */
 export async function removeGun(token: string, gunId: string): Promise<void> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     e2eGuns = e2eGuns.filter((g) => g.id !== gunId)
     return
   }
@@ -1392,7 +1461,7 @@ export async function updateGun(
   gunId: string,
   updates: { nickname?: string | null }
 ): Promise<{ gun: Gun }> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     const gun = e2eGuns.find((g) => g.id === gunId)
     if (!gun) throw new Error('Gun not found')
     if (updates.nickname !== undefined) gun.nickname = updates.nickname
@@ -1421,7 +1490,7 @@ export async function uploadGunImage(
   gunId: string,
   imageDataUrl: string
 ): Promise<{ gun: Gun; message: string }> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     const gun = e2eGuns.find((g) => g.id === gunId)
     if (!gun) throw new Error('Gun not found')
     gun.imageUrl = imageDataUrl
@@ -1449,7 +1518,7 @@ export async function deleteGunImage(
   token: string,
   gunId: string
 ): Promise<{ gun: Gun; message: string }> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     const gun = e2eGuns.find((g) => g.id === gunId)
     if (!gun) throw new Error('Gun not found')
     gun.imageUrl = null
@@ -1551,7 +1620,7 @@ export async function getFirearmAmmoPreferences(
   token: string,
   firearmId: string
 ): Promise<FirearmAmmoPreferencesResponse> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     return {
       groups: [],
       _meta: { firearmId, totalPreferences: 0 },
@@ -1576,7 +1645,7 @@ export async function getFirearmAmmoPreferences(
 export async function getUserAmmoPreferences(
   token: string
 ): Promise<UserAmmoPreferencesResponse> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     return {
       preferences: [],
       _meta: { count: 0 },
@@ -1604,7 +1673,7 @@ export async function addAmmoPreference(
   ammoSkuId: string,
   useCase: AmmoUseCase
 ): Promise<{ preference: AmmoPreference }> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     const preference: AmmoPreference = {
       id: `e2e-pref-${Date.now()}`,
       firearmId,
@@ -1648,7 +1717,7 @@ export async function updateAmmoPreferenceUseCase(
   preferenceId: string,
   newUseCase: AmmoUseCase
 ): Promise<{ preference: AmmoPreference }> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     throw new Error('Not implemented in E2E mode')
   }
 
@@ -1677,7 +1746,7 @@ export async function removeAmmoPreference(
   firearmId: string,
   preferenceId: string
 ): Promise<void> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     return
   }
 
@@ -1702,7 +1771,7 @@ export async function getFirearmCaliber(
   token: string,
   firearmId: string
 ): Promise<{ caliber: string | null }> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     const gun = e2eGuns.find((g) => g.id === firearmId)
     return { caliber: gun?.caliber || null }
   }
@@ -1756,7 +1825,7 @@ export interface PriceCheckParams {
  * Per mobile_price_check_v1_spec.md
  */
 export async function checkPrice(params: PriceCheckParams, token?: string): Promise<PriceCheckResult> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     return {
       classification: 'TYPICAL',
       enteredPricePerRound: params.pricePerRound,
@@ -1824,7 +1893,7 @@ export interface UpcLookupResult {
  * Look up a product by UPC code (for barcode scanning)
  */
 export async function lookupProductByUpc(upc: string): Promise<UpcLookupResult> {
-  if (E2E_TEST_MODE) {
+  if (isE2E) {
     // E2E mock: return a found product for any valid-looking UPC
     if (upc && upc.length >= 8) {
       return {
@@ -1850,5 +1919,91 @@ export async function lookupProductByUpc(upc: string): Promise<UpcLookupResult> 
     throw new Error(error.error || 'Failed to lookup UPC')
   }
 
+  return response.json()
+}
+
+// ============================================
+// Account Deletion API
+// ============================================
+
+/**
+ * Deletion blocker info
+ */
+export interface DeletionBlocker {
+  code: string
+  message: string
+  resolution?: string
+}
+
+/**
+ * Account deletion eligibility status
+ */
+export interface DeletionEligibility {
+  eligible: boolean
+  blockers: DeletionBlocker[]
+  pendingDeletion: {
+    requestedAt: string
+    scheduledFor: string
+  } | null
+}
+
+/**
+ * Check if user can delete their account
+ */
+export async function checkDeletionEligibility(token: string): Promise<DeletionEligibility> {
+  if (isE2E) {
+    return {
+      eligible: true,
+      blockers: [],
+      pendingDeletion: null,
+    }
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/users/me/deletion-eligibility`, {
+    headers: buildAuthHeaders(token),
+  })
+
+  await handleAuthResponse(response, 'Failed to check deletion eligibility')
+  return response.json()
+}
+
+/**
+ * Request account deletion (14-day cooling-off period)
+ */
+export async function requestAccountDeletion(
+  token: string,
+  confirmation: string
+): Promise<{ message: string; scheduledFor: string }> {
+  if (isE2E) {
+    return {
+      message: 'Account deletion scheduled',
+      scheduledFor: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    }
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/users/me/delete`, {
+    method: 'POST',
+    headers: buildAuthHeaders(token),
+    body: JSON.stringify({ confirmation }),
+  })
+
+  await handleAuthResponse(response, 'Failed to request account deletion')
+  return response.json()
+}
+
+/**
+ * Cancel pending account deletion
+ */
+export async function cancelAccountDeletion(token: string): Promise<{ message: string }> {
+  if (isE2E) {
+    return { message: 'Deletion cancelled' }
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/users/me/cancel-deletion`, {
+    method: 'POST',
+    headers: buildAuthHeaders(token),
+  })
+
+  await handleAuthResponse(response, 'Failed to cancel account deletion')
   return response.json()
 }
