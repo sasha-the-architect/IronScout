@@ -3,7 +3,8 @@ import { loggers } from '../config/logger'
 
 const log = loggers.email
 const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM_EMAIL = process.env.FROM_EMAIL || 'alerts@ironscout.ai'
+// All apps use EMAIL_FROM for consistency
+const FROM_EMAIL = process.env.EMAIL_FROM || 'IronScout <noreply@ironscout.ai>'
 
 interface PriceDropEmailData {
   userName: string

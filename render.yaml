@@ -105,14 +105,13 @@ services:
       - fromGroup: ironscout-stripe
       - fromGroup: ironscout-slack
       - fromGroup: ironscout-openai
+      - fromGroup: ironscout-email
       - key: PORT
         value: 8000
       - key: DATABASE_URL
         fromDatabase:
           name: ironscout-db
           property: connectionString
-      - key: FROM_EMAIL
-        sync: false
 
   # --------------------------------------------------------------------------
   # Next.js Web Frontend
@@ -223,9 +222,8 @@ services:
 #     - fromGroup: ironscout-secrets
 #     - fromGroup: ironscout-redis
 #     - fromGroup: ironscout-slack
+#     - fromGroup: ironscout-email
 #     - key: DATABASE_URL
 #       fromDatabase:
 #         name: ironscout-db
 #         property: connectionString
-#     - key: FROM_EMAIL
-#       sync: false
