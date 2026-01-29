@@ -1,4 +1,4 @@
-# Spec: Scraper Framework v0.4
+# Spec: Scraper Framework v0.5
 
 **Status:** Draft (Decisions Resolved, All Feedback Incorporated)
 **Owner:** Engineering (Harvester)
@@ -120,6 +120,9 @@ Unlike traditional crawlers that discover URLs via pagination, this framework sc
 | 13 | robots_path_blocked Semantics | FALSE=inherit (default), TRUE=block this URL (admin override) |
 | 14 | User-Agent | Required header: `IronScout/1.0 (+url; email)` |
 | 15 | Manual Enqueue | Subject to same backpressure/gates; force-enqueue capped at 10 URLs |
+| 16 | Availability → inStock | IN_STOCK→true, OUT_OF_STOCK/BACKORDER→false (affects alerts) |
+| 17 | source_product_id Precedence | Explicit link takes precedence over identityKey; mismatch logs warning |
+| 18 | robots_compliant Gate | Second hard gate after scrape_enabled; auto-set by robots.txt policy |
 
 ---
 
@@ -839,30 +842,94 @@ ALTER TABLE source_products
   UNIQUE (source_id, identity_key);
 ```
 
-**Writer Upsert Rule:**
-The scrape writer MUST use upsert semantics:
+**source_product_id Precedence Rules:**
+
+When writing a scraped offer, the writer must resolve the target `source_products` record:
 
 ```typescript
-await prisma.source_products.upsert({
-  where: {
-    source_id_identity_key: {
-      sourceId: offer.sourceId,
-      identityKey: offer.identityKey,
+/**
+ * Resolve source_product for a scraped offer.
+ *
+ * PRECEDENCE:
+ * 1. If scrape_targets.source_product_id is set → use it directly (price refresh)
+ * 2. Otherwise → upsert by (source_id, identity_key)
+ *
+ * RECONCILIATION:
+ * - If source_product_id is set AND identityKey differs from existing record:
+ *   - Log warning (potential data drift)
+ *   - Use source_product_id (it was explicitly linked)
+ *   - DO NOT update the existing record's identityKey
+ */
+async function resolveSourceProduct(
+  offer: ScrapedOffer,
+  target: ScrapeTarget
+): Promise<string> {
+  // Case 1: Explicit source_product_id (price refresh scenario)
+  if (target.sourceProductId) {
+    const existing = await prisma.source_products.findUnique({
+      where: { id: target.sourceProductId }
+    })
+
+    if (!existing) {
+      // source_product was deleted - fall back to upsert
+      log.warn('source_product_id not found, falling back to identityKey upsert', {
+        targetId: target.id,
+        sourceProductId: target.sourceProductId,
+      })
+      return upsertByIdentityKey(offer)
     }
-  },
-  create: { /* full offer data */ },
-  update: {
-    // Update mutable fields only
-    title: offer.title,
-    url: offer.url,
-    brand: offer.brand,
-    // ... other fields
-    updatedAt: new Date(),
-  },
-})
+
+    // Reconciliation check
+    if (existing.identityKey !== offer.identityKey) {
+      log.warn('identityKey mismatch on linked source_product', {
+        targetId: target.id,
+        sourceProductId: target.sourceProductId,
+        existingIdentityKey: existing.identityKey,
+        offerIdentityKey: offer.identityKey,
+      })
+      // Use the linked source_product anyway - explicit link takes precedence
+    }
+
+    return target.sourceProductId
+  }
+
+  // Case 2: No explicit link - upsert by identityKey
+  return upsertByIdentityKey(offer)
+}
 ```
 
-**Rationale:** Without this constraint, duplicate offers from the same source accumulate across runs. The `identityKey` (see Appendix B) provides stable identity; upsert ensures we update existing records rather than creating duplicates.
+**Writer Upsert Rule (identityKey path):**
+
+When no `source_product_id` is set, the scrape writer MUST use upsert semantics:
+
+```typescript
+async function upsertByIdentityKey(offer: ScrapedOffer): Promise<string> {
+  const result = await prisma.source_products.upsert({
+    where: {
+      source_id_identity_key: {
+        sourceId: offer.sourceId,
+        identityKey: offer.identityKey,
+      }
+    },
+    create: { /* full offer data */ },
+    update: {
+      // Update mutable fields only
+      title: offer.title,
+      url: offer.url,
+      brand: offer.brand,
+      // ... other fields
+      updatedAt: new Date(),
+    },
+  })
+  return result.id
+}
+```
+
+**Rationale:**
+- `source_product_id` is set when refreshing prices for known products (e.g., imported from affiliate feed)
+- `identityKey` upsert is the default for new URL scraping
+- Explicit links take precedence to avoid breaking existing product associations
+- Reconciliation warnings surface drift without breaking the flow
 
 ### 9.3 scrape_runs Table
 
@@ -960,7 +1027,11 @@ ALTER TABLE sources ADD COLUMN IF NOT EXISTS scrape_enabled BOOLEAN NOT NULL DEF
 -- Domain-level compliance (moved from scrape_targets)
 ALTER TABLE sources ADD COLUMN IF NOT EXISTS tos_reviewed_at TIMESTAMPTZ;
 ALTER TABLE sources ADD COLUMN IF NOT EXISTS tos_approved_by TEXT;
-ALTER TABLE sources ADD COLUMN IF NOT EXISTS robots_compliant BOOLEAN DEFAULT TRUE;
+
+-- ROBOTS COMPLIANCE GATE: robots_compliant must be TRUE for scraping to proceed
+-- Default TRUE = assume compliant until robots.txt check fails
+-- Set to FALSE when: robots.txt blocks us, or legal review prohibits scraping
+ALTER TABLE sources ADD COLUMN IF NOT EXISTS robots_compliant BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- Composite unique constraint for adapter_id validation from scrape_targets
 -- Required for the foreign key in scrape_targets(source_id, adapter_id)
@@ -981,6 +1052,29 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_id_adapter_id
 2. `sources.scrape_enabled = TRUE` → URLs may be scraped (subject to target-level checks)
 3. Scheduler MUST filter by `sources.scrape_enabled = TRUE` before querying scrape_targets
 4. This is the "allowlist" gate referenced throughout the spec
+
+**robots_compliant Gating Rules:**
+1. `sources.robots_compliant = FALSE` → No URLs from this source are ever scraped
+2. `sources.robots_compliant = TRUE` → URLs may be scraped (subject to live robots.txt check)
+3. Scheduler MUST filter by `sources.robots_compliant = TRUE` in addition to `scrape_enabled`
+4. Set to FALSE automatically when:
+   - robots.txt returns Disallow for all our paths after 3 consecutive checks
+   - Legal review determines we cannot scrape this domain
+5. Set to TRUE automatically when:
+   - robots.txt fetch succeeds and allows our User-Agent
+6. Can be manually overridden by admin (requires audit log entry)
+
+**Combined Gate (Scheduler Query):**
+```sql
+SELECT t.*
+FROM scrape_targets t
+JOIN sources s ON t.source_id = s.id
+WHERE s.scrape_enabled = TRUE        -- Admin allowlist
+  AND s.robots_compliant = TRUE      -- Robots/legal compliance
+  AND t.enabled = TRUE               -- Target-level toggle
+  AND t.status = 'ACTIVE'            -- Not broken/paused/stale
+  AND (t.schedule IS NULL OR cron_is_due(t.schedule, t.last_scraped_at))
+```
 
 **Rationale:** ToS and robots.txt are domain-level concerns. Storing at source level (not URL level) prevents:
 - Inconsistent approvals across URLs for same domain
@@ -1016,7 +1110,8 @@ export interface ScrapeUrlJobData {
 ```
 Scheduler/Trigger
        │
-       ├── Query sources WHERE scrape_enabled = TRUE (allowlist gate)
+       ├── Query sources WHERE scrape_enabled = TRUE AND robots_compliant = TRUE
+       │   (both gates must pass - see §9.5 Combined Gate)
        ├── Join scrape_targets WHERE enabled = TRUE AND status = 'ACTIVE'
        ├── Filter by schedule (cron in UTC) and last_scraped_at
        ├── Create scrape_runs record (with source_id, retailer_id)
@@ -1042,12 +1137,14 @@ SCRAPE_URL Worker
        │   ├── Validate offer (fail-closed on missing required fields)
        │   │
        │   ├── If valid:
-       │   │   ├── Write source_products record
+       │   │   ├── Resolve source_product (see §9.2 precedence rules)
+       │   │   ├── Write source_products record (upsert by identityKey)
        │   │   ├── Write source_product_identifiers records
        │   │   ├── Write prices record (ADR-015 compliant):
        │   │   │   - ingestionRunType = 'SCRAPE'
        │   │   │   - ingestionRunId = runId
        │   │   │   - observedAt = offer.observedAt
+       │   │   │   - inStock = mapAvailability(offer.availability)
        │   │   ├── Enqueue resolver job
        │   │   └── Reset consecutive_failures on target
        │   │
@@ -1067,8 +1164,42 @@ SCRAPE_URL Worker
 - `ingestionRunType = 'SCRAPE'`
 - `ingestionRunId = scrape_runs.id`
 - `observedAt` from the offer
+- `inStock` mapped from availability (see below)
 
 This enables the price corrections overlay to work correctly and ensures scraped prices are excluded from consumer queries until explicitly enabled.
+
+**Availability to inStock Mapping:**
+
+The `prices.inStock` boolean is derived from `offer.availability` using this canonical mapping:
+
+```typescript
+/**
+ * Map scraped availability to prices.inStock boolean.
+ * This affects alerts and visibility logic.
+ *
+ * IMPORTANT: UNKNOWN availability is dropped before this point (fail-closed).
+ * This function only handles valid availability values.
+ */
+function mapAvailability(availability: Availability): boolean {
+  switch (availability) {
+    case 'IN_STOCK':
+      return true
+    case 'OUT_OF_STOCK':
+      return false
+    case 'BACKORDER':
+      return false  // Treat as unavailable for alert/visibility purposes
+    case 'UNKNOWN':
+      // Should never reach here - UNKNOWN is dropped in validation
+      throw new Error('UNKNOWN availability should be dropped before price write')
+  }
+}
+```
+
+**Rationale:**
+- `IN_STOCK` → `true`: Product available for immediate purchase
+- `OUT_OF_STOCK` → `false`: Product not available
+- `BACKORDER` → `false`: Treat as unavailable for alerts (user can't buy immediately)
+- Alerts trigger on `inStock` transitions, so this mapping determines alert behavior
 
 ---
 
@@ -1282,7 +1413,8 @@ apps/harvester/src/scraper/
 - [ ] SCRAPE runs excluded from all consumer queries (audited)
 - [ ] Metrics emitted for all key operations
 - [ ] Queue rejects new URLs when at capacity
-- [ ] Scheduler only queries sources with `scrape_enabled=TRUE`
+- [ ] Scheduler only queries sources with `scrape_enabled=TRUE AND robots_compliant=TRUE`
+- [ ] robots_compliant auto-updates based on robots.txt policy (3 consecutive blocks → FALSE)
 - [ ] Scheduler respects `enabled` and `status` precedence rules
 - [ ] Cron schedules interpreted as UTC
 - [ ] scrape_targets.adapter_id validated against sources.adapter_id
