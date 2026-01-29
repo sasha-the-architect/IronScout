@@ -22,13 +22,30 @@ import { logger } from './logger';
 
 // JWT secret for merchant portal tokens
 // CRITICAL: At least one of these must be set in production
-const jwtSecretString = process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
-if (!jwtSecretString && process.env.NODE_ENV === 'production') {
-  throw new Error('CRITICAL: No JWT secret configured. Set MERCHANT_JWT_SECRET, JWT_SECRET, or NEXTAUTH_SECRET in production.');
+// Note: We defer the check to runtime to allow builds without env vars
+function getJwtSecret(): Uint8Array {
+  const jwtSecretString = process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!jwtSecretString) {
+    // During Next.js build phase, env vars may not be available - use placeholder
+    // NEXT_PHASE is set to 'phase-production-build' during `next build`
+    const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+    if (process.env.NODE_ENV === 'production' && !isBuildPhase) {
+      throw new Error('CRITICAL: No JWT secret configured. Set MERCHANT_JWT_SECRET, JWT_SECRET, or NEXTAUTH_SECRET in production.');
+    }
+    // Dev/build fallback
+    return new TextEncoder().encode('dev-only-merchant-secret-not-for-production');
+  }
+  return new TextEncoder().encode(jwtSecretString);
 }
-const JWT_SECRET = new TextEncoder().encode(
-  jwtSecretString || 'dev-only-merchant-secret-not-for-production'
-);
+
+// Lazy-loaded to avoid build-time errors
+let _jwtSecret: Uint8Array | null = null;
+function getJWT_SECRET(): Uint8Array {
+  if (!_jwtSecret) {
+    _jwtSecret = getJwtSecret();
+  }
+  return _jwtSecret;
+}
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .split(',')
@@ -203,13 +220,13 @@ export async function createMerchantToken(merchantUser: MerchantUserWithMerchant
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .sign(JWT_SECRET);
+    .sign(getJWT_SECRET());
 }
 
 export async function verifyMerchantToken(token: string): Promise<MerchantSession | null> {
   try {
     logger.debug('Verifying merchant JWT token');
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, getJWT_SECRET());
 
     const merchantUserId = payload.merchantUserId as string;
     const merchantId = payload.merchantId as string;
