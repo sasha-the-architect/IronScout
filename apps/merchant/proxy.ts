@@ -2,21 +2,17 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-// JWT secret for merchant portal tokens
-// Uses MERCHANT_JWT_SECRET, JWT_SECRET, or NEXTAUTH_SECRET
-// If none are set, auth will fail gracefully (JWT verification will reject)
-const jwtSecretString = process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+// All apps use NEXTAUTH_SECRET as the single JWT secret
+const jwtSecretString = process.env.NEXTAUTH_SECRET;
 if (!jwtSecretString && process.env.NODE_ENV === 'production') {
-  console.warn('[merchant-proxy] WARNING: No JWT secret configured. Auth will fail.');
+  console.warn('[merchant-proxy] WARNING: NEXTAUTH_SECRET not configured. Auth will fail.');
 }
 const JWT_SECRET = new TextEncoder().encode(
-  jwtSecretString || 'unconfigured-secret-auth-will-fail'
+  jwtSecretString || 'dev-only-secret-not-for-production'
 );
 
-// Admin impersonation token secret (same as main app)
-const ADMIN_IMPERSONATION_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-only-admin-secret'
-);
+// Admin impersonation uses the same secret
+const ADMIN_IMPERSONATION_SECRET = JWT_SECRET;
 
 const SESSION_COOKIE = 'merchant-session';
 const IMPERSONATION_COOKIE = 'merchant-impersonation-token';

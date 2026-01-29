@@ -20,18 +20,13 @@ import { logger } from './logger';
 // Configuration
 // =============================================
 
-// JWT secret for merchant portal tokens
-// Uses MERCHANT_JWT_SECRET, JWT_SECRET, or NEXTAUTH_SECRET
-// If none are set, auth will fail gracefully (JWT verification will reject)
+// All apps use NEXTAUTH_SECRET as the single JWT secret
 function getJwtSecret(): Uint8Array {
-  const jwtSecretString = process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
-  if (!jwtSecretString) {
-    if (process.env.NODE_ENV === 'production') {
-      console.warn('[merchant-auth] WARNING: No JWT secret configured. Auth will fail.');
-    }
-    return new TextEncoder().encode('unconfigured-secret-auth-will-fail');
+  const jwtSecretString = process.env.NEXTAUTH_SECRET;
+  if (!jwtSecretString && process.env.NODE_ENV === 'production') {
+    console.warn('[merchant-auth] WARNING: NEXTAUTH_SECRET not configured. Auth will fail.');
   }
-  return new TextEncoder().encode(jwtSecretString);
+  return new TextEncoder().encode(jwtSecretString || 'dev-only-secret-not-for-production');
 }
 
 // Lazy-loaded to avoid build-time errors

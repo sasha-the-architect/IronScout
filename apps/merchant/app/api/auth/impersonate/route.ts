@@ -6,8 +6,9 @@ import { loggers } from '@/lib/logger';
 // Force dynamic rendering - this route uses cookies for auth
 export const dynamic = 'force-dynamic';
 
-const MERCHANT_JWT_SECRET = new TextEncoder().encode(
-  process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'merchant-secret-change-me'
+// All apps use NEXTAUTH_SECRET as the single JWT secret
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.NEXTAUTH_SECRET || 'dev-only-secret-not-for-production'
 );
 
 // Get the base URL for redirects
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Verify the impersonation token
-    const { payload } = await jwtVerify(token, MERCHANT_JWT_SECRET);
+    const { payload } = await jwtVerify(token, JWT_SECRET);
 
     // Check if this is an impersonation token
     if (!payload.isImpersonating) {
@@ -107,7 +108,7 @@ export async function GET(request: NextRequest) {
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('4h')
-      .sign(MERCHANT_JWT_SECRET);
+      .sign(JWT_SECRET);
 
     loggers.auth.info('Impersonation success', {
       merchantEmail: merchantUser.email,

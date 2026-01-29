@@ -28,11 +28,11 @@ const log = loggers.auth
 
 const router: RouterType = Router()
 
-// JWT secret - must be set in environment
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+// All apps use NEXTAUTH_SECRET as the single JWT secret
+const JWT_SECRET = process.env.NEXTAUTH_SECRET
 if (!JWT_SECRET) {
   // SECURITY: Fail fast - server cannot function without JWT secret
-  throw new Error('FATAL: JWT_SECRET or NEXTAUTH_SECRET environment variable is required for authentication')
+  throw new Error('FATAL: NEXTAUTH_SECRET environment variable is required for authentication')
 }
 
 // Admin emails - must use OAuth, not credentials

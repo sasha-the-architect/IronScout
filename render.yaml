@@ -37,7 +37,7 @@ envVarGroups:
 
   - name: ironscout-secrets
     envVars:
-      - key: JWT_SECRET
+      - key: NEXTAUTH_SECRET
         sync: false
       - key: RESEND_API_KEY
         sync: false
@@ -179,8 +179,6 @@ services:
         fromDatabase:
           name: ironscout-db
           property: connectionString
-      - key: NEXTAUTH_SECRET
-        sync: false
 
   # --------------------------------------------------------------------------
   # Marketing Site (static) - www.ironscout.ai

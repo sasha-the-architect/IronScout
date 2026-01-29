@@ -23,7 +23,8 @@ const log = logger.child('users')
 
 const router: RouterType = Router()
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+// All apps use NEXTAUTH_SECRET as the single JWT secret
+const JWT_SECRET = process.env.NEXTAUTH_SECRET
 
 // ============================================================================
 // MIDDLEWARE

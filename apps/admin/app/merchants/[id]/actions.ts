@@ -560,8 +560,9 @@ export async function resendVerificationEmail(merchantId: string) {
 // Admin Impersonation
 // =============================================================================
 
-const MERCHANT_JWT_SECRET = new TextEncoder().encode(
-  process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'merchant-secret-change-me'
+// All apps use NEXTAUTH_SECRET as the single JWT secret
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.NEXTAUTH_SECRET || 'dev-only-secret-not-for-production'
 );
 
 export async function impersonateMerchant(merchantId: string) {
@@ -601,7 +602,7 @@ export async function impersonateMerchant(merchantId: string) {
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('5m') // Short expiry - only used for initial redirect
-      .sign(MERCHANT_JWT_SECRET);
+      .sign(JWT_SECRET);
 
     // Log the impersonation action
     await logAdminAction(session.userId, 'IMPERSONATE_MERCHANT', {

@@ -7,14 +7,11 @@ import { loggers } from '../config/logger'
 
 const log = loggers.auth
 
-/**
- * JWT secret for verifying tokens.
- * NextAuth uses NEXTAUTH_SECRET, but we also support JWT_SECRET for flexibility.
- */
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+// All apps use NEXTAUTH_SECRET as the single JWT secret
+const JWT_SECRET = process.env.NEXTAUTH_SECRET
 
 if (!JWT_SECRET) {
-  log.warn('JWT_SECRET/NEXTAUTH_SECRET not set - JWT verification will fail')
+  log.warn('NEXTAUTH_SECRET not set - JWT verification will fail')
 }
 
 /**
