@@ -1138,7 +1138,7 @@ SCRAPE_URL Worker
        │   │
        │   ├── If valid:
        │   │   ├── Resolve source_product (see §9.2 precedence rules)
-       │   │   ├── Write source_products record (upsert by identityKey)
+       │   │   ├── Write/update resolved source_product (upsert by identityKey only if no source_product_id)
        │   │   ├── Write source_product_identifiers records
        │   │   ├── Write prices record (ADR-015 compliant):
        │   │   │   - ingestionRunType = 'SCRAPE'

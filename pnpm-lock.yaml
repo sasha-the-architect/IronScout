@@ -87,8 +87,8 @@ importers:
         specifier: ^1.17.0
         version: 1.17.0
       stripe:
-        specifier: ^20.2.0
-        version: 20.2.0(@types/node@25.0.10)
+        specifier: ^20.3.0
+        version: 20.3.0(@types/node@25.0.10)
       tailwind-merge:
         specifier: ^3.4.0
         version: 3.4.0
@@ -122,7 +122,7 @@ importers:
         version: 9.39.2(jiti@2.6.1)
       eslint-config-next:
         specifier: ^16.1.4
-        version: 16.1.4(@typescript-eslint/parser@8.53.1(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
+        version: 16.1.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       eslint-plugin-react:
         specifier: ^7.37.5
         version: 7.37.5(eslint@9.39.2(jiti@2.6.1))
@@ -190,8 +190,8 @@ importers:
         specifier: ^6.8.0
         version: 6.8.0(@react-email/render@1.1.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
       stripe:
-        specifier: ^20.2.0
-        version: 20.2.0(@types/node@25.0.10)
+        specifier: ^20.3.0
+        version: 20.3.0(@types/node@25.0.10)
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -520,8 +520,8 @@ importers:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       stripe:
-        specifier: ^20.2.0
-        version: 20.2.0(@types/node@25.0.10)
+        specifier: ^20.3.0
+        version: 20.3.0(@types/node@25.0.10)
       tailwind-merge:
         specifier: ^3.4.0
         version: 3.4.0
@@ -561,7 +561,7 @@ importers:
         version: 9.39.2(jiti@2.6.1)
       eslint-config-next:
         specifier: ^16.1.4
-        version: 16.1.4(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
+        version: 16.1.4(@typescript-eslint/parser@8.53.1(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       eslint-plugin-react:
         specifier: ^7.37.5
         version: 7.37.5(eslint@9.39.2(jiti@2.6.1))
@@ -5442,8 +5442,8 @@ packages:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
 
-  stripe@20.2.0:
-    resolution: {integrity: sha512-m8niTfdm3nPP/yQswRWMwQxqEUcTtB3RTJQ9oo6NINDzgi7aPOadsH/fPXIIfL1Sc5+lqQFKSk7WiO6CXmvaeA==}
+  stripe@20.3.0:
+    resolution: {integrity: sha512-DYzcmV1MfYhycr1GwjCjeQVYk9Gu8dpxyTlu7qeDCsuguug7oUTxPsUQuZeSf/OPzK7pofqobvOKVqAwlpgf/Q==}
     engines: {node: '>=16'}
     peerDependencies:
       '@types/node': '>=16'
@@ -11138,9 +11138,7 @@ snapshots:
 
   strip-json-comments@3.1.1: {}
 
-  stripe@20.2.0(@types/node@25.0.10):
-    dependencies:
-      qs: 6.14.1
+  stripe@20.3.0(@types/node@25.0.10):
     optionalDependencies:
       '@types/node': 25.0.10
 
