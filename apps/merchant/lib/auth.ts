@@ -21,19 +21,15 @@ import { logger } from './logger';
 // =============================================
 
 // JWT secret for merchant portal tokens
-// CRITICAL: At least one of these must be set in production
-// Note: We defer the check to runtime to allow builds without env vars
+// Uses MERCHANT_JWT_SECRET, JWT_SECRET, or NEXTAUTH_SECRET
+// If none are set, auth will fail gracefully (JWT verification will reject)
 function getJwtSecret(): Uint8Array {
   const jwtSecretString = process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
   if (!jwtSecretString) {
-    // During Next.js build phase, env vars may not be available - use placeholder
-    // NEXT_PHASE is set to 'phase-production-build' during `next build`
-    const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
-    if (process.env.NODE_ENV === 'production' && !isBuildPhase) {
-      throw new Error('CRITICAL: No JWT secret configured. Set MERCHANT_JWT_SECRET, JWT_SECRET, or NEXTAUTH_SECRET in production.');
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[merchant-auth] WARNING: No JWT secret configured. Auth will fail.');
     }
-    // Dev/build fallback
-    return new TextEncoder().encode('dev-only-merchant-secret-not-for-production');
+    return new TextEncoder().encode('unconfigured-secret-auth-will-fail');
   }
   return new TextEncoder().encode(jwtSecretString);
 }

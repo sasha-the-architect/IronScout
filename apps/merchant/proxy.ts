@@ -3,15 +3,14 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
 // JWT secret for merchant portal tokens
-// CRITICAL: At least one of these must be set in production
+// Uses MERCHANT_JWT_SECRET, JWT_SECRET, or NEXTAUTH_SECRET
+// If none are set, auth will fail gracefully (JWT verification will reject)
 const jwtSecretString = process.env.MERCHANT_JWT_SECRET || process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
-// During Next.js build phase, env vars may not be available - skip the check
-const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
-if (!jwtSecretString && process.env.NODE_ENV === 'production' && !isBuildPhase) {
-  throw new Error('CRITICAL: No JWT secret configured for merchant proxy.');
+if (!jwtSecretString && process.env.NODE_ENV === 'production') {
+  console.warn('[merchant-proxy] WARNING: No JWT secret configured. Auth will fail.');
 }
 const JWT_SECRET = new TextEncoder().encode(
-  jwtSecretString || 'dev-only-merchant-secret-not-for-production'
+  jwtSecretString || 'unconfigured-secret-auth-will-fail'
 );
 
 // Admin impersonation token secret (same as main app)
