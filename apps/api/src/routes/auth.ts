@@ -31,8 +31,7 @@ const router: RouterType = Router()
 // All apps use NEXTAUTH_SECRET as the single JWT secret
 const JWT_SECRET = process.env.NEXTAUTH_SECRET
 if (!JWT_SECRET) {
-  // SECURITY: Fail fast - server cannot function without JWT secret
-  throw new Error('FATAL: NEXTAUTH_SECRET environment variable is required for authentication')
+  log.warn('NEXTAUTH_SECRET not set - auth endpoints will fail')
 }
 
 // Admin emails - must use OAuth, not credentials
