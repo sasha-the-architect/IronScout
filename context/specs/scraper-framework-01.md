@@ -1,6 +1,6 @@
-# Spec: Scraper Framework v0.3
+# Spec: Scraper Framework v0.4
 
-**Status:** Draft (Decisions Resolved, Feedback Incorporated)
+**Status:** Draft (Decisions Resolved, All Feedback Incorporated)
 **Owner:** Engineering (Harvester)
 **Created:** 2026-01-29
 **Updated:** 2026-01-29
@@ -107,12 +107,19 @@ Unlike traditional crawlers that discover URLs via pagination, this framework sc
 |---|----------|------------|
 | 1 | URL/Allowlist Storage | Database table (`scrape_targets`) |
 | 2 | First Retailer | SGAmmo |
-| 3 | Rate Limit Default | Conservative: 0.5 req/sec |
+| 3 | Rate Limit Default | Conservative: 0.5 req/sec, Redis-backed (eTLD+1 scoped) |
 | 4 | Drift Thresholds | 50% failure, 2 consecutive batches, min 20 URLs |
 | 5 | Crawling Library | fetch + cheerio, pluggable fetcher interface |
 | 6 | JS Rendering | Defer until needed |
 | 7 | Backpressure | Block/reject with retry-after + 24h max-age |
 | 8 | Price Format | Cents (integer) internally, Decimal(10,2) on write |
+| 9 | Source Allowlist Gate | `sources.scrape_enabled` boolean (hard gate, default FALSE) |
+| 10 | adapter_id Consistency | FK constraint ensures scrape_targets.adapter_id matches sources.adapter_id |
+| 11 | Status vs Enabled Precedence | enabled=FALSE → skip; enabled=TRUE AND status=ACTIVE → scrape |
+| 12 | Cron Timezone | UTC (all schedules interpreted in UTC, no DST) |
+| 13 | robots_path_blocked Semantics | FALSE=inherit (default), TRUE=block this URL (admin override) |
+| 14 | User-Agent | Required header: `IronScout/1.0 (+url; email)` |
+| 15 | Manual Enqueue | Subject to same backpressure/gates; force-enqueue capped at 10 URLs |
 
 ---
 
@@ -329,9 +336,20 @@ export interface FetchOptions {
   /** Maximum response size in bytes (default: 10MB) */
   maxSizeBytes?: number
 
-  /** Custom headers */
+  /** Custom headers (merged with defaults) */
   headers?: Record<string, string>
 }
+
+/**
+ * Default headers for all HTTP requests.
+ * REQUIRED: User-Agent identifies the bot with contact info.
+ * Sites may block requests without proper identification.
+ */
+export const DEFAULT_FETCH_HEADERS = {
+  'User-Agent': 'IronScout/1.0 (+https://ironscout.ai/bot; bot@ironscout.ai)',
+  'Accept': 'text/html,application/xhtml+xml',
+  'Accept-Language': 'en-US,en;q=0.9',
+} as const
 
 export interface FetchResult {
   status: 'ok' | 'error' | 'blocked' | 'timeout' | 'too_large' | 'robots_blocked'
@@ -686,7 +704,7 @@ export interface EnqueueResult {
   retryAfterMs?: number
 
   /** Reason for rejection */
-  reason?: 'queue_full' | 'adapter_disabled' | 'rate_limited'
+  reason?: 'queue_full' | 'adapter_disabled' | 'rate_limited' | 'source_disabled'
 }
 ```
 
@@ -701,6 +719,15 @@ When the scheduler attempts to enqueue URLs and receives rejections:
 2. If consecutive scheduling cycles rejected: exponential backoff (2x, max 1 hour)
 3. Track `schedulerBackoffUntil` timestamp; skip scheduling until then
 4. Alert if backoff exceeds 30 minutes (indicates persistent capacity issue)
+
+**Manual/Admin Enqueue Backpressure:**
+Admin portal and API manual enqueue endpoints follow the same rules:
+1. Check queue capacity before accepting enqueue request
+2. If queue full: return HTTP 429 with `Retry-After` header
+3. If source disabled (`scrape_enabled=FALSE`): return HTTP 409 Conflict
+4. If adapter disabled: return HTTP 409 Conflict
+5. Manual enqueues do NOT bypass capacity limits or allowlist gates
+6. Admin can force-enqueue (with explicit flag) only for debugging, capped at 10 URLs
 
 ### 8.3 Stale URL Cleanup
 
@@ -741,17 +768,20 @@ CREATE TABLE scrape_targets (
   source_product_id TEXT REFERENCES source_products(id),
 
   -- Scheduling
-  schedule TEXT,  -- cron expression, e.g., '0 */4 * * *'
+  -- Cron expression in UTC timezone (e.g., '0 */4 * * *' = every 4 hours UTC)
+  -- All schedules are interpreted as UTC to avoid DST ambiguity
+  schedule TEXT,
   priority INTEGER DEFAULT 0,  -- higher = process first
 
-  -- Status
+  -- Status and Enabled (see precedence rules below)
   status TEXT NOT NULL DEFAULT 'ACTIVE',  -- ACTIVE, PAUSED, BROKEN, STALE
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
 
   -- URL-level compliance override (can only BLOCK, never loosen)
-  -- TRUE = inherit from domain policy; FALSE = block this specific URL
-  -- Setting to TRUE does NOT override a domain-level block
-  robots_path_blocked BOOLEAN DEFAULT FALSE,
+  -- FALSE = inherit from domain policy (default)
+  -- TRUE = block this specific URL (admin manually flagged)
+  -- NOTE: Setting to FALSE does NOT override a domain-level robots.txt block
+  robots_path_blocked BOOLEAN NOT NULL DEFAULT FALSE,
 
   -- Tracking
   last_scraped_at TIMESTAMPTZ,
@@ -765,8 +795,26 @@ CREATE TABLE scrape_targets (
   notes TEXT,
 
   -- Unique on canonical URL per source (prevents duplicates via tracking params)
-  UNIQUE(source_id, canonical_url)
+  UNIQUE(source_id, canonical_url),
+
+  -- adapter_id must match the source's adapter_id (enforced by trigger or app logic)
+  -- See constraint definition below
+  CONSTRAINT fk_scrape_targets_adapter_source
+    FOREIGN KEY (source_id, adapter_id)
+    REFERENCES sources(id, adapter_id)
+    DEFERRABLE INITIALLY DEFERRED
 );
+
+-- Status vs Enabled Precedence Rules:
+-- 1. If enabled = FALSE, target is never scraped (explicit admin disable)
+-- 2. If enabled = TRUE but status = PAUSED|BROKEN|STALE, target is not scraped
+-- 3. Only targets with enabled = TRUE AND status = ACTIVE are scraped
+--
+-- Use cases:
+-- - enabled=FALSE: Admin temporarily disables (e.g., retailer complaint)
+-- - status=PAUSED: Programmatic pause (e.g., maintenance window)
+-- - status=BROKEN: Auto-set by drift detection after consecutive failures
+-- - status=STALE: Auto-set when URL hasn't been processed within max age
 
 CREATE INDEX idx_scrape_targets_source ON scrape_targets(source_id);
 CREATE INDEX idx_scrape_targets_adapter ON scrape_targets(adapter_id);
@@ -904,10 +952,21 @@ CREATE TABLE scrape_adapter_status (
 ALTER TABLE sources ADD COLUMN IF NOT EXISTS adapter_id TEXT;
 ALTER TABLE sources ADD COLUMN IF NOT EXISTS scrape_config JSONB DEFAULT '{}';
 
+-- HARD ALLOWLIST GATE: scrape_enabled must be TRUE for any scraping to occur
+-- This is the primary switch that permits scraping for a source
+-- Default FALSE = no scraping until explicitly approved
+ALTER TABLE sources ADD COLUMN IF NOT EXISTS scrape_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Domain-level compliance (moved from scrape_targets)
 ALTER TABLE sources ADD COLUMN IF NOT EXISTS tos_reviewed_at TIMESTAMPTZ;
 ALTER TABLE sources ADD COLUMN IF NOT EXISTS tos_approved_by TEXT;
 ALTER TABLE sources ADD COLUMN IF NOT EXISTS robots_compliant BOOLEAN DEFAULT TRUE;
+
+-- Composite unique constraint for adapter_id validation from scrape_targets
+-- Required for the foreign key in scrape_targets(source_id, adapter_id)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_id_adapter_id
+  ON sources(id, adapter_id)
+  WHERE adapter_id IS NOT NULL;
 
 -- scrape_config schema example:
 -- {
@@ -916,6 +975,12 @@ ALTER TABLE sources ADD COLUMN IF NOT EXISTS robots_compliant BOOLEAN DEFAULT TR
 --   "customHeaders": { "Accept-Language": "en-US" }
 -- }
 ```
+
+**scrape_enabled Gating Rules:**
+1. `sources.scrape_enabled = FALSE` → No URLs from this source are ever scraped
+2. `sources.scrape_enabled = TRUE` → URLs may be scraped (subject to target-level checks)
+3. Scheduler MUST filter by `sources.scrape_enabled = TRUE` before querying scrape_targets
+4. This is the "allowlist" gate referenced throughout the spec
 
 **Rationale:** ToS and robots.txt are domain-level concerns. Storing at source level (not URL level) prevents:
 - Inconsistent approvals across URLs for same domain
@@ -951,9 +1016,11 @@ export interface ScrapeUrlJobData {
 ```
 Scheduler/Trigger
        │
-       ├── Select due scrape_targets
+       ├── Query sources WHERE scrape_enabled = TRUE (allowlist gate)
+       ├── Join scrape_targets WHERE enabled = TRUE AND status = 'ACTIVE'
+       ├── Filter by schedule (cron in UTC) and last_scraped_at
        ├── Create scrape_runs record (with source_id, retailer_id)
-       ├── Enqueue SCRAPE_URL jobs
+       ├── Enqueue SCRAPE_URL jobs (respect backpressure)
        │
        ▼
 SCRAPE_URL Worker
@@ -1136,12 +1203,16 @@ apps/harvester/src/scraper/
 - [ ] Create `scrape_targets` table migration
 - [ ] Create `scrape_runs` table migration
 - [ ] Create `scrape_adapter_status` table migration
-- [ ] Add scraper fields to `sources` table migration
+- [ ] Add scraper fields to `sources` table migration:
+  - [ ] `scrape_enabled` (boolean, default FALSE)
+  - [ ] `adapter_id` (text)
+  - [ ] Composite unique index `(id, adapter_id)` for FK validation
+- [ ] Add FK constraint on scrape_targets `(source_id, adapter_id)` → `sources(id, adapter_id)`
 - [ ] Review SGAmmo ToS
 - [ ] Review SGAmmo robots.txt
 - [ ] Document compliance approval
 
-**Exit criteria:** ToS approved, tables exist, robots.txt policy documented.
+**Exit criteria:** ToS approved, tables exist, FK constraints validated, robots.txt policy documented.
 
 ### Phase 1: Shared Framework
 
@@ -1174,9 +1245,11 @@ apps/harvester/src/scraper/
 
 ### Phase 3: Scale Readiness
 
-- [ ] Admin portal: manage scrape_targets
-- [ ] Admin portal: view scrape_runs
+- [ ] Admin portal: manage scrape_targets (add/remove/pause)
+- [ ] Admin portal: view scrape_runs (with metrics)
 - [ ] Admin portal: enable/disable adapters
+- [ ] Admin portal: toggle `sources.scrape_enabled` (allowlist gate)
+- [ ] Admin portal: manual enqueue with backpressure feedback
 - [ ] Grafana dashboard for scraper metrics
 - [ ] Runbook for drift alerts
 - [ ] Runbook for adapter re-enable
@@ -1200,13 +1273,19 @@ apps/harvester/src/scraper/
 ### Phase 1 Exit
 
 - [ ] Fetcher respects robots.txt (blocked URLs return `robots_blocked`)
+- [ ] Fetcher sends User-Agent header with contact info
 - [ ] Rate limiter enforces 0.5 req/sec default (Redis-backed, global)
+- [ ] Rate limiter scopes by eTLD+1 (not full hostname)
 - [ ] Validator rejects offers missing required fields
 - [ ] Drift detector auto-disables adapter after 2 consecutive failed batches
 - [ ] OOS_NO_PRICE drops are tracked but excluded from drift calculations
 - [ ] SCRAPE runs excluded from all consumer queries (audited)
 - [ ] Metrics emitted for all key operations
 - [ ] Queue rejects new URLs when at capacity
+- [ ] Scheduler only queries sources with `scrape_enabled=TRUE`
+- [ ] Scheduler respects `enabled` and `status` precedence rules
+- [ ] Cron schedules interpreted as UTC
+- [ ] scrape_targets.adapter_id validated against sources.adapter_id
 
 ### Phase 2 Exit
 
