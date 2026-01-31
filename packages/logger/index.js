@@ -404,8 +404,9 @@ function formatPrettyBrowser(entry) {
         : entry.service;
     // Extract known fields
     const { timestamp, level, service, component, message, error, ...meta } = entry;
-    // Format metadata
-    const metaStr = Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : '';
+    // Format metadata with redaction applied (fixes sensitive data leak)
+    const redactedMeta = isRedactionEnabled() ? redactEntry(meta) : meta;
+    const metaStr = Object.keys(redactedMeta).length > 0 ? ` ${JSON.stringify(redactedMeta)}` : '';
     // Build message with %c placeholders for styling
     const formattedMessage = `%c${timestamp} %c${levelStr} %c[${componentPath}] %c${message}${metaStr}`;
     const styles = [
